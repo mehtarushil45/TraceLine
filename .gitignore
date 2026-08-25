@@ -1,0 +1,11 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+data/raw/
+data/processed/
+*.log
+regen_error.txt
+data/validation_run/
+data/validation_enriched/
+gen-fraud-graph/
