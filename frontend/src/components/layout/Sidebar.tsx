@@ -2,16 +2,30 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Activity,
+  Briefcase,
   Layers,
   LayoutDashboard,
   ShieldAlert,
   Users,
 } from 'lucide-react';
 import { getHealth } from '../../api';
+import { getCases, useCaseWatcher } from '../../utils/caseManager';
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
+  const [openCasesCount, setOpenCasesCount] = useState(0);
+
+  const updateCasesCount = () => {
+    const cases = getCases();
+    setOpenCasesCount(cases.filter((c) => c.status !== 'CLOSED').length);
+  };
+
+  useEffect(() => {
+    updateCasesCount();
+    const unsub = useCaseWatcher(updateCasesCount);
+    return unsub;
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,6 +74,13 @@ export const Sidebar: React.FC = () => {
       path: '/transactions',
       icon: Activity,
       match: ['/transactions'],
+    },
+    {
+      label: 'Investigations',
+      path: '/investigations',
+      icon: Briefcase,
+      match: ['/investigations'],
+      badge: openCasesCount > 0 ? openCasesCount.toString() : undefined,
     },
   ];
 
@@ -136,7 +157,7 @@ export const Sidebar: React.FC = () => {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
+                justifyContent: 'space-between',
                 padding: '9px 12px',
                 borderRadius: '6px',
                 fontSize: '13px',
@@ -160,8 +181,25 @@ export const Sidebar: React.FC = () => {
                 }
               }}
             >
-              <Icon size={16} style={{ color: active ? 'var(--accent-cyan)' : 'inherit' }} />
-              {item.label}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Icon size={16} style={{ color: active ? 'var(--accent-cyan)' : 'inherit' }} />
+                <span>{item.label}</span>
+              </div>
+              {item.badge && (
+                <span
+                  style={{
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                    color: '#38bdf8',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  {item.badge}
+                </span>
+              )}
             </Link>
           );
         })}

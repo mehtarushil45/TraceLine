@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  AlertTriangle,
   ArrowLeft,
   Clock,
   Layers,
@@ -22,7 +21,8 @@ import type {
 } from '../types/api';
 import { RiskBadge } from '../components/common/RiskBadge';
 import { RiskScore } from '../components/common/RiskScore';
-import { SignalBadge } from '../components/common/SignalBadge';
+import { AddToInvestigationButton } from '../components/common/AddToInvestigationButton';
+import { EvidencePanel } from '../components/community/EvidencePanel';
 import { FeatureBreakdown } from '../components/community/FeatureBreakdown';
 import { NetworkGraph } from '../components/graph/NetworkGraph';
 import { AccountTable } from '../components/account/AccountTable';
@@ -147,33 +147,43 @@ export const CommunityDetailPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Breadcrumb & Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
-        <button
-          onClick={() => navigate('/communities')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          <ArrowLeft size={14} />
-          Communities
-        </button>
-        <span>/</span>
-        <span className="font-mono text-slate-200">Community #{community.community_id}</span>
+      {/* 1. Breadcrumb & Actions Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+          <button
+            onClick={() => navigate('/communities')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <ArrowLeft size={14} />
+            Back to Communities
+          </button>
+          <span>/</span>
+          <span className="font-mono text-slate-200">Community #{community.community_id}</span>
+        </div>
+
+        <AddToInvestigationButton
+          targetType="COMMUNITY"
+          targetId={community.community_id.toString()}
+          targetLabel={`Community #${community.community_id}`}
+          riskScore={community.risk_score}
+          riskLevel={community.risk_level}
+        />
       </div>
 
-      {/* Main Workspace Header */}
+      {/* 2. Main Workspace Header */}
       <div
         className="dash-card"
         style={{
-          padding: '24px',
+          padding: '24px 28px',
           borderColor: isHigh ? 'rgba(239, 68, 68, 0.4)' : 'var(--border)',
           backgroundColor: isHigh ? 'rgba(239, 68, 68, 0.04)' : 'var(--bg-card)',
           display: 'flex',
@@ -202,7 +212,7 @@ export const CommunityDetailPage: React.FC = () => {
               <RiskBadge level={community.risk_level} size="lg" />
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Louvain Cluster · {community.member_count.toLocaleString()} member accounts · $
+              Louvain Partition Cluster · {community.member_count.toLocaleString()} member accounts · $
               {community.transaction_statistics.total_transaction_amount.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -212,7 +222,7 @@ export const CommunityDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Risk Score Meter */}
+        {/* Risk Score Gauge */}
         <div
           style={{
             padding: '12px 20px',
@@ -225,51 +235,26 @@ export const CommunityDetailPage: React.FC = () => {
           }}
         >
           <div>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Risk Score
             </span>
             <RiskScore
               score={community.risk_score}
-              probability={community.risk_probability}
               level={community.risk_level}
               size="lg"
+              showSubtitle={true}
             />
           </div>
         </div>
       </div>
 
-      {/* Why is this Community Flagged? */}
-      <div
-        className="dash-card"
-        style={{
-          padding: '18px 20px',
-          borderLeft: `4px solid ${isHigh ? '#ef4444' : '#f59e0b'}`,
-          backgroundColor: '#0b1120',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <AlertTriangle size={16} style={{ color: isHigh ? '#ef4444' : '#f59e0b' }} />
-          <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-main)' }}>
-            Why is this community flagged?
-          </span>
-        </div>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-          The machine learning risk baseline identified strong observable anomalies in this cluster’s network structure and transaction patterns:
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
-          <SignalBadge signal={community.top_signal_1} />
-          {community.top_signal_2 && <SignalBadge signal={community.top_signal_2} />}
-          {community.top_signal_3 && <SignalBadge signal={community.top_signal_3} />}
-        </div>
-      </div>
+      {/* 3. "Why is this Community Flagged?" & Investigator Summary */}
+      <EvidencePanel community={community} />
 
-      {/* 4 Feature Families Breakdown */}
+      {/* 4. 4 Feature Families Breakdown (21 Observable Features) */}
       <FeatureBreakdown community={community} />
 
-      {/* Investigation Tabs Header */}
+      {/* 5. Investigation Tabs Header */}
       <div style={{ borderBottom: '1px solid var(--border)', display: 'flex', gap: '16px' }}>
         <button
           onClick={() => setActiveTab('accounts')}
@@ -288,7 +273,7 @@ export const CommunityDetailPage: React.FC = () => {
           }}
         >
           <Users size={16} />
-          Member Accounts ({community.member_count})
+          Member Accounts ({community.member_count.toLocaleString()})
         </button>
 
         <button
@@ -332,11 +317,11 @@ export const CommunityDetailPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Tab 1: Member Accounts Table */}
+      {/* Tab A: Member Accounts Table */}
       {activeTab === 'accounts' && (
         <div className="dash-card">
           {loadingAccounts ? (
-            <LoadingSkeleton type="table" count={5} />
+            <LoadingSkeleton type="table" count={6} />
           ) : (
             <>
               <AccountTable accounts={accounts} />
@@ -352,18 +337,18 @@ export const CommunityDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 2: Interactive Network Graph */}
+      {/* Tab B: Interactive Network Graph */}
       {activeTab === 'graph' && (
         <div>
           {loadingGraph || !graphData ? (
-            <LoadingSkeleton type="graph" height="520px" />
+            <LoadingSkeleton type="graph" height="560px" />
           ) : (
-            <NetworkGraph graphData={graphData} height="560px" />
+            <NetworkGraph graphData={graphData} height="580px" />
           )}
         </div>
       )}
 
-      {/* Tab 3: Chronological Activity Timeline */}
+      {/* Tab C: Chronological Activity Timeline */}
       {activeTab === 'timeline' && (
         <div>
           {loadingTimeline ? (

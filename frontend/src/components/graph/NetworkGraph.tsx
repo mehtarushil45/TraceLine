@@ -262,7 +262,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               outline: 'none',
             }}
           >
-            <option value="cose">Force-Directed</option>
+            <option value="cose">Force-Directed (Cose)</option>
             <option value="concentric">Concentric (Degree)</option>
             <option value="circle">Circular</option>
           </select>
@@ -432,7 +432,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               position: 'absolute',
               top: '12px',
               right: '12px',
-              width: '300px',
+              width: '320px',
               backgroundColor: 'rgba(15, 23, 42, 0.95)',
               backdropFilter: 'blur(8px)',
               border: '1px solid var(--border-light)',
@@ -470,10 +470,10 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
               {selectedEdge.shared_instruments.length > 0 && (
                 <div>
-                  <span style={{ color: 'var(--text-dim)' }}>Shared Instruments ({selectedEdge.shared_instruments.length}):</span>
+                  <span style={{ color: 'var(--text-dim)' }}>Shared Payment Instruments ({selectedEdge.shared_instruments.length}):</span>
                   <div className="font-mono" style={{ color: '#fbbf24', fontSize: '10px' }}>
                     {selectedEdge.shared_instruments.join(', ')}
                   </div>
@@ -495,10 +495,18 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
                   </div>
                 </div>
               )}
-              {selectedEdge.temporal_overlap > 0 && (
+              {selectedEdge.shared_merchants.length > 0 && (
                 <div>
+                  <span style={{ color: 'var(--text-dim)' }}>Shared Merchants ({selectedEdge.shared_merchants.length}):</span>
+                  <div className="font-mono" style={{ color: '#94a3b8', fontSize: '10px' }}>
+                    {selectedEdge.shared_merchants.join(', ')}
+                  </div>
+                </div>
+              )}
+              {selectedEdge.temporal_overlap > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-dim)' }}>Same-Day Temporal Overlap:</span>
-                  <span className="font-mono" style={{ color: '#38bdf8', marginLeft: '6px' }}>
+                  <span className="font-mono font-semibold" style={{ color: '#38bdf8' }}>
                     {selectedEdge.temporal_overlap} days
                   </span>
                 </div>

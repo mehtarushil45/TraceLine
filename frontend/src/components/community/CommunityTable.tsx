@@ -207,7 +207,7 @@ export const CommunityTable: React.FC<CommunityTableProps> = ({ communities }) =
                     </div>
                   </td>
                   <td>
-                    <RiskScore score={comm.risk_score} probability={comm.risk_probability} level={comm.risk_level} size="sm" />
+                    <RiskScore score={comm.risk_score} level={comm.risk_level} size="sm" />
                   </td>
                   <td>
                     <RiskBadge level={comm.risk_level} size="sm" />

@@ -3,18 +3,18 @@ import type { RiskLevel } from '../../types/api';
 
 interface RiskScoreProps {
   score: number;
-  probability?: number;
   level?: RiskLevel | string;
   size?: 'sm' | 'md' | 'lg';
   showBar?: boolean;
+  showSubtitle?: boolean;
 }
 
 export const RiskScore: React.FC<RiskScoreProps> = ({
   score,
-  probability,
   level,
   size = 'md',
   showBar = false,
+  showSubtitle = false,
 }) => {
   const normLevel = level
     ? (level.toUpperCase() as RiskLevel)
@@ -50,11 +50,6 @@ export const RiskScore: React.FC<RiskScoreProps> = ({
         <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
           /100
         </span>
-        {probability !== undefined && size !== 'sm' && (
-          <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginLeft: '4px' }}>
-            ({(probability * 100).toFixed(1)}%)
-          </span>
-        )}
       </div>
 
       {showBar && (
@@ -77,6 +72,12 @@ export const RiskScore: React.FC<RiskScoreProps> = ({
             }}
           />
         </div>
+      )}
+
+      {showSubtitle && (
+        <span style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
+          Model risk score derived from observable network evidence
+        </span>
       )}
     </div>
   );

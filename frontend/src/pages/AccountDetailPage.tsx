@@ -21,6 +21,7 @@ import type {
   TransactionItem,
 } from '../types/api';
 import { RiskBadge } from '../components/common/RiskBadge';
+import { AddToInvestigationButton } from '../components/common/AddToInvestigationButton';
 import { TransactionTable } from '../components/transaction/TransactionTable';
 import { ConnectionsTable } from '../components/account/ConnectionsTable';
 import { Pagination } from '../components/common/Pagination';
@@ -121,26 +122,36 @@ export const AccountDetailPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
-        <button
-          onClick={() => navigate('/accounts')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          <ArrowLeft size={14} />
-          Accounts
-        </button>
-        <span>/</span>
-        <span className="font-mono text-slate-200">{account.account_id}</span>
+      {/* Breadcrumb & Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+          <button
+            onClick={() => navigate('/accounts')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <ArrowLeft size={14} />
+            Accounts
+          </button>
+          <span>/</span>
+          <span className="font-mono text-slate-200">{account.account_id}</span>
+        </div>
+
+        <AddToInvestigationButton
+          targetType="ACCOUNT"
+          targetId={account.account_id}
+          targetLabel={`Account ${account.account_id} (${account.customer_name})`}
+          riskScore={account.account_risk_score !== null ? Math.round(account.account_risk_score * 100) : null}
+          riskLevel={account.community_risk_level}
+        />
       </div>
 
       {/* Account Profile Header Card */}

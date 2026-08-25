@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getTransaction } from '../api';
 import type { TransactionDetailResponse } from '../types/api';
+import { AddToInvestigationButton } from '../components/common/AddToInvestigationButton';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorState } from '../components/common/ErrorState';
 
@@ -53,26 +54,34 @@ export const TransactionDetailPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1000px' }}>
-      {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          <ArrowLeft size={14} />
-          Back
-        </button>
-        <span>/</span>
-        <span className="font-mono text-slate-200">{tx.transaction_id}</span>
+      {/* Breadcrumb & Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <ArrowLeft size={14} />
+            Back
+          </button>
+          <span>/</span>
+          <span className="font-mono text-slate-200">{tx.transaction_id}</span>
+        </div>
+
+        <AddToInvestigationButton
+          targetType="TRANSACTION"
+          targetId={tx.transaction_id}
+          targetLabel={`Transaction ${tx.transaction_id} ($${tx.amount.toFixed(2)})`}
+        />
       </div>
 
       {/* Transaction Top Card */}
