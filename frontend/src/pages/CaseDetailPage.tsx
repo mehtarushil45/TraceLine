@@ -6,6 +6,7 @@ import {
   Briefcase,
   CheckCircle2,
   ExternalLink,
+  FileText,
   Layers,
   Plus,
   Save,
@@ -17,6 +18,7 @@ import type { CasePriority, CaseStatus, InvestigationCase, InvestigationTarget }
 import { deleteCase, getCase, removeTargetFromCase, updateCase, addTargetToCase, useCaseWatcher } from '../utils/caseManager';
 import { RiskBadge } from '../components/common/RiskBadge';
 import { ErrorState } from '../components/common/ErrorState';
+import { SarExportModal } from '../components/layout/SarExportModal';
 
 export const CaseDetailPage: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
@@ -28,6 +30,7 @@ export const CaseDetailPage: React.FC = () => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [savedNotesFeedback, setSavedNotesFeedback] = useState(false);
   const [addTargetInput, setAddTargetInput] = useState('');
+  const [isSarModalOpen, setIsSarModalOpen] = useState(false);
 
   const loadCase = () => {
     if (!caseId) return;
@@ -100,12 +103,18 @@ export const CaseDetailPage: React.FC = () => {
         label: `Transaction ${raw.toLowerCase()}`,
         addedAt: new Date().toISOString(),
       };
-    } else {
-      const num = raw.replace(/^(comm_|community_)/i, '');
+    } else if (!isNaN(Number(raw))) {
       target = {
         type: 'COMMUNITY',
-        id: num,
-        label: `Community #${num}`,
+        id: raw,
+        label: `Community #${raw}`,
+        addedAt: new Date().toISOString(),
+      };
+    } else {
+      target = {
+        type: 'ACCOUNT',
+        id: raw.toLowerCase(),
+        label: `Account ${raw.toLowerCase()}`,
         addedAt: new Date().toISOString(),
       };
     }
@@ -114,46 +123,91 @@ export const CaseDetailPage: React.FC = () => {
     setAddTargetInput('');
   };
 
-  const handleDeleteCase = () => {
-    if (window.confirm(`Are you sure you want to delete "${investigationCase.title}"?`)) {
+  const handleDeleteThisCase = () => {
+    if (window.confirm('Delete this investigation case entirely?')) {
       deleteCase(investigationCase.id);
       navigate('/investigations');
     }
   };
 
-  const communities = investigationCase.targets.filter((t) => t.type === 'COMMUNITY');
-  const accounts = investigationCase.targets.filter((t) => t.type === 'ACCOUNT');
-  const transactions = investigationCase.targets.filter((t) => t.type === 'TRANSACTION');
+  const communityTargets = investigationCase.targets.filter((t) => t.type === 'COMMUNITY');
+  const accountTargets = investigationCase.targets.filter((t) => t.type === 'ACCOUNT');
+  const transactionTargets = investigationCase.targets.filter((t) => t.type === 'TRANSACTION');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px' }}>
-      {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
-        <button
-          onClick={() => navigate('/investigations')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          <ArrowLeft size={14} />
-          Investigation Queue
-        </button>
-        <span>/</span>
-        <span className="font-mono text-slate-200">{investigationCase.id}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* 1. Breadcrumb & Action Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+          <button
+            onClick={() => navigate('/investigations')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <ArrowLeft size={14} />
+            Investigations
+          </button>
+          <span>/</span>
+          <span className="font-mono text-slate-200">{investigationCase.id}</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => setIsSarModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              backgroundColor: '#162447',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
+              color: 'var(--text-main)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <FileText size={13} style={{ color: 'var(--accent-cyan)' }} />
+            <span>Generate SAR</span>
+          </button>
+
+          <button
+            onClick={handleDeleteThisCase}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              backgroundColor: 'rgba(244, 63, 94, 0.1)',
+              border: '1px solid rgba(244, 63, 94, 0.3)',
+              borderRadius: '6px',
+              color: '#fca5a5',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <Trash2 size={13} />
+            <span>Delete Case</span>
+          </button>
+        </div>
       </div>
 
-      {/* Case Header Card */}
+      {/* 2. Case Workspace Header */}
       <div
         className="dash-card"
         style={{
-          padding: '24px',
+          padding: '24px 28px',
+          backgroundColor: '#070d1e',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -161,205 +215,158 @@ export const CaseDetailPage: React.FC = () => {
           gap: '20px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1, minWidth: '300px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1, minWidth: '320px' }}>
           <div
             style={{
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(56, 189, 248, 0.15)',
+              padding: '14px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(0, 240, 255, 0.15)',
+              border: '1px solid rgba(0, 240, 255, 0.3)',
               color: 'var(--accent-cyan)',
+              boxShadow: '0 0 16px rgba(0, 240, 255, 0.2)',
             }}
           >
-            <Briefcase size={28} />
+            <Briefcase size={26} />
           </div>
 
           <div style={{ flex: 1 }}>
             {isEditingTitle ? (
-              <form onSubmit={handleSaveTitle} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <form onSubmit={handleSaveTitle} style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '500px' }}>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  autoFocus
                   style={{
-                    padding: '4px 8px',
-                    backgroundColor: '#080c14',
-                    border: '1px solid var(--border-focus)',
+                    flex: 1,
+                    padding: '6px 12px',
+                    backgroundColor: '#030712',
+                    border: '1px solid var(--accent-cyan)',
                     borderRadius: '4px',
-                    color: 'var(--text-main)',
-                    fontSize: '18px',
+                    color: '#fff',
+                    fontSize: '16px',
                     fontWeight: 700,
                     outline: 'none',
-                    width: '100%',
                   }}
+                  autoFocus
                 />
                 <button
                   type="submit"
                   style={{
-                    padding: '4px 10px',
+                    padding: '6px 12px',
                     backgroundColor: '#0284c7',
                     border: 'none',
                     borderRadius: '4px',
                     color: '#fff',
                     fontSize: '12px',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
                   }}
                 >
                   Save
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingTitle(false)}
-                  style={{
-                    padding: '4px 8px',
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    color: 'var(--text-dim)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
               </form>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h1
-                  onClick={() => setIsEditingTitle(true)}
-                  title="Click to edit title"
-                  style={{
-                    fontSize: '22px',
-                    fontWeight: 800,
-                    color: 'var(--text-main)',
-                    cursor: 'pointer',
-                    letterSpacing: '-0.02em',
-                  }}
-                >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
                   {investigationCase.title}
                 </h1>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)', cursor: 'pointer' }} onClick={() => setIsEditingTitle(true)}>
-                  ✎
-                </span>
+                <button
+                  onClick={() => setIsEditingTitle(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-dim)',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Edit
+                </button>
               </div>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
-              <span className="font-mono">{investigationCase.id}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+              <span className="font-mono text-slate-400">{investigationCase.id}</span>
               <span>·</span>
-              <span>Created {new Date(investigationCase.createdAt).toLocaleDateString()}</span>
+              <span>Created {new Date(investigationCase.createdAt).toLocaleString()}</span>
               <span>·</span>
-              <span>Last updated {new Date(investigationCase.updatedAt).toLocaleTimeString()}</span>
+              <span>Updated {new Date(investigationCase.updatedAt).toLocaleString()}</span>
             </div>
           </div>
         </div>
 
-        {/* Workflow Controls: Status & Priority */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          {/* Priority Select */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Priority Tier
-            </span>
-            <select
-              value={investigationCase.priority}
-              onChange={(e) => handlePriorityChange(e.target.value as CasePriority)}
-              style={{
-                backgroundColor: '#1e293b',
-                border: '1px solid var(--border)',
-                color: 'var(--text-main)',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="HIGH">HIGH Priority</option>
-              <option value="MEDIUM">MEDIUM Priority</option>
-              <option value="LOW">LOW Priority</option>
-            </select>
-          </div>
-
-          {/* Status Workflow Select */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Investigation Status
+        {/* Status & Priority Selectors */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>
+              Status Workflow
             </span>
             <select
               value={investigationCase.status}
               onChange={(e) => handleStatusChange(e.target.value as CaseStatus)}
               style={{
-                backgroundColor:
-                  investigationCase.status === 'OPEN'
-                    ? 'rgba(56, 189, 248, 0.15)'
-                    : investigationCase.status === 'REVIEW'
-                    ? 'rgba(245, 158, 11, 0.15)'
-                    : '#1e293b',
-                border: '1px solid',
-                borderColor:
-                  investigationCase.status === 'OPEN'
-                    ? 'rgba(56, 189, 248, 0.4)'
-                    : investigationCase.status === 'REVIEW'
-                    ? 'rgba(245, 158, 11, 0.4)'
-                    : 'var(--border)',
-                color:
-                  investigationCase.status === 'OPEN'
-                    ? '#7dd3fc'
-                    : investigationCase.status === 'REVIEW'
-                    ? '#fcd34d'
-                    : 'var(--text-muted)',
-                padding: '6px 12px',
+                backgroundColor: '#030712',
+                border: '1px solid var(--border-light)',
                 borderRadius: '6px',
+                color: 'var(--text-main)',
+                padding: '6px 12px',
                 fontSize: '12px',
                 fontWeight: 700,
-                fontFamily: 'var(--font-mono)',
                 outline: 'none',
                 cursor: 'pointer',
               }}
             >
-              <option value="OPEN">OPEN</option>
-              <option value="REVIEW">UNDER REVIEW</option>
-              <option value="CLOSED">CLOSED</option>
+              <option value="OPEN">● OPEN</option>
+              <option value="REVIEW">◐ UNDER REVIEW</option>
+              <option value="CLOSED">○ CLOSED</option>
             </select>
           </div>
 
-          <button
-            onClick={handleDeleteCase}
-            title="Delete Investigation"
-            style={{
-              padding: '8px',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
-              borderRadius: '6px',
-              color: '#f87171',
-              cursor: 'pointer',
-              marginTop: '16px',
-            }}
-          >
-            <Trash2 size={16} />
-          </button>
+          <div>
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>
+              Priority Level
+            </span>
+            <select
+              value={investigationCase.priority}
+              onChange={(e) => handlePriorityChange(e.target.value as CasePriority)}
+              style={{
+                backgroundColor: '#030712',
+                border: '1px solid var(--border-light)',
+                borderRadius: '6px',
+                color: 'var(--text-main)',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="HIGH">HIGH PRIORITY</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="LOW">LOW</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Investigator Notes Section */}
-      <div className="dash-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-main)' }}>
+      {/* 3. Investigator Notes Workspace */}
+      <div className="dash-card" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div>
+            <h3 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f8fafc' }}>
               Investigator Notes
-            </span>
+            </h3>
             <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-              (Observations, cross-entity links, interview notes)
+              Document hypotheses, observable evidence findings, and relationship topology.
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {savedNotesFeedback && (
-              <span className="font-mono text-xs text-emerald-400" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle2 size={12} /> Notes Saved
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#86efac', fontWeight: 600 }}>
+                <CheckCircle2 size={13} />
+                Saved to Local Storage
               </span>
             )}
             <button
@@ -368,13 +375,13 @@ export const CaseDetailPage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '5px 12px',
+                padding: '6px 14px',
                 backgroundColor: '#0284c7',
                 border: 'none',
                 borderRadius: '4px',
                 color: '#fff',
-                fontSize: '11px',
-                fontWeight: 600,
+                fontSize: '12px',
+                fontWeight: 700,
                 cursor: 'pointer',
               }}
             >
@@ -385,55 +392,55 @@ export const CaseDetailPage: React.FC = () => {
         </div>
 
         <textarea
-          rows={4}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. Repeated payment-instrument reuse across several connected accounts. Review transaction timing and account relationships..."
+          placeholder="e.g. 'Cluster #3 accounts exhibit shared hardware fingerprint device_102 and payment card token_99. Coordinate with merchant operations for settlement review...'"
+          rows={5}
           style={{
             width: '100%',
             padding: '12px 14px',
-            backgroundColor: '#080c14',
+            backgroundColor: '#030712',
             border: '1px solid var(--border)',
             borderRadius: '6px',
             color: 'var(--text-main)',
             fontSize: '13px',
+            fontFamily: 'var(--font-sans)',
             lineHeight: 1.5,
             outline: 'none',
-            fontFamily: 'inherit',
             resize: 'vertical',
           }}
         />
       </div>
 
-      {/* Investigation Targets Section */}
-      <div className="dash-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* 4. Investigation Targets & Quick-Attach */}
+      <div className="dash-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-main)' }}>
-              Investigation Targets ({investigationCase.targets.length})
+            <h3 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f8fafc' }}>
+              Attached Targets ({investigationCase.targets.length})
             </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Communities, accounts, and transactions attached to this investigation case.
-            </p>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+              Tracked Communities, Accounts, and Transactions linked to this case.
+            </span>
           </div>
 
-          {/* Quick Add Target Form */}
-          <form onSubmit={handleQuickAddTarget} style={{ display: 'flex', gap: '8px' }}>
+          {/* Quick Add Bar */}
+          <form onSubmit={handleQuickAddTarget} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="text"
               value={addTargetInput}
               onChange={(e) => setAddTargetInput(e.target.value)}
-              placeholder="Attach ID (e.g. 3, acc_100, tx_7517)..."
+              placeholder="Quick attach (e.g. 3, acc_100, tx_7517)..."
               style={{
+                width: '280px',
                 padding: '6px 12px',
-                backgroundColor: '#080c14',
+                backgroundColor: '#030712',
                 border: '1px solid var(--border)',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 color: 'var(--text-main)',
                 fontSize: '12px',
                 fontFamily: 'var(--font-mono)',
                 outline: 'none',
-                width: '240px',
               }}
             />
             <button
@@ -445,7 +452,7 @@ export const CaseDetailPage: React.FC = () => {
                 padding: '6px 12px',
                 backgroundColor: '#1e293b',
                 border: '1px solid var(--border-light)',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 color: 'var(--text-main)',
                 fontSize: '12px',
                 fontWeight: 600,
@@ -458,26 +465,29 @@ export const CaseDetailPage: React.FC = () => {
           </form>
         </div>
 
+        {/* Empty Targets State */}
         {investigationCase.targets.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
-            No targets attached to this case yet. Use the "Add to Investigation" button on any Community, Account, or Transaction page.
+          <div style={{ padding: '30px 20px', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: '6px' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              No targets attached yet. Attach entities via the quick input above or browse Communities/Accounts.
+            </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* 1. Flagged Communities */}
-            {communities.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                  Communities ({communities.length})
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Communities */}
+            {communityTargets.length > 0 && (
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-cyan)', display: 'block', marginBottom: '8px' }}>
+                  Communities ({communityTargets.length})
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-                  {communities.map((t) => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+                  {communityTargets.map((t) => (
                     <div
-                      key={`${t.type}_${t.id}`}
+                      key={t.id}
                       style={{
                         padding: '12px 14px',
                         borderRadius: '6px',
-                        backgroundColor: '#080c14',
+                        backgroundColor: '#070d1e',
                         border: '1px solid var(--border)',
                         display: 'flex',
                         alignItems: 'center',
@@ -485,11 +495,14 @@ export const CaseDetailPage: React.FC = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ padding: '6px', borderRadius: '4px', backgroundColor: '#1e293b', color: 'var(--accent-cyan)' }}>
-                          <Layers size={16} />
-                        </div>
+                        <Layers size={16} style={{ color: 'var(--accent-cyan)' }} />
                         <div>
-                          <span className="font-mono font-bold text-slate-100 text-sm">{t.label}</span>
+                          <Link
+                            to={`/communities/${t.id}`}
+                            style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textDecoration: 'none' }}
+                          >
+                            {t.label}
+                          </Link>
                           {t.riskLevel && (
                             <div style={{ marginTop: '2px' }}>
                               <RiskBadge level={t.riskLevel} size="sm" />
@@ -501,25 +514,13 @@ export const CaseDetailPage: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Link
                           to={`/communities/${t.id}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 8px',
-                            backgroundColor: '#1e293b',
-                            borderRadius: '4px',
-                            color: 'var(--accent-cyan)',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            textDecoration: 'none',
-                          }}
+                          style={{ color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center' }}
                         >
-                          Open <ExternalLink size={11} />
+                          <ExternalLink size={14} />
                         </Link>
                         <button
                           onClick={() => handleRemoveTarget(t)}
-                          title="Remove target"
-                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
                         >
                           <X size={14} />
                         </button>
@@ -530,20 +531,20 @@ export const CaseDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* 2. Target Accounts */}
-            {accounts.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                  Accounts ({accounts.length})
+            {/* Accounts */}
+            {accountTargets.length > 0 && (
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#38bdf8', display: 'block', marginBottom: '8px' }}>
+                  Accounts ({accountTargets.length})
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-                  {accounts.map((t) => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+                  {accountTargets.map((t) => (
                     <div
-                      key={`${t.type}_${t.id}`}
+                      key={t.id}
                       style={{
                         padding: '12px 14px',
                         borderRadius: '6px',
-                        backgroundColor: '#080c14',
+                        backgroundColor: '#070d1e',
                         border: '1px solid var(--border)',
                         display: 'flex',
                         alignItems: 'center',
@@ -551,39 +552,28 @@ export const CaseDetailPage: React.FC = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ padding: '6px', borderRadius: '4px', backgroundColor: '#1e293b', color: 'var(--accent-cyan)' }}>
-                          <User size={16} />
-                        </div>
+                        <User size={16} style={{ color: '#38bdf8' }} />
                         <div>
-                          <span className="font-mono font-bold text-slate-100 text-sm">{t.id}</span>
-                          <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)' }}>
+                          <Link
+                            to={`/accounts/${t.id}`}
+                            className="font-mono"
+                            style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textDecoration: 'none' }}
+                          >
                             {t.label}
-                          </span>
+                          </Link>
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Link
                           to={`/accounts/${t.id}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 8px',
-                            backgroundColor: '#1e293b',
-                            borderRadius: '4px',
-                            color: 'var(--accent-cyan)',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            textDecoration: 'none',
-                          }}
+                          style={{ color: '#38bdf8', display: 'flex', alignItems: 'center' }}
                         >
-                          Open <ExternalLink size={11} />
+                          <ExternalLink size={14} />
                         </Link>
                         <button
                           onClick={() => handleRemoveTarget(t)}
-                          title="Remove target"
-                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
                         >
                           <X size={14} />
                         </button>
@@ -594,20 +584,20 @@ export const CaseDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* 3. Target Transactions */}
-            {transactions.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                  Transactions ({transactions.length})
+            {/* Transactions */}
+            {transactionTargets.length > 0 && (
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#fbbf24', display: 'block', marginBottom: '8px' }}>
+                  Transactions ({transactionTargets.length})
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-                  {transactions.map((t) => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+                  {transactionTargets.map((t) => (
                     <div
-                      key={`${t.type}_${t.id}`}
+                      key={t.id}
                       style={{
                         padding: '12px 14px',
                         borderRadius: '6px',
-                        backgroundColor: '#080c14',
+                        backgroundColor: '#070d1e',
                         border: '1px solid var(--border)',
                         display: 'flex',
                         alignItems: 'center',
@@ -615,39 +605,28 @@ export const CaseDetailPage: React.FC = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ padding: '6px', borderRadius: '4px', backgroundColor: '#1e293b', color: 'var(--accent-cyan)' }}>
-                          <Activity size={16} />
-                        </div>
+                        <Activity size={16} style={{ color: '#fbbf24' }} />
                         <div>
-                          <span className="font-mono font-bold text-slate-100 text-sm">{t.id}</span>
-                          <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)' }}>
+                          <Link
+                            to={`/transactions/${t.id}`}
+                            className="font-mono"
+                            style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textDecoration: 'none' }}
+                          >
                             {t.label}
-                          </span>
+                          </Link>
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Link
                           to={`/transactions/${t.id}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 8px',
-                            backgroundColor: '#1e293b',
-                            borderRadius: '4px',
-                            color: 'var(--accent-cyan)',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            textDecoration: 'none',
-                          }}
+                          style={{ color: '#fbbf24', display: 'flex', alignItems: 'center' }}
                         >
-                          Open <ExternalLink size={11} />
+                          <ExternalLink size={14} />
                         </Link>
                         <button
                           onClick={() => handleRemoveTarget(t)}
-                          title="Remove target"
-                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
                         >
                           <X size={14} />
                         </button>
@@ -660,6 +639,8 @@ export const CaseDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <SarExportModal isOpen={isSarModalOpen} onClose={() => setIsSarModalOpen(false)} />
     </div>
   );
 };

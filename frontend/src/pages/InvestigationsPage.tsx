@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Plus,
   Trash2,
+  X,
 } from 'lucide-react';
 import type { CasePriority, CaseStatus, InvestigationCase } from '../types/cases';
 import { createCase, deleteCase, getCases, useCaseWatcher } from '../utils/caseManager';
@@ -62,13 +63,13 @@ export const InvestigationsPage: React.FC = () => {
         return (
           <span
             style={{
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '4px',
-              backgroundColor: 'rgba(56, 189, 248, 0.15)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              color: '#38bdf8',
+              backgroundColor: 'rgba(0, 240, 255, 0.15)',
+              border: '1px solid rgba(0, 240, 255, 0.35)',
+              color: '#00F0FF',
               fontSize: '11px',
-              fontWeight: 600,
+              fontWeight: 700,
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -79,13 +80,13 @@ export const InvestigationsPage: React.FC = () => {
         return (
           <span
             style={{
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '4px',
-              backgroundColor: 'rgba(245, 158, 11, 0.15)',
-              border: '1px solid rgba(245, 158, 11, 0.3)',
+              backgroundColor: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid rgba(251, 191, 36, 0.35)',
               color: '#fbbf24',
               fontSize: '11px',
-              fontWeight: 600,
+              fontWeight: 700,
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -96,13 +97,13 @@ export const InvestigationsPage: React.FC = () => {
         return (
           <span
             style={{
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '4px',
               backgroundColor: 'rgba(148, 163, 184, 0.15)',
               border: '1px solid rgba(148, 163, 184, 0.3)',
               color: '#94a3b8',
               fontSize: '11px',
-              fontWeight: 600,
+              fontWeight: 700,
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -118,13 +119,13 @@ export const InvestigationsPage: React.FC = () => {
         return (
           <span
             style={{
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '4px',
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              backgroundColor: 'rgba(244, 63, 94, 0.15)',
+              border: '1px solid rgba(244, 63, 94, 0.4)',
               color: '#fca5a5',
               fontSize: '11px',
-              fontWeight: 600,
+              fontWeight: 800,
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -135,13 +136,13 @@ export const InvestigationsPage: React.FC = () => {
         return (
           <span
             style={{
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '4px',
-              backgroundColor: 'rgba(245, 158, 11, 0.15)',
-              border: '1px solid rgba(245, 158, 11, 0.3)',
-              color: '#fcd34d',
+              backgroundColor: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid rgba(251, 191, 36, 0.4)',
+              color: '#fde68a',
               fontSize: '11px',
-              fontWeight: 600,
+              fontWeight: 800,
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -152,13 +153,13 @@ export const InvestigationsPage: React.FC = () => {
         return (
           <span
             style={{
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '4px',
               backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
               color: '#86efac',
               fontSize: '11px',
-              fontWeight: 600,
+              fontWeight: 800,
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -170,30 +171,27 @@ export const InvestigationsPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Page Header */}
+      {/* Header Banner */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                padding: '8px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(0, 240, 255, 0.15)',
+                border: '1px solid rgba(0, 240, 255, 0.3)',
                 color: 'var(--accent-cyan)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
               }}
             >
-              <Briefcase size={18} />
+              <Briefcase size={20} />
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
-              Investigation Queue
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+              Investigation Queue & Watchlist
             </h1>
           </div>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Track communities, accounts and transactions requiring investigator review.
+            Track suspicious clusters, accounts, and transactions with persistent notes and multi-target forensics.
           </p>
         </div>
 
@@ -203,87 +201,94 @@ export const InvestigationsPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '8px 16px',
+            padding: '10px 18px',
             backgroundColor: '#0284c7',
+            background: 'linear-gradient(135deg, #0284c7 0%, #00F0FF 100%)',
             border: 'none',
             borderRadius: '6px',
-            color: '#fff',
-            fontSize: '12px',
-            fontWeight: 600,
+            color: '#030712',
+            fontSize: '13px',
+            fontWeight: 800,
             cursor: 'pointer',
+            boxShadow: '0 0 20px rgba(0, 240, 255, 0.3)',
           }}
         >
-          <Plus size={15} />
-          New Investigation Case
+          <Plus size={16} />
+          Create New Case
         </button>
       </div>
 
-      {/* Summary KPI Cards */}
+      {/* KPI Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-        <div className="dash-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-            Open Cases
+        <div className="dash-card" style={{ padding: '18px 20px', borderTop: '3px solid #00F0FF' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
+            Active Open Cases
           </span>
-          <div className="font-mono text-xl font-bold text-sky-400">{openCount}</div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Requiring investigator triage</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+            <span className="font-mono font-bold text-2xl text-cyan-400">{openCount}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>awaiting triage</span>
+          </div>
         </div>
 
-        <div className="dash-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+        <div className="dash-card" style={{ padding: '18px 20px', borderTop: '3px solid #fbbf24' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
             Under Review
           </span>
-          <div className="font-mono text-xl font-bold text-amber-400">{reviewCount}</div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Active analysis & note-taking</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+            <span className="font-mono font-bold text-2xl text-amber-400">{reviewCount}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>in active analysis</span>
+          </div>
         </div>
 
-        <div className="dash-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+        <div className="dash-card" style={{ padding: '18px 20px', borderTop: '3px solid #64748b' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
             Closed Cases
           </span>
-          <div className="font-mono text-xl font-bold text-slate-400">{closedCount}</div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Resolved investigations</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+            <span className="font-mono font-bold text-2xl text-slate-300">{closedCount}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>resolved</span>
+          </div>
         </div>
 
-        <div className="dash-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-            High-Priority Targets
+        <div className="dash-card" style={{ padding: '18px 20px', borderTop: '3px solid #f43f5e' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
+            High-Risk Tracked Targets
           </span>
-          <div className="font-mono text-xl font-bold text-red-400">{highPriorityTargetsCount}</div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Flagged accounts/clusters in queue</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+            <span className="font-mono font-bold text-2xl text-rose-400">{highPriorityTargetsCount}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>critical entities</span>
+          </div>
         </div>
       </div>
 
-      {/* Cases Queue Table Card */}
+      {/* Cases Table */}
       <div className="dash-card" style={{ overflow: 'hidden' }}>
-        {/* Filter Bar */}
+        {/* Table Filter Header */}
         <div
           style={{
-            padding: '14px 16px',
+            padding: '14px 20px',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#0b1120',
+            backgroundColor: '#070d1e',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginRight: '8px' }}>
-              Filter Status:
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {(['ALL', 'OPEN', 'REVIEW', 'CLOSED'] as const).map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
                 style={{
-                  padding: '4px 10px',
-                  borderRadius: '4px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
                   fontSize: '11px',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: 'pointer',
                   border: '1px solid',
-                  borderColor: statusFilter === st ? 'var(--border-light)' : 'transparent',
-                  backgroundColor: statusFilter === st ? '#1e293b' : 'transparent',
-                  color: statusFilter === st ? 'var(--text-main)' : 'var(--text-muted)',
+                  borderColor: statusFilter === st ? 'var(--accent-cyan)' : 'transparent',
+                  backgroundColor: statusFilter === st ? 'rgba(0, 240, 255, 0.15)' : 'transparent',
+                  color: statusFilter === st ? '#00F0FF' : 'var(--text-muted)',
                 }}
               >
                 {st}
@@ -296,33 +301,37 @@ export const InvestigationsPage: React.FC = () => {
           </span>
         </div>
 
-        {/* List / Table */}
+        {/* Empty State */}
         {filteredCases.length === 0 ? (
-          <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div style={{ padding: '60px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
             <div
               style={{
-                padding: '12px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(51, 65, 85, 0.2)',
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(51, 65, 85, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 color: 'var(--text-muted)',
               }}
             >
-              <Briefcase size={24} />
+              <Briefcase size={22} />
             </div>
-            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-muted)' }}>
-              No active investigations
-            </span>
-            <p style={{ fontSize: '12px', color: 'var(--text-dim)', maxWidth: '400px', lineHeight: 1.5 }}>
-              Prioritize a community, account, or transaction from the network explorer to begin an investigation case.
-            </p>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)' }}>No cases found</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '380px' }}>
+                You can create a new investigation or attach communities directly using the [ + Add to Investigation ] button on any detail view.
+              </p>
+            </div>
             <Link
               to="/communities"
               style={{
                 fontSize: '12px',
+                fontWeight: 700,
                 color: 'var(--accent-cyan)',
-                fontWeight: 600,
                 textDecoration: 'none',
-                marginTop: '4px',
+                marginTop: '6px',
               }}
             >
               Explore Flagged Communities →
@@ -336,7 +345,7 @@ export const InvestigationsPage: React.FC = () => {
                   <th>Case Title & ID</th>
                   <th>Priority</th>
                   <th>Status</th>
-                  <th>Targets</th>
+                  <th>Attached Targets</th>
                   <th>Last Updated</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -349,11 +358,11 @@ export const InvestigationsPage: React.FC = () => {
                     style={{ cursor: 'pointer' }}
                   >
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '13px' }}>
+                      <div>
+                        <span style={{ fontWeight: 700, color: '#f8fafc', fontSize: '14px' }}>
                           {c.title}
                         </span>
-                        <span className="font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                        <span className="font-mono" style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginTop: '2px' }}>
                           {c.id}
                         </span>
                       </div>
@@ -362,48 +371,19 @@ export const InvestigationsPage: React.FC = () => {
                     <td>{getStatusBadge(c.status)}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span className="font-mono font-semibold text-slate-200">
-                          {c.targets.length} target{c.targets.length === 1 ? '' : 's'}
+                        <span className="font-mono font-bold text-slate-200">{c.targets.length}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                          ({c.targets.filter((t) => t.type === 'COMMUNITY').length}C ·{' '}
+                          {c.targets.filter((t) => t.type === 'ACCOUNT').length}A ·{' '}
+                          {c.targets.filter((t) => t.type === 'TRANSACTION').length}T)
                         </span>
-                        {c.targets.length > 0 && (
-                          <div style={{ display: 'flex', gap: '3px' }}>
-                            {c.targets.map((t, idx) => (
-                              <span
-                                key={idx}
-                                title={`${t.type}: ${t.label}`}
-                                style={{
-                                  padding: '1px 5px',
-                                  borderRadius: '3px',
-                                  fontSize: '9px',
-                                  fontFamily: 'var(--font-mono)',
-                                  backgroundColor: '#1e293b',
-                                  color: t.riskLevel === 'HIGH' ? '#f87171' : 'var(--text-muted)',
-                                }}
-                              >
-                                {t.type[0]}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </td>
-                    <td className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {c.updatedAt ? new Date(c.updatedAt).toLocaleString() : '—'}
+                    <td className="font-mono text-slate-400 text-xs">
+                      {new Date(c.updatedAt).toLocaleDateString()}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '12px' }}>
-                        <span
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '2px',
-                            fontSize: '11px',
-                            color: 'var(--accent-cyan)',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Inspect Case <ChevronRight size={13} />
-                        </span>
                         <button
                           onClick={(e) => handleDelete(e, c.id)}
                           title="Delete Case"
@@ -414,11 +394,25 @@ export const InvestigationsPage: React.FC = () => {
                             cursor: 'pointer',
                             padding: '4px',
                           }}
-                          onMouseOver={(e) => (e.currentTarget.style.color = '#ef4444')}
+                          onMouseOver={(e) => (e.currentTarget.style.color = '#f87171')}
                           onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-dim)')}
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={15} />
                         </button>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            fontSize: '12px',
+                            color: 'var(--accent-cyan)',
+                            fontWeight: 700,
+                          }}
+                        >
+                          Inspect Case
+                          <ChevronRight size={14} />
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -435,66 +429,69 @@ export const InvestigationsPage: React.FC = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(3, 7, 18, 0.85)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 100,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 50,
-            padding: '16px',
+            padding: '20px',
           }}
+          onClick={() => setShowNewModal(false)}
         >
           <div
             className="dash-card"
             style={{
               width: '100%',
-              maxWidth: '480px',
+              maxWidth: '520px',
+              backgroundColor: '#0a1024',
+              border: '1px solid rgba(0, 240, 255, 0.3)',
               padding: '24px',
-              backgroundColor: '#0f172a',
-              border: '1px solid var(--border-focus)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '18px',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#f8fafc' }}>
                 Create New Investigation Case
               </h3>
               <button
                 onClick={() => setShowNewModal(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '16px' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', display: 'block', marginBottom: '6px' }}>
                   Case Title
                 </label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Cluster 3 Hardware Sharing Investigation"
+                  placeholder="e.g. Cluster #3 Infrastructure & Card Reuse Triage"
                   style={{
                     width: '100%',
                     padding: '8px 12px',
-                    backgroundColor: '#080c14',
+                    backgroundColor: '#030712',
                     border: '1px solid var(--border)',
                     borderRadius: '6px',
                     color: 'var(--text-main)',
                     fontSize: '13px',
                     outline: 'none',
                   }}
+                  autoFocus
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '6px' }}>
-                  Initial Priority
+                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', display: 'block', marginBottom: '6px' }}>
+                  Priority Level
                 </label>
                 <select
                   value={newPriority}
@@ -502,7 +499,7 @@ export const InvestigationsPage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '8px 12px',
-                    backgroundColor: '#080c14',
+                    backgroundColor: '#030712',
                     border: '1px solid var(--border)',
                     borderRadius: '6px',
                     color: 'var(--text-main)',
@@ -510,25 +507,25 @@ export const InvestigationsPage: React.FC = () => {
                     outline: 'none',
                   }}
                 >
-                  <option value="HIGH">High Priority</option>
-                  <option value="MEDIUM">Medium Priority</option>
-                  <option value="LOW">Low Priority</option>
+                  <option value="HIGH">HIGH (Immediate Threat)</option>
+                  <option value="MEDIUM">MEDIUM (Watchlist Review)</option>
+                  <option value="LOW">LOW (Informational)</option>
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', display: 'block', marginBottom: '6px' }}>
                   Initial Investigator Notes
                 </label>
                 <textarea
-                  rows={3}
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
-                  placeholder="Notes on why this investigation was initiated..."
+                  placeholder="Record initial observable evidence hypotheses, e.g. 'Multiple accounts sharing virtual card credentials and device fingerprints...'"
+                  rows={3}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
-                    backgroundColor: '#080c14',
+                    backgroundColor: '#030712',
                     border: '1px solid var(--border)',
                     borderRadius: '6px',
                     color: 'var(--text-main)',
@@ -539,17 +536,18 @@ export const InvestigationsPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
                 <button
                   type="button"
                   onClick={() => setShowNewModal(false)}
                   style={{
-                    padding: '8px 16px',
-                    backgroundColor: 'transparent',
+                    padding: '8px 14px',
+                    backgroundColor: '#1e293b',
                     border: '1px solid var(--border)',
                     borderRadius: '6px',
                     color: 'var(--text-muted)',
                     fontSize: '12px',
+                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
@@ -560,11 +558,12 @@ export const InvestigationsPage: React.FC = () => {
                   style={{
                     padding: '8px 16px',
                     backgroundColor: '#0284c7',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #00F0FF 100%)',
                     border: 'none',
                     borderRadius: '6px',
-                    color: '#fff',
+                    color: '#030712',
                     fontSize: '12px',
-                    fontWeight: 600,
+                    fontWeight: 800,
                     cursor: 'pointer',
                   }}
                 >

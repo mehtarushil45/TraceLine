@@ -14,70 +14,59 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({
 }) => {
   const normLevel = (level || 'LOW').toUpperCase() as RiskLevel;
 
-  let badgeClass = 'badge-risk-low';
-  let dotColor = 'bg-emerald-400';
-  let dotPulse = 'bg-emerald-500';
+  let bg = 'rgba(16, 185, 129, 0.12)';
+  let border = '1px solid rgba(16, 185, 129, 0.35)';
+  let color = '#86efac';
+  let dotColor = '#10b981';
+  let glow = '0 0 10px rgba(16, 185, 129, 0.2)';
 
   if (normLevel === 'HIGH') {
-    badgeClass = 'badge-risk-high';
-    dotColor = 'bg-red-400';
-    dotPulse = 'bg-red-500';
+    bg = 'rgba(244, 63, 94, 0.15)';
+    border = '1px solid rgba(244, 63, 94, 0.4)';
+    color = '#fca5a5';
+    dotColor = '#f43f5e';
+    glow = '0 0 14px rgba(244, 63, 94, 0.35)';
   } else if (normLevel === 'MEDIUM') {
-    badgeClass = 'badge-risk-medium';
-    dotColor = 'bg-amber-400';
-    dotPulse = 'bg-amber-500';
+    bg = 'rgba(251, 191, 36, 0.15)';
+    border = '1px solid rgba(251, 191, 36, 0.4)';
+    color = '#fde68a';
+    dotColor = '#fbbf24';
+    glow = '0 0 12px rgba(251, 191, 36, 0.25)';
   }
 
-  const sizeClasses = {
-    sm: 'px-1.5 py-0.5 text-[10px] font-semibold gap-1',
-    md: 'px-2.5 py-1 text-xs font-semibold gap-1.5',
-    lg: 'px-3.5 py-1.5 text-sm font-bold gap-2',
-  };
+  const padding = size === 'lg' ? '4px 12px' : size === 'sm' ? '2px 6px' : '3px 9px';
+  const fontSize = size === 'lg' ? '12px' : size === 'sm' ? '10px' : '11px';
+  const dotSize = size === 'lg' ? '7px' : size === 'sm' ? '5px' : '6px';
 
   return (
     <span
       style={{
         display: 'inline-flex',
         alignItems: 'center',
+        gap: '6px',
         borderRadius: '4px',
         fontFamily: 'var(--font-mono)',
+        fontWeight: 700,
         letterSpacing: '0.04em',
+        backgroundColor: bg,
+        border,
+        color,
+        padding,
+        fontSize,
+        boxShadow: glow,
       }}
-      className={`${badgeClass} ${sizeClasses[size]}`}
     >
       {showDot && (
         <span
           style={{
-            position: 'relative',
-            display: 'flex',
-            height: size === 'lg' ? '8px' : '6px',
-            width: size === 'lg' ? '8px' : '6px',
+            width: dotSize,
+            height: dotSize,
+            borderRadius: '50%',
+            backgroundColor: dotColor,
+            boxShadow: `0 0 6px ${dotColor}`,
           }}
-        >
-          {normLevel === 'HIGH' && (
-            <span
-              style={{
-                position: 'absolute',
-                display: 'inline-flex',
-                height: '100%',
-                width: '100%',
-                borderRadius: '9999px',
-                opacity: 0.75,
-              }}
-              className={`${dotPulse} animate-ping`}
-            />
-          )}
-          <span
-            style={{
-              position: 'relative',
-              display: 'inline-flex',
-              borderRadius: '9999px',
-              height: '100%',
-              width: '100%',
-            }}
-            className={dotColor}
-          />
-        </span>
+          className={normLevel === 'HIGH' ? 'animate-pulse-dot' : ''}
+        />
       )}
       {normLevel}
     </span>

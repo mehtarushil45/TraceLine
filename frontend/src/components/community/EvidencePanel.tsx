@@ -34,8 +34,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Graph',
     icon: Cpu,
     color: '#fb923c',
-    bgColor: 'rgba(251, 146, 60, 0.1)',
-    borderColor: 'rgba(251, 146, 60, 0.25)',
+    bgColor: 'rgba(251, 146, 60, 0.12)',
+    borderColor: 'rgba(251, 146, 60, 0.35)',
     featureKey: 'weight_per_member',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toFixed(2)} wt/member` : '—'),
     interpretation: 'High concentration of relationship evidence relative to cluster membership size, indicating tightly bound co-activity.',
@@ -44,8 +44,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Infrastructure',
     icon: Smartphone,
     color: '#f87171',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.25)',
+    bgColor: 'rgba(244, 63, 94, 0.12)',
+    borderColor: 'rgba(244, 63, 94, 0.35)',
     featureKey: 'device_sharing_ratio',
     formatValue: (v) => (v !== null && v !== undefined ? `${(v * 100).toFixed(3)}%` : '—'),
     interpretation: 'Unusually high proportion of accounts operating from common hardware devices across distinct payment credentials.',
@@ -54,8 +54,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Infrastructure',
     icon: Smartphone,
     color: '#f87171',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.25)',
+    bgColor: 'rgba(244, 63, 94, 0.12)',
+    borderColor: 'rgba(244, 63, 94, 0.35)',
     featureKey: 'unique_shared_devices',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toLocaleString()} devices` : '—'),
     interpretation: 'Significant raw count of multi-account shared hardware fingerprints observed within this cluster.',
@@ -64,8 +64,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Infrastructure',
     icon: CreditCard,
     color: '#fbbf24',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    bgColor: 'rgba(251, 191, 36, 0.12)',
+    borderColor: 'rgba(251, 191, 36, 0.35)',
     featureKey: 'instrument_sharing_ratio',
     formatValue: (v) => (v !== null && v !== undefined ? `${(v * 100).toFixed(3)}%` : '—'),
     interpretation: 'Multiple accounts linked to the same cards, bank accounts, or funding instruments.',
@@ -74,8 +74,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Infrastructure',
     icon: CreditCard,
     color: '#fbbf24',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    bgColor: 'rgba(251, 191, 36, 0.12)',
+    borderColor: 'rgba(251, 191, 36, 0.35)',
     featureKey: 'unique_shared_instruments',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toLocaleString()} instruments` : '—'),
     interpretation: 'Extensive overlap in payment credentials spanning multiple customer profiles.',
@@ -83,9 +83,9 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
   temporal_compression_score: {
     category: 'Temporal',
     icon: Clock,
-    color: '#38bdf8',
-    bgColor: 'rgba(56, 189, 248, 0.1)',
-    borderColor: 'rgba(56, 189, 248, 0.25)',
+    color: '#00F0FF',
+    bgColor: 'rgba(0, 240, 255, 0.12)',
+    borderColor: 'rgba(0, 240, 255, 0.35)',
     featureKey: 'temporal_compression_score',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toFixed(4)}` : '—'),
     interpretation: 'High clustering of transactions in narrow time windows rather than standard organic temporal dispersion.',
@@ -93,9 +93,9 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
   temporal_overlap_mean: {
     category: 'Temporal',
     icon: Clock,
-    color: '#38bdf8',
-    bgColor: 'rgba(56, 189, 248, 0.1)',
-    borderColor: 'rgba(56, 189, 248, 0.25)',
+    color: '#00F0FF',
+    bgColor: 'rgba(0, 240, 255, 0.12)',
+    borderColor: 'rgba(0, 240, 255, 0.35)',
     featureKey: 'temporal_overlap_mean',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toFixed(2)} days` : '—'),
     interpretation: 'Frequent same-day concurrent activity observed across accounts in this community.',
@@ -104,8 +104,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Graph',
     icon: Network,
     color: '#a855f7',
-    bgColor: 'rgba(168, 85, 247, 0.1)',
-    borderColor: 'rgba(168, 85, 247, 0.25)',
+    bgColor: 'rgba(168, 85, 247, 0.12)',
+    borderColor: 'rgba(168, 85, 247, 0.35)',
     featureKey: 'mean_edge_weight',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toFixed(2)}` : '—'),
     interpretation: 'High average multi-layer evidence weight connecting account pairs across the community graph.',
@@ -114,8 +114,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Graph',
     icon: Cpu,
     color: '#38bdf8',
-    bgColor: 'rgba(56, 189, 248, 0.1)',
-    borderColor: 'rgba(56, 189, 248, 0.25)',
+    bgColor: 'rgba(56, 189, 248, 0.12)',
+    borderColor: 'rgba(56, 189, 248, 0.35)',
     featureKey: 'density',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toFixed(6)}` : '—'),
     interpretation: 'Elevated ratio of actual interconnected edges relative to all possible account combinations.',
@@ -124,8 +124,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Infrastructure',
     icon: Network,
     color: '#c084fc',
-    bgColor: 'rgba(192, 132, 252, 0.1)',
-    borderColor: 'rgba(192, 132, 252, 0.25)',
+    bgColor: 'rgba(192, 132, 252, 0.12)',
+    borderColor: 'rgba(192, 132, 252, 0.35)',
     featureKey: 'unique_shared_ips',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toLocaleString()} IPs` : '—'),
     interpretation: 'Multiple accounts routing payment actions through identical IP addresses or subnet gateways.',
@@ -134,8 +134,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Financial',
     icon: DollarSign,
     color: '#f87171',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.25)',
+    bgColor: 'rgba(244, 63, 94, 0.12)',
+    borderColor: 'rgba(244, 63, 94, 0.35)',
     featureKey: 'declined_rate',
     formatValue: (v) => (v !== null && v !== undefined ? `${(v * 100).toFixed(2)}%` : '—'),
     interpretation: 'Elevated proportion of attempted transactions rejected or declined by issuers/gateways.',
@@ -144,8 +144,8 @@ const SIGNAL_DICTIONARY: Record<string, Omit<SignalMetadata, 'title'>> = {
     category: 'Financial',
     icon: TrendingUp,
     color: '#34d399',
-    bgColor: 'rgba(52, 211, 153, 0.1)',
-    borderColor: 'rgba(52, 211, 153, 0.25)',
+    bgColor: 'rgba(52, 211, 153, 0.12)',
+    borderColor: 'rgba(52, 211, 153, 0.35)',
     featureKey: 'amount_cv',
     formatValue: (v) => (v !== null && v !== undefined ? `${v.toFixed(3)}` : '—'),
     interpretation: 'High variance in payment amounts compared to the mean, characteristic of rapid testing and large cash-outs.',
@@ -164,7 +164,6 @@ function parseSignal(rawSignal: string): SignalMetadata {
     }
   }
 
-  // Fallback metadata
   return {
     title: rawSignal,
     category: 'Infrastructure',
@@ -184,7 +183,6 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ community }) => {
   const rawSignals = [top_signal_1, top_signal_2, top_signal_3].filter(Boolean);
   const parsedSignals = rawSignals.map((s) => parseSignal(s));
 
-  // Dynamic Investigator Interpretation Generator based ONLY on observable metrics
   const isHigh = risk_level === 'HIGH';
   const isMed = risk_level === 'MEDIUM';
 
@@ -203,65 +201,68 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ community }) => {
     <div
       className="dash-card"
       style={{
-        padding: '22px 24px',
-        borderLeft: `4px solid ${isHigh ? '#ef4444' : isMed ? '#f59e0b' : '#10b981'}`,
-        backgroundColor: '#0a0f1d',
+        padding: '24px 28px',
+        borderLeft: `4px solid ${isHigh ? '#f43f5e' : isMed ? '#fbbf24' : '#10b981'}`,
+        backgroundColor: '#070d1e',
         display: 'flex',
         flexDirection: 'column',
-        gap: '18px',
+        gap: '20px',
       }}
     >
       {/* Panel Top Title & Context */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
-              padding: '6px',
-              borderRadius: '4px',
-              backgroundColor: isHigh ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-              color: isHigh ? '#ef4444' : '#f59e0b',
+              padding: '8px',
+              borderRadius: '6px',
+              backgroundColor: isHigh ? 'rgba(244, 63, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)',
+              color: isHigh ? '#f43f5e' : '#fbbf24',
+              boxShadow: isHigh ? '0 0 16px rgba(244, 63, 94, 0.3)' : 'none',
             }}
           >
-            <ShieldAlert size={18} />
+            <ShieldAlert size={20} />
           </div>
           <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-main)' }}>
-              Why is this community flagged?
+            <h3 style={{ fontSize: '15px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#f8fafc' }}>
+              Why is this cluster prioritized?
             </h3>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-              Observable evidence contributing to investigator prioritization (Strict Leakage-Free Mode)
+            <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+              Observable graph evidence contributing to investigator prioritization (Strict Zero-Leakage Mode)
             </span>
           </div>
         </div>
 
         <span
           style={{
-            padding: '3px 8px',
+            padding: '4px 10px',
             borderRadius: '4px',
-            backgroundColor: '#1e293b',
-            color: 'var(--text-muted)',
+            backgroundColor: '#162447',
+            border: '1px solid var(--border-light)',
+            color: 'var(--accent-cyan)',
             fontSize: '11px',
+            fontWeight: 700,
             fontFamily: 'var(--font-mono)',
           }}
         >
-          {parsedSignals.length} Primary Observable Signals
+          {parsedSignals.length} Forensics Anomaly Vectors
         </span>
       </div>
 
-      {/* Investigator Summary Box */}
+      {/* Investigator Forensic Summary HUD Box */}
       <div
         style={{
-          padding: '12px 16px',
-          borderRadius: '6px',
-          backgroundColor: '#080c14',
+          padding: '14px 18px',
+          borderRadius: '8px',
+          backgroundColor: '#030712',
           border: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'flex-start',
           gap: '12px',
         }}
       >
-        <Info size={16} style={{ color: 'var(--accent-cyan)', marginTop: '2px', flexShrink: 0 }} />
-        <p style={{ fontSize: '13px', color: 'var(--text-main)', lineHeight: 1.5, margin: 0 }}>
+        <Info size={18} style={{ color: 'var(--accent-cyan)', marginTop: '2px', flexShrink: 0 }} />
+        <p style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: 1.6, margin: 0 }}>
           {generateInvestigatorSummary()}
         </p>
       </div>
@@ -277,21 +278,22 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ community }) => {
             <div
               key={idx}
               style={{
-                padding: '14px 16px',
-                borderRadius: '6px',
+                padding: '16px 18px',
+                borderRadius: '8px',
                 backgroundColor: sig.bgColor,
                 border: `1px solid ${sig.borderColor}`,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '8px',
+                gap: '10px',
+                transition: 'all 0.15s ease',
               }}
             >
               {/* Signal Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Icon size={15} style={{ color: sig.color }} />
-                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: sig.color, letterSpacing: '0.04em' }}>
-                    Signal #{idx + 1} · {sig.category}
+                  <Icon size={16} style={{ color: sig.color }} />
+                  <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: sig.color, letterSpacing: '0.04em' }}>
+                    Vector #{idx + 1} · {sig.category}
                   </span>
                 </div>
 
@@ -299,11 +301,11 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ community }) => {
                   className="font-mono"
                   style={{
                     fontSize: '12px',
-                    fontWeight: 700,
-                    color: 'var(--text-main)',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                    padding: '2px 6px',
-                    borderRadius: '3px',
+                    fontWeight: 800,
+                    color: '#f8fafc',
+                    backgroundColor: 'rgba(3, 7, 18, 0.7)',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
                     border: '1px solid var(--border)',
                   }}
                 >
@@ -312,12 +314,12 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ community }) => {
               </div>
 
               {/* Signal Title */}
-              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
                 {sig.title}
               </span>
 
               {/* Signal Interpretation */}
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
                 {sig.interpretation}
               </p>
             </div>

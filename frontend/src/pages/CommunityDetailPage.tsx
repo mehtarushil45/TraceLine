@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Clock,
+  FileText,
   Layers,
   Network,
   Users,
@@ -30,6 +31,7 @@ import { TimelineView } from '../components/timeline/TimelineView';
 import { Pagination } from '../components/common/Pagination';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorState } from '../components/common/ErrorState';
+import { SarExportModal } from '../components/layout/SarExportModal';
 
 export const CommunityDetailPage: React.FC = () => {
   const { communityId } = useParams<{ communityId: string }>();
@@ -37,6 +39,7 @@ export const CommunityDetailPage: React.FC = () => {
 
   const [community, setCommunity] = useState<CommunityDetailResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'accounts' | 'graph' | 'timeline'>('accounts');
+  const [isSarModalOpen, setIsSarModalOpen] = useState(false);
 
   // Tab 1: Accounts State
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
@@ -147,8 +150,8 @@ export const CommunityDetailPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* 1. Breadcrumb & Actions Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+      {/* 1. Breadcrumb & Action Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
           <button
             onClick={() => navigate('/communities')}
@@ -164,28 +167,52 @@ export const CommunityDetailPage: React.FC = () => {
             }}
           >
             <ArrowLeft size={14} />
-            Back to Communities
+            Communities
           </button>
           <span>/</span>
           <span className="font-mono text-slate-200">Community #{community.community_id}</span>
         </div>
 
-        <AddToInvestigationButton
-          targetType="COMMUNITY"
-          targetId={community.community_id.toString()}
-          targetLabel={`Community #${community.community_id}`}
-          riskScore={community.risk_score}
-          riskLevel={community.risk_level}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => setIsSarModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              backgroundColor: '#162447',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
+              color: 'var(--text-main)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <FileText size={13} style={{ color: 'var(--accent-cyan)' }} />
+            <span>Generate SAR</span>
+          </button>
+
+          <AddToInvestigationButton
+            targetType="COMMUNITY"
+            targetId={community.community_id.toString()}
+            targetLabel={`Community #${community.community_id}`}
+            riskScore={community.risk_score}
+            riskLevel={community.risk_level}
+          />
+        </div>
       </div>
 
-      {/* 2. Main Workspace Header */}
+      {/* 2. Flagship Workspace Hero HUD */}
       <div
         className="dash-card"
         style={{
-          padding: '24px 28px',
-          borderColor: isHigh ? 'rgba(239, 68, 68, 0.4)' : 'var(--border)',
-          backgroundColor: isHigh ? 'rgba(239, 68, 68, 0.04)' : 'var(--bg-card)',
+          padding: '26px 30px',
+          borderColor: isHigh ? 'rgba(244, 63, 94, 0.4)' : 'var(--border)',
+          background: isHigh
+            ? 'linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(11, 19, 41, 0.9) 100%)'
+            : 'var(--bg-card)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -193,20 +220,21 @@ export const CommunityDetailPage: React.FC = () => {
           gap: '20px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '18px' }}>
           <div
             style={{
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: isHigh ? 'rgba(239, 68, 68, 0.15)' : 'rgba(51, 65, 85, 0.3)',
-              color: isHigh ? '#ef4444' : 'var(--text-muted)',
+              padding: '14px',
+              borderRadius: '10px',
+              backgroundColor: isHigh ? 'rgba(244, 63, 94, 0.2)' : 'rgba(51, 65, 85, 0.3)',
+              color: isHigh ? '#f43f5e' : 'var(--text-muted)',
+              boxShadow: isHigh ? '0 0 20px rgba(244, 63, 94, 0.3)' : 'none',
             }}
           >
-            <Layers size={28} />
+            <Layers size={30} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h1 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
                 Community #{community.community_id}
               </h1>
               <RiskBadge level={community.risk_level} size="lg" />
@@ -222,21 +250,22 @@ export const CommunityDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Risk Score Gauge */}
+        {/* Risk Score Meter HUD */}
         <div
           style={{
-            padding: '12px 20px',
-            borderRadius: '6px',
-            backgroundColor: '#080c14',
+            padding: '14px 22px',
+            borderRadius: '8px',
+            backgroundColor: '#030712',
             border: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             gap: '20px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
           }}
         >
           <div>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Risk Score
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              ML Risk Score
             </span>
             <RiskScore
               score={community.risk_score}
@@ -248,7 +277,7 @@ export const CommunityDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. "Why is this Community Flagged?" & Investigator Summary */}
+      {/* 3. "Why is this Community Flagged?" Evidence Panel */}
       <EvidencePanel community={community} />
 
       {/* 4. 4 Feature Families Breakdown (21 Observable Features) */}
@@ -262,17 +291,17 @@ export const CommunityDetailPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 16px',
+            padding: '12px 18px',
             background: 'none',
             border: 'none',
             borderBottom: activeTab === 'accounts' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
-            color: activeTab === 'accounts' ? 'var(--text-main)' : 'var(--text-muted)',
+            color: activeTab === 'accounts' ? '#f8fafc' : 'var(--text-muted)',
             fontSize: '13px',
-            fontWeight: 600,
+            fontWeight: 700,
             cursor: 'pointer',
           }}
         >
-          <Users size={16} />
+          <Users size={16} style={{ color: activeTab === 'accounts' ? 'var(--accent-cyan)' : 'inherit' }} />
           Member Accounts ({community.member_count.toLocaleString()})
         </button>
 
@@ -282,17 +311,17 @@ export const CommunityDetailPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 16px',
+            padding: '12px 18px',
             background: 'none',
             border: 'none',
             borderBottom: activeTab === 'graph' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
-            color: activeTab === 'graph' ? 'var(--text-main)' : 'var(--text-muted)',
+            color: activeTab === 'graph' ? '#f8fafc' : 'var(--text-muted)',
             fontSize: '13px',
-            fontWeight: 600,
+            fontWeight: 700,
             cursor: 'pointer',
           }}
         >
-          <Network size={16} />
+          <Network size={16} style={{ color: activeTab === 'graph' ? 'var(--accent-cyan)' : 'inherit' }} />
           Network Topology Graph
         </button>
 
@@ -302,17 +331,17 @@ export const CommunityDetailPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 16px',
+            padding: '12px 18px',
             background: 'none',
             border: 'none',
             borderBottom: activeTab === 'timeline' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
-            color: activeTab === 'timeline' ? 'var(--text-main)' : 'var(--text-muted)',
+            color: activeTab === 'timeline' ? '#f8fafc' : 'var(--text-muted)',
             fontSize: '13px',
-            fontWeight: 600,
+            fontWeight: 700,
             cursor: 'pointer',
           }}
         >
-          <Clock size={16} />
+          <Clock size={16} style={{ color: activeTab === 'timeline' ? 'var(--accent-cyan)' : 'inherit' }} />
           Activity Timeline
         </button>
       </div>
@@ -358,6 +387,8 @@ export const CommunityDetailPage: React.FC = () => {
           )}
         </div>
       )}
+
+      <SarExportModal isOpen={isSarModalOpen} onClose={() => setIsSarModalOpen(false)} />
     </div>
   );
 };

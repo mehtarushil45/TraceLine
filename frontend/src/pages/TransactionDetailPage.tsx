@@ -2,11 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
-  Clock,
   Smartphone,
   Store,
+  User,
   XCircle,
 } from 'lucide-react';
 import { getTransaction } from '../api';
@@ -53,7 +52,7 @@ export const TransactionDetailPage: React.FC = () => {
   const isDeclined = tx.transaction_status.toLowerCase() === 'declined';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1000px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1080px' }}>
       {/* Breadcrumb & Actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
@@ -71,7 +70,7 @@ export const TransactionDetailPage: React.FC = () => {
             }}
           >
             <ArrowLeft size={14} />
-            Back
+            Transactions
           </button>
           <span>/</span>
           <span className="font-mono text-slate-200">{tx.transaction_id}</span>
@@ -84,183 +83,186 @@ export const TransactionDetailPage: React.FC = () => {
         />
       </div>
 
-      {/* Transaction Top Card */}
+      {/* Transaction Top Hero Card */}
       <div
         className="dash-card"
         style={{
-          padding: '24px',
+          padding: '26px 30px',
+          backgroundColor: '#070d1e',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '16px',
+          gap: '20px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
           <div
             style={{
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: isDeclined ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-              color: isDeclined ? '#ef4444' : '#10b981',
+              padding: '14px',
+              borderRadius: '10px',
+              backgroundColor: isDeclined ? 'rgba(244, 63, 94, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+              color: isDeclined ? '#f43f5e' : '#10b981',
+              boxShadow: isDeclined ? '0 0 16px rgba(244, 63, 94, 0.25)' : '0 0 16px rgba(16, 185, 129, 0.2)',
             }}
           >
-            {isDeclined ? <XCircle size={28} /> : <CheckCircle2 size={28} />}
+            {isDeclined ? <XCircle size={30} /> : <CheckCircle2 size={30} />}
           </div>
           <div>
-            <span className="font-mono" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)' }}>
-              {tx.transaction_id}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', fontSize: '13px', color: 'var(--text-muted)' }}>
-              <Clock size={13} />
-              <span className="font-mono">{tx.timestamp.replace('T', ' ')}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <h1 className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+                {tx.transaction_id}
+              </h1>
+              <span
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: '4px',
+                  backgroundColor: isDeclined ? 'rgba(244, 63, 94, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                  border: `1px solid ${isDeclined ? 'rgba(244, 63, 94, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                  color: isDeclined ? '#fca5a5' : '#86efac',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {tx.transaction_status.toUpperCase()}
+              </span>
             </div>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+              Processed: {new Date(tx.timestamp).toLocaleString()}
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Amount
-            </span>
-            <div className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-main)' }}>
-              ${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
-          <span
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              backgroundColor: isDeclined ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-              color: isDeclined ? '#fca5a5' : '#86efac',
-              fontSize: '12px',
-              fontWeight: 700,
-              fontFamily: 'var(--font-mono)',
-              textTransform: 'uppercase',
-            }}
-          >
-            {tx.transaction_status}
+        {/* Amount Pill */}
+        <div
+          style={{
+            padding: '12px 22px',
+            borderRadius: '8px',
+            backgroundColor: '#030712',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+          }}
+        >
+          <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+            Settlement Amount
+          </span>
+          <span className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc' }}>
+            ${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
       </div>
 
-      {/* Transaction Flow Card */}
-      <div className="dash-card" style={{ padding: '20px' }}>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '14px' }}>
-          Transaction Flow Parties
-        </span>
+      {/* Money Flow Architecture Diagram */}
+      <div className="dash-card" style={{ padding: '24px' }}>
+        <h3 style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: '16px' }}>
+          Payment Gateway Transfer Flow
+        </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '16px' }}>
-          {/* Source Account Card */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', alignItems: 'center' }}>
+          {/* Origin Account */}
           <div
             onClick={() => navigate(`/accounts/${tx.src_account_id}`)}
             style={{
-              padding: '16px',
-              borderRadius: '6px',
-              backgroundColor: '#080c14',
+              padding: '16px 18px',
+              borderRadius: '8px',
+              backgroundColor: '#070d1e',
               border: '1px solid var(--border)',
               cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
               transition: 'border-color 0.15s ease',
             }}
             onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
             onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
           >
-            <span style={{ fontSize: '11px', color: '#f87171', fontWeight: 600, textTransform: 'uppercase' }}>
-              Source (Origin) Account
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+              Source Account (Origin)
             </span>
-            <span className="font-mono font-bold text-slate-100 text-sm">{tx.src_account_id}</span>
-            <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', marginTop: '4px' }}>View account profile →</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <User size={16} style={{ color: 'var(--accent-cyan)' }} />
+              <span className="font-mono font-bold text-slate-100">{tx.src_account_id}</span>
+            </div>
           </div>
 
-          <ArrowRight size={22} style={{ color: 'var(--text-dim)' }} />
-
-          {/* Destination Account Card */}
+          {/* Destination Account */}
           <div
             onClick={() => navigate(`/accounts/${tx.dst_account_id}`)}
             style={{
-              padding: '16px',
-              borderRadius: '6px',
-              backgroundColor: '#080c14',
+              padding: '16px 18px',
+              borderRadius: '8px',
+              backgroundColor: '#070d1e',
               border: '1px solid var(--border)',
               cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
               transition: 'border-color 0.15s ease',
             }}
             onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
             onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
           >
-            <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 600, textTransform: 'uppercase' }}>
-              Destination Account
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+              Destination Account (Beneficiary)
             </span>
-            <span className="font-mono font-bold text-slate-100 text-sm">{tx.dst_account_id}</span>
-            <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', marginTop: '4px' }}>View account profile →</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <User size={16} style={{ color: '#34d399' }} />
+              <span className="font-mono font-bold text-slate-100">{tx.dst_account_id}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Grid: Merchant Catalog & Device/Footprint Information */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-        {/* Merchant & Payment */}
-        <div className="dash-card" style={{ padding: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+      {/* Digital Footprint & Telemetry Matrix */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+        {/* Merchant & Gateway Data */}
+        <div className="dash-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
             <Store size={16} style={{ color: '#fbbf24' }} />
-            <span style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-main)' }}>
-              Merchant & Method
+            <span style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', color: '#f8fafc' }}>
+              Merchant Context
             </span>
           </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Merchant ID:</span>
-              <span className="font-mono font-semibold text-slate-200">{tx.merchant_id || 'P2P / None'}</span>
-            </div>
-            {tx.merchant_name && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Merchant Name:</span>
-                <span className="font-semibold text-slate-200">{tx.merchant_name}</span>
-              </div>
-            )}
-            {tx.merchant_category && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Category:</span>
-                <span className="font-semibold text-slate-200">{tx.merchant_category}</span>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Payment Method:</span>
-              <span className="font-mono text-slate-200">{tx.payment_method || '—'}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Merchant ID:</span>
+              <span className="font-mono font-semibold text-slate-200">{tx.merchant_id || '—'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Account Age:</span>
-              <span className="font-mono text-slate-200">{tx.account_age_days ? `${tx.account_age_days} days` : '—'}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Merchant Name:</span>
+              <span className="font-mono font-semibold text-slate-200">{tx.merchant_name || '—'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Merchant Category:</span>
+              <span className="font-mono font-semibold text-slate-200">{tx.merchant_category || '—'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Payment Method:</span>
+              <span className="font-mono font-semibold text-slate-200">{tx.payment_method || 'TRANSFER'}</span>
             </div>
           </div>
         </div>
 
-        {/* Digital Footprint */}
-        <div className="dash-card" style={{ padding: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
-            <Smartphone size={16} style={{ color: '#38bdf8' }} />
-            <span style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-main)' }}>
-              Observable Footprint
+        {/* Device & Observable Digital Footprint */}
+        <div className="dash-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+            <Smartphone size={16} style={{ color: 'var(--accent-cyan)' }} />
+            <span style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', color: '#f8fafc' }}>
+              Observable Digital Footprint
             </span>
           </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Device ID:</span>
-              <span className="font-mono text-slate-200">{tx.device_id || '—'}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Device Fingerprint ID:</span>
+              <span className="font-mono font-semibold text-cyan-300">{tx.device_id || '—'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Payment Instrument ID:</span>
-              <span className="font-mono text-slate-200">{tx.payment_instrument_id || '—'}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Payment Instrument Token:</span>
+              <span className="font-mono font-semibold text-amber-300">{tx.payment_instrument_id || '—'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>IP Address:</span>
-              <span className="font-mono text-slate-200">{tx.ip_address || '—'}</span>
+              <span style={{ color: 'var(--text-muted)' }}>IP Address:</span>
+              <span className="font-mono font-semibold text-purple-300">{tx.ip_address || '—'}</span>
             </div>
           </div>
         </div>

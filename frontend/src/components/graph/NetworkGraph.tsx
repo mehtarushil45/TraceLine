@@ -17,7 +17,7 @@ interface NetworkGraphProps {
 
 export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   graphData,
-  height = '520px',
+  height = '560px',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -35,8 +35,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
     // Add nodes
     graphData.nodes.forEach((node) => {
-      // Calculate node size based on degree
-      const size = Math.min(48, Math.max(16, 16 + node.degree * 2));
+      const size = Math.min(52, Math.max(18, 18 + node.degree * 2.2));
       elements.push({
         group: 'nodes',
         data: {
@@ -78,7 +77,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           style: {
             'background-color': '#0284c7',
             'border-width': 2,
-            'border-color': '#38bdf8',
+            'border-color': '#00F0FF',
             'label': 'data(label)',
             'color': '#cbd5e1',
             'font-size': '10px',
@@ -94,8 +93,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'node:selected',
           style: {
-            'background-color': '#f59e0b',
-            'border-color': '#fbbf24',
+            'background-color': '#fbbf24',
+            'border-color': '#fef08a',
             'border-width': 3,
             'color': '#fef08a',
             'font-weight': 'bold',
@@ -104,7 +103,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'node.highlighted',
           style: {
-            'background-color': '#ef4444',
+            'background-color': '#f43f5e',
             'border-color': '#fca5a5',
             'border-width': 3,
           },
@@ -112,10 +111,10 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'edge',
           style: {
-            'width': 'mapData(weight, 1, 15, 1, 6)',
-            'line-color': '#334155',
+            'width': 'mapData(weight, 1, 15, 1.2, 6)',
+            'line-color': '#1e293b',
             'curve-style': 'bezier',
-            'opacity': 0.6,
+            'opacity': 0.7,
             'transition-property': 'line-color, opacity, width',
             'transition-duration': 0.15,
           },
@@ -123,9 +122,9 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'edge:selected',
           style: {
-            'line-color': '#f59e0b',
+            'line-color': '#00F0FF',
             'opacity': 1,
-            'width': 3,
+            'width': 3.5,
           },
         },
         {
@@ -223,23 +222,24 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '10px 16px',
+          padding: '12px 18px',
           borderBottom: '1px solid var(--border)',
-          backgroundColor: '#0b1120',
+          backgroundColor: '#050a18',
           fontSize: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-            Network Topology
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.02em' }}>
+            Topology Canvas
           </span>
           <span
             style={{
-              padding: '2px 6px',
+              padding: '2px 8px',
               borderRadius: '4px',
-              backgroundColor: '#1e293b',
-              color: 'var(--text-muted)',
+              backgroundColor: '#162447',
+              color: 'var(--accent-cyan)',
               fontSize: '11px',
+              fontWeight: 700,
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -247,19 +247,20 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* Layout Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <select
             value={layoutName}
             onChange={(e) => setLayoutName(e.target.value as any)}
             style={{
-              backgroundColor: '#1e293b',
-              border: '1px solid var(--border)',
-              color: 'var(--text-muted)',
-              padding: '4px 8px',
-              borderRadius: '4px',
+              backgroundColor: '#0f172a',
+              border: '1px solid var(--border-light)',
+              color: 'var(--text-main)',
+              padding: '5px 10px',
+              borderRadius: '6px',
               fontSize: '11px',
+              fontWeight: 600,
               outline: 'none',
+              cursor: 'pointer',
             }}
           >
             <option value="cose">Force-Directed (Cose)</option>
@@ -271,10 +272,10 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             onClick={handleZoomIn}
             title="Zoom In"
             style={{
-              padding: '4px 8px',
-              backgroundColor: '#1e293b',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
+              padding: '5px 8px',
+              backgroundColor: '#0f172a',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
               color: 'var(--text-muted)',
               cursor: 'pointer',
             }}
@@ -285,10 +286,10 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             onClick={handleZoomOut}
             title="Zoom Out"
             style={{
-              padding: '4px 8px',
-              backgroundColor: '#1e293b',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
+              padding: '5px 8px',
+              backgroundColor: '#0f172a',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
               color: 'var(--text-muted)',
               cursor: 'pointer',
             }}
@@ -299,10 +300,10 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             onClick={handleFit}
             title="Fit to Screen"
             style={{
-              padding: '4px 8px',
-              backgroundColor: '#1e293b',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
+              padding: '5px 8px',
+              backgroundColor: '#0f172a',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
               color: 'var(--text-muted)',
               cursor: 'pointer',
             }}
@@ -314,34 +315,34 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
       {/* Graph Canvas Container */}
       <div style={{ position: 'relative', width: '100%', height }}>
-        <div ref={containerRef} style={{ width: '100%', height: '100%', backgroundColor: '#070b12' }} />
+        <div ref={containerRef} style={{ width: '100%', height: '100%', backgroundColor: '#030712' }} />
 
         {/* Legend Overlay */}
         <div
           style={{
             position: 'absolute',
-            bottom: '12px',
-            left: '12px',
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(4px)',
+            bottom: '14px',
+            left: '14px',
+            backgroundColor: 'rgba(5, 10, 24, 0.85)',
+            backdropFilter: 'blur(8px)',
             border: '1px solid var(--border)',
             borderRadius: '6px',
-            padding: '8px 12px',
+            padding: '10px 14px',
             fontSize: '11px',
             color: 'var(--text-muted)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '4px',
+            gap: '6px',
             pointerEvents: 'none',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
-            <span>Node size = Connection Degree</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00F0FF', boxShadow: '0 0 6px #00F0FF' }} />
+            <span>Node radius = Connection Degree</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '12px', height: '2px', backgroundColor: '#64748b' }} />
-            <span>Edge thickness = Evidence Weight</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '14px', height: '2px', backgroundColor: '#38bdf8' }} />
+            <span>Edge thickness = Multi-Layer Evidence Weight</span>
           </div>
         </div>
 
@@ -350,24 +351,24 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '12px',
-              right: '12px',
-              width: '280px',
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid var(--border-focus)',
-              borderRadius: '6px',
-              padding: '14px',
+              top: '14px',
+              right: '14px',
+              width: '290px',
+              backgroundColor: 'rgba(5, 10, 24, 0.95)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(0, 240, 255, 0.4)',
+              borderRadius: '8px',
+              padding: '16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+              gap: '12px',
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 240, 255, 0.15)',
               zIndex: 10,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-cyan)', textTransform: 'uppercase' }}>
-                Selected Account
+              <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Selected Account Node
               </span>
               <button
                 onClick={() => setSelectedNode(null)}
@@ -378,7 +379,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>
+              <span className="font-mono" style={{ fontSize: '15px', fontWeight: 800, color: '#f8fafc' }}>
                 {selectedNode.id}
               </span>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -386,16 +387,16 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
               <div>
                 <span style={{ color: 'var(--text-dim)', display: 'block' }}>Degree:</span>
-                <span className="font-mono" style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                  {selectedNode.degree} connections
+                <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                  {selectedNode.degree} edges
                 </span>
               </div>
               <div>
                 <span style={{ color: 'var(--text-dim)', display: 'block' }}>Balance:</span>
-                <span className="font-mono" style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                <span className="font-mono" style={{ fontWeight: 700, color: '#34d399' }}>
                   ${selectedNode.balance?.toLocaleString() || '0.00'}
                 </span>
               </div>
@@ -408,13 +409,14 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                padding: '7px 12px',
+                padding: '8px 12px',
                 backgroundColor: '#0284c7',
+                background: 'linear-gradient(135deg, #0284c7 0%, #00F0FF 100%)',
                 border: 'none',
-                borderRadius: '4px',
-                color: '#fff',
+                borderRadius: '6px',
+                color: '#030712',
                 fontSize: '12px',
-                fontWeight: 600,
+                fontWeight: 800,
                 cursor: 'pointer',
                 marginTop: '4px',
               }}
@@ -430,23 +432,23 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '12px',
-              right: '12px',
+              top: '14px',
+              right: '14px',
               width: '320px',
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid var(--border-light)',
-              borderRadius: '6px',
-              padding: '14px',
+              backgroundColor: 'rgba(5, 10, 24, 0.95)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(251, 191, 36, 0.4)',
+              borderRadius: '8px',
+              padding: '16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+              gap: '12px',
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7), 0 0 16px rgba(251, 191, 36, 0.15)',
               zIndex: 10,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Evidence Link
               </span>
               <button
@@ -458,23 +460,23 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-              <span style={{ color: 'var(--text-main)' }}>{selectedEdge.source}</span>
+              <span style={{ color: '#f8fafc', fontWeight: 700 }}>{selectedEdge.source}</span>
               <span style={{ color: 'var(--text-dim)' }}>⇄</span>
-              <span style={{ color: 'var(--text-main)' }}>{selectedEdge.target}</span>
+              <span style={{ color: '#f8fafc', fontWeight: 700 }}>{selectedEdge.target}</span>
             </div>
 
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
               <span>Total Evidence Weight:</span>
-              <span className="font-mono font-bold" style={{ color: '#f59e0b' }}>
+              <span className="font-mono font-bold" style={{ color: '#fbbf24' }}>
                 {selectedEdge.weight.toFixed(2)}
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
               {selectedEdge.shared_instruments.length > 0 && (
                 <div>
                   <span style={{ color: 'var(--text-dim)' }}>Shared Payment Instruments ({selectedEdge.shared_instruments.length}):</span>
-                  <div className="font-mono" style={{ color: '#fbbf24', fontSize: '10px' }}>
+                  <div className="font-mono" style={{ color: '#fbbf24', fontSize: '10px', marginTop: '2px' }}>
                     {selectedEdge.shared_instruments.join(', ')}
                   </div>
                 </div>
@@ -482,7 +484,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               {selectedEdge.shared_devices.length > 0 && (
                 <div>
                   <span style={{ color: 'var(--text-dim)' }}>Shared Devices ({selectedEdge.shared_devices.length}):</span>
-                  <div className="font-mono" style={{ color: '#f87171', fontSize: '10px' }}>
+                  <div className="font-mono" style={{ color: '#f87171', fontSize: '10px', marginTop: '2px' }}>
                     {selectedEdge.shared_devices.join(', ')}
                   </div>
                 </div>
@@ -490,7 +492,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               {selectedEdge.shared_ips.length > 0 && (
                 <div>
                   <span style={{ color: 'var(--text-dim)' }}>Shared IPs ({selectedEdge.shared_ips.length}):</span>
-                  <div className="font-mono" style={{ color: '#c084fc', fontSize: '10px' }}>
+                  <div className="font-mono" style={{ color: '#c084fc', fontSize: '10px', marginTop: '2px' }}>
                     {selectedEdge.shared_ips.join(', ')}
                   </div>
                 </div>
@@ -498,7 +500,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               {selectedEdge.shared_merchants.length > 0 && (
                 <div>
                   <span style={{ color: 'var(--text-dim)' }}>Shared Merchants ({selectedEdge.shared_merchants.length}):</span>
-                  <div className="font-mono" style={{ color: '#94a3b8', fontSize: '10px' }}>
+                  <div className="font-mono" style={{ color: '#94a3b8', fontSize: '10px', marginTop: '2px' }}>
                     {selectedEdge.shared_merchants.join(', ')}
                   </div>
                 </div>

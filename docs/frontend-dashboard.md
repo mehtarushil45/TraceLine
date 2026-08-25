@@ -1,57 +1,80 @@
-# TraceLine Investigator Dashboard & Case Management
+# TraceLine AI | Razorpay Risk & Fraud Intelligence Hub
 
-TraceLine is an explainable graph-based payment fraud intelligence platform built on **React 19**, **TypeScript**, **Vite**, and **Cytoscape.js**, communicating with a **FastAPI** backend with local case triage and watchlist persistence.
+TraceLine is a next-generation graph-based payment fraud intelligence and investigation platform tailored for the **Razorpay Buildathon**. It combines unsupervised Louvain community detection and explainable ensemble ML over 50,000 payment accounts with an elite cyber-SOC investigator workspace.
 
 ---
 
-## 1. System Architecture
+## 1. System Architecture & Tech Stack
 
 ```
-                       ┌─────────────────────────────────────────┐
-                       │     TraceLine React Investigator UI     │
-                       │          (http://127.0.0.1:5173)         │
-                       └──────────────┬──────────────────┬───────┘
-                                      │                  │ LocalStorage Case Engine
-                                      │                  ▼
-                                      │       ┌──────────────────────────────┐
-                                      │       │ Investigation Case & Targets │
-                                      │       │ Open/Review/Closed Workflows │
-                                      │       └──────────────────────────────┘
-                                      ▼
-                       ┌─────────────────────────────────────────┐
-                       │         FastAPI Intelligence API        │
-                       │          (http://127.0.0.1:8000)         │
-                       └────────────────────┬────────────────────┘
-                                            │ Observable In-Memory Indices
-                                            ▼
- ┌───────────────────────────┬───────────────────────────┬───────────────────────────┐
- │ 50,000 Observable Accounts│  450,546 Transactions     │  59 Louvain Communities   │
- │ 2,617,094 Graph Edges     │  21 Observable Features   │  ML Risk Scorer (LR + RF) │
- └───────────────────────────┴───────────────────────────┴───────────────────────────┘
+                          ┌────────────────────────────────────────────────────────┐
+                          │   TraceLine AI | Razorpay Cyber Risk Hub (React 19)    │
+                          │   - Plus Jakarta Sans & JetBrains Mono Fonts           │
+                          │   - Glassmorphism & Cyber Grid Design System           │
+                          │   - Omnisearch Modal [⌘K / Ctrl+K]                     │
+                          │   - ISO-20022 Aligned SAR Forensic Dossier Generator   │
+                          │   - Persistent Case Management & Target Watchlist      │
+                          └──────────────┬───────────────────────────┬─────────────┘
+                                         │                           │
+                                         │ Local Storage             │ HTTP / JSON API (Proxy)
+                                         ▼                           ▼
+                         ┌─────────────────────────────┐   ┌─────────────────────────────┐
+                         │   Investigation Case Store  │   │  FastAPI Intelligence Engine│
+                         │   - Open / Review / Closed  │   │  (http://127.0.0.1:8000)    │
+                         │   - Persistent Analyst Log  │   └──────────────┬──────────────┘
+                         └─────────────────────────────┘                  │
+                                                                          │ Observable Indices
+                                                                          ▼
+ ┌──────────────────────────────────────┬──────────────────────────────────────┬──────────────────────────────────────┐
+ │  50,000 Observable Payment Accounts  │  450,546 Verified Network Tx Events  │  59 Louvain Communities (Res=1.0)    │
+ │  2,617,094 Multi-Layer Evidence Edges│  21 Observable Explainable Features  │  Ensemble ML Risk Scorer (LR + RF)   │
+ └──────────────────────────────────────┴──────────────────────────────────────┴──────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Risk Score & Anti-Leakage Calibration
+## 2. Elite Design Tokens & Visual Aesthetics
 
-- **Score Interpretation**: ML risk scores are displayed as `Risk Score: X/100` with the explicit subtitle:
-  > *"Model risk score derived from observable network evidence"*
-- **Strict Compliance**: The UI never describes scores as calibrated probabilities of fraud or likelihood of fraud.
-- **Zero Leakage**: Ground-truth fields (`pattern_id`, `is_ring_member`, `link_type`, `fraud_cases.csv`, `community_labels.csv`, `fraud_purity`, `max_ring_coverage`) are never exposed or rendered.
+- **Color System**:
+  - **Background**: Deep Obsidian `#030712` and `#050a18` with subtle cyber grid texture and ambient radial glow gradients.
+  - **Razorpay Brand & Accents**: Electric Razorpay Blue (`#0C2340`, `#0284c7`, `#3395FF`), Neon Cyan (`#00F0FF`), Cyber Purple (`#8b5cf6`), Signal Crimson (`#f43f5e`), Signal Amber (`#fbbf24`), Signal Emerald (`#10b981`).
+  - **Surface Treatment**: Glassmorphism cards (`backdrop-filter: blur(16px); background: rgba(11, 19, 41, 0.75); border: 1px solid rgba(56, 189, 248, 0.12);`).
+  - **Typography**: Google Fonts **Plus Jakarta Sans** (clean, futuristic fintech headlines) + **JetBrains Mono** (hashes, transaction IDs, currencies, graph telemetry).
 
 ---
 
-## 3. Application Routes & Workspaces
+## 3. Workspaces & Key Capabilities
 
-| Route | Workspace | Description |
-| :--- | :--- | :--- |
-| `/dashboard` (or `/`) | **Overview Dashboard** | Network KPIs (50k accounts, 450.5k transactions, 59 communities, 2.6M edges), risk distribution bar (17 HIGH / 13 MEDIUM / 29 LOW), and top flagged priority queue. |
-| `/communities` | **Community Explorer** | Searchable, filterable, and sortable table of all 59 Louvain communities with density, mean weights, tx/member, and top signals. |
-| `/communities/:communityId` | **Community Investigation Workspace** | Flagged reasons, top 3 observable signals, 4 feature breakdown cards, member accounts, Cytoscape graph canvas, timeline stream, and `[ + Add to Investigation ]` action. |
-| `/accounts/:accountId` | **Account Inspector** | Customer balance, creation date, assigned community context, transaction history, observable graph connections, and `[ + Add to Investigation ]` action. |
-| `/transactions/:transactionId` | **Transaction Detail** | Complete transaction record, origin/destination cards, merchant details, digital footprint, and `[ + Add to Investigation ]` action. |
-| `/investigations` | **Investigation Queue** | Case management dashboard with Open, Under Review, and Closed case counters, priority filters, case creation modal, and target badges. |
-| `/investigations/:caseId` | **Case Detail & Watchlist** | Case title editor, Status workflow (`OPEN` → `REVIEW` → `CLOSED`), Priority selector (`HIGH`/`MEDIUM`/`LOW`), Investigator Notes editor, and attached Communities, Accounts, and Transactions. |
+### A. Executive Security Operations Command (`/dashboard`)
+- **Live Threat Radar HUD**: Highlights network threat concentration (17 High-Risk clusters identified across 50,000 accounts).
+- **Flagship Quick Triage Shortcut**: Direct access to prioritize cluster **Community #3** (Risk Score 92/100, 1,231 members, heavy device & instrument reuse).
+- **4 Glowing Glassmorphic KPI Cards**: Accounts (50k), Transactions (450.5k), Graph Evidence Edges (2.61M), Louvain Clusters (59).
+- **Observable Fraud Typology Matrix**: 4 visual cards breaking down *Hardware & Device Clustering*, *Payment Instrument Collusion*, *Temporal Micro-Bursting*, and *Decline Velocity Spikes*.
+- **Risk Spectrum Distribution Bar**: Multi-segmented progress bar for High (28.8%), Medium (22.0%), and Low (49.2%) clusters.
+- **Top Flagged Communities Leaderboard**: Table with risk gauges, density metrics, mean edge weights, observable signal tags, and instant `Add to Investigation` buttons.
+
+### B. Universal Omnisearch (`[⌘K]` / `[Ctrl+K]`) & SAR Export
+- **Omnisearch Modal**: Instant fuzzy searching across Community IDs (`#0`–`#58`), Accounts (`acc_...`), Transactions (`tx_...`), and Cases.
+- **Forensic SAR Dossier Generator**: One-click generation of formal **Suspicious Activity Reports** (ISO-20022 aligned) ready to copy or download as Markdown (`.md`).
+
+### C. Community Investigation Workspace (`/communities/:communityId`)
+- **Flagship Hero Banner**: Community ID, Louvain Cluster Index, ML Risk Score meter, Total Network Volume, Member Accounts.
+- **Razorpay Explainable AI Evidence Panel**: Natural language forensic summary, top 3 observable signal cards with feature delta intensity bars.
+- **4 Feature Dimension Cards (21 Observable Features)**: Graph Topology (4), Entity Sharing (6), Temporal Velocity (5), Transaction Analytics (6).
+- **Interactive Network Topology Graph (Cytoscape)**:
+  - Deep space cyber canvas with glowing cyan nodes and bezier evidence edges.
+  - Layout engine selector: Force-Directed (Cose), Concentric (Degree), Circular.
+  - Interactive side-drawers on node and edge click detailing degrees, balances, shared cards, devices, IPs, and temporal overlap.
+- **Member Accounts Directory & Activity Timeline Stream**.
+
+### D. Account Profile & Transaction Inspector (`/accounts/:id`, `/transactions/:id`)
+- Customer KYC profile, outgoing vs incoming flow metrics, decline rates, connected peer matrix.
+- Interactive **Payment Gateway Transfer Flow** diagram and observable digital footprint breakdown (hardware fingerprint, card token, IP address).
+
+### E. Investigation Queue & Case Workspace (`/investigations`, `/investigations/:caseId`)
+- Persistent case management across `OPEN` → `UNDER REVIEW` → `CLOSED` status workflows.
+- Auto-saving **Investigator Notes** editor.
+- Multi-entity target watchlist categorized by Communities, Accounts, and Transactions with one-click navigation and quick ID attach.
 
 ---
 
@@ -68,4 +91,4 @@ cd frontend
 npm install
 npm run dev
 ```
-*Frontend UI: `http://127.0.0.1:5173`*
+*Frontend URL: `http://127.0.0.1:5173`*
