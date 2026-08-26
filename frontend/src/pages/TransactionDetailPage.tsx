@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRight,
+  Briefcase,
   CheckCircle2,
+  ExternalLink,
   Smartphone,
   Store,
   User,
@@ -13,6 +16,12 @@ import type { TransactionDetailResponse } from '../types/api';
 import { AddToInvestigationButton } from '../components/common/AddToInvestigationButton';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorState } from '../components/common/ErrorState';
+import {
+  getPlaybookContext,
+  updatePlaybookContext,
+  updatePlaybookStep,
+} from '../utils/playbookManager';
+import { getOrCreateActiveCase } from '../utils/caseManager';
 
 export const TransactionDetailPage: React.FC = () => {
   const { transactionId } = useParams<{ transactionId: string }>();
@@ -31,6 +40,15 @@ export const TransactionDetailPage: React.FC = () => {
       try {
         const res = await getTransaction(transactionId);
         setTx(res);
+
+        const ctx = getPlaybookContext();
+        if (ctx.isActive) {
+          updatePlaybookContext({
+            transactionId: res.transaction_id,
+            accountId: res.src_account_id,
+          });
+          updatePlaybookStep(5);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : `Transaction '${transactionId}' not found`);
       } finally {
@@ -50,6 +68,18 @@ export const TransactionDetailPage: React.FC = () => {
   }
 
   const isDeclined = tx.transaction_status.toLowerCase() === 'declined';
+
+  const handleProceedToCase = () => {
+    const activeCase = getOrCreateActiveCase({
+      type: 'TRANSACTION',
+      id: tx.transaction_id,
+      label: `Transaction ${tx.transaction_id} ($${tx.amount.toFixed(2)})`,
+      addedAt: new Date().toISOString(),
+    });
+    updatePlaybookContext({ caseId: activeCase.id });
+    updatePlaybookStep(6);
+    navigate(`/investigations/${activeCase.id}`);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1080px' }}>
@@ -76,11 +106,35 @@ export const TransactionDetailPage: React.FC = () => {
           <span className="font-mono text-slate-200">{tx.transaction_id}</span>
         </div>
 
-        <AddToInvestigationButton
-          targetType="TRANSACTION"
-          targetId={tx.transaction_id}
-          targetLabel={`Transaction ${tx.transaction_id} ($${tx.amount.toFixed(2)})`}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={handleProceedToCase}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              backgroundColor: 'rgba(0, 240, 255, 0.12)',
+              border: '1px solid rgba(0, 240, 255, 0.35)',
+              borderRadius: '6px',
+              color: 'var(--accent-cyan)',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Briefcase size={13} />
+            <span>Step 6: Proceed to Case Dossier</span>
+            <ArrowRight size={13} />
+          </button>
+
+          <AddToInvestigationButton
+            targetType="TRANSACTION"
+            targetId={tx.transaction_id}
+            targetLabel={`Transaction ${tx.transaction_id} ($${tx.amount.toFixed(2)})`}
+          />
+        </div>
       </div>
 
       {/* Transaction Top Hero Card */}
@@ -110,7 +164,7 @@ export const TransactionDetailPage: React.FC = () => {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <h1 className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+              <h1 className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', margin: 0 }}>
                 {tx.transaction_id}
               </h1>
               <span
@@ -129,7 +183,7 @@ export const TransactionDetailPage: React.FC = () => {
                 {tx.transaction_status.toUpperCase()}
               </span>
             </div>
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
               Processed: {new Date(tx.timestamp).toLocaleString()}
             </span>
           </div>
@@ -158,11 +212,11 @@ export const TransactionDetailPage: React.FC = () => {
 
       {/* Money Flow Architecture Diagram */}
       <div className="dash-card" style={{ padding: '24px' }}>
-        <h3 style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: '16px' }}>
+        <h3 style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: '16px', margin: 0 }}>
           Payment Gateway Transfer Flow
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', alignItems: 'center', marginTop: '14px' }}>
           {/* Origin Account */}
           <div
             onClick={() => navigate(`/accounts/${tx.src_account_id}`)}
@@ -180,9 +234,12 @@ export const TransactionDetailPage: React.FC = () => {
             <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
               Source Account (Origin)
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-              <User size={16} style={{ color: 'var(--accent-cyan)' }} />
-              <span className="font-mono font-bold text-slate-100">{tx.src_account_id}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <User size={16} style={{ color: 'var(--accent-cyan)' }} />
+                <span className="font-mono font-bold text-slate-100">{tx.src_account_id}</span>
+              </div>
+              <ExternalLink size={13} style={{ color: 'var(--text-dim)' }} />
             </div>
           </div>
 
@@ -203,9 +260,12 @@ export const TransactionDetailPage: React.FC = () => {
             <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
               Destination Account (Beneficiary)
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-              <User size={16} style={{ color: '#34d399' }} />
-              <span className="font-mono font-bold text-slate-100">{tx.dst_account_id}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <User size={16} style={{ color: '#34d399' }} />
+                <span className="font-mono font-bold text-slate-100">{tx.dst_account_id}</span>
+              </div>
+              <ExternalLink size={13} style={{ color: 'var(--text-dim)' }} />
             </div>
           </div>
         </div>

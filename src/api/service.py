@@ -28,12 +28,15 @@ from src.api.schemas import (
     AccountSummary,
     AccountTransactionStats,
     CommunityDetailResponse,
+    CommunityEvidenceResponse,
     CommunityGraphResponse,
     CommunityListResponse,
     CommunitySummary,
     CommunityTimelineResponse,
     ConnectionItem,
+    AccountEvidenceResponse,
     EntitySharingStats,
+    EvidenceItemSchema,
     GraphEdge,
     GraphNode,
     PaginatedAccountsResponse,
@@ -737,6 +740,122 @@ class TraceLineService:
             community_id=community_id,
             total_events=total,
             events=events,
+        )
+
+    def get_community_evidence(self, community_id: int) -> Optional[CommunityEvidenceResponse]:
+        """Run observable evidence analysis for a community.
+
+        Uses the Evidence Intelligence Engine with in-memory indexed data.
+        Returns None if the community does not exist.
+
+        Note: evidence_score is DISTINCT from risk_score.
+          risk_score     = ML-derived ensemble prioritization
+          evidence_score = deterministic observable rule strength
+        """
+        self.load_data()
+
+        if (
+            self.community_risk_scores_df.empty
+            or community_id not in self.community_risk_scores_df.index
+        ):
+            return None
+
+        from src.intelligence.evidence_engine import EvidenceEngine
+
+        engine = EvidenceEngine(
+            transactions_df=self.transactions_df,
+            community_to_accounts=self.community_to_accounts,
+            account_to_community=self.account_to_community,
+            account_connections_map=self.account_connections_map,
+            community_edges_map=self.community_edges_map,
+            community_features_df=self.community_features_df,
+            account_sent_tx_indices=self.account_sent_tx_indices,
+            account_recv_tx_indices=self.account_recv_tx_indices,
+        )
+
+        result = engine.get_community_evidence(community_id)
+
+        return CommunityEvidenceResponse(
+            community_id=result.community_id,
+            evidence_score=result.evidence_score,
+            evidence_count=result.evidence_count,
+            high_count=result.high_count,
+            medium_count=result.medium_count,
+            low_count=result.low_count,
+            runtime_ms=result.runtime_ms,
+            items=[
+                EvidenceItemSchema(
+                    evidence_id=item.evidence_id,
+                    entity_type=item.entity_type,
+                    entity_id=item.entity_id,
+                    type=item.type,
+                    severity=item.severity,
+                    title=item.title,
+                    description=item.description,
+                    score_contribution=item.score_contribution,
+                    observed_at=item.observed_at,
+                    supporting_entities=item.supporting_entities,
+                    metrics=item.metrics,
+                )
+                for item in result.items
+            ],
+        )
+
+    def get_account_evidence(self, account_id: str) -> Optional[AccountEvidenceResponse]:
+        """Run observable evidence analysis for an account.
+
+        Uses the Evidence Intelligence Engine with in-memory indexed data.
+        Returns None if the account does not exist.
+
+        Note: evidence_score is DISTINCT from risk_score.
+          risk_score     = ML-derived ensemble prioritization
+          evidence_score = deterministic observable rule strength
+        """
+        self.load_data()
+
+        if self.accounts_df.empty or account_id not in self.accounts_df.index:
+            return None
+
+        from src.intelligence.evidence_engine import EvidenceEngine
+
+        engine = EvidenceEngine(
+            transactions_df=self.transactions_df,
+            community_to_accounts=self.community_to_accounts,
+            account_to_community=self.account_to_community,
+            account_connections_map=self.account_connections_map,
+            community_edges_map=self.community_edges_map,
+            community_features_df=self.community_features_df,
+            account_sent_tx_indices=self.account_sent_tx_indices,
+            account_recv_tx_indices=self.account_recv_tx_indices,
+        )
+
+        result = engine.get_account_evidence(account_id)
+
+        return AccountEvidenceResponse(
+            account_id=result.account_id,
+            community_id=result.community_id,
+            evidence_score=result.evidence_score,
+            evidence_count=result.evidence_count,
+            high_count=result.high_count,
+            medium_count=result.medium_count,
+            low_count=result.low_count,
+            runtime_ms=result.runtime_ms,
+            items=[
+                EvidenceItemSchema(
+                    evidence_id=item.evidence_id,
+                    entity_type=item.entity_type,
+                    entity_id=item.entity_id,
+                    type=item.type,
+                    severity=item.severity,
+                    title=item.title,
+                    description=item.description,
+                    score_contribution=item.score_contribution,
+                    observed_at=item.observed_at,
+                    supporting_entities=item.supporting_entities,
+                    metrics=item.metrics,
+                )
+                for item in result.items
+            ],
         )
 
 

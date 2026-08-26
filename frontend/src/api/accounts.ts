@@ -2,6 +2,7 @@ import { fetchApi } from './client';
 import type {
   AccountConnectionsResponse,
   AccountDetailResponse,
+  AccountEvidenceResponse,
   PaginatedTransactionsResponse,
 } from '../types/api';
 
@@ -22,4 +23,8 @@ export async function getAccountTransactions(
 
 export async function getAccountConnections(accountId: string): Promise<AccountConnectionsResponse> {
   return fetchApi<AccountConnectionsResponse>(`/accounts/${accountId}/connections`);
+}
+
+export async function getAccountEvidence(accountId: string): Promise<AccountEvidenceResponse> {
+  return fetchApi<AccountEvidenceResponse>(`/accounts/${accountId}/evidence`);
 }

@@ -1,6 +1,7 @@
 import { fetchApi } from './client';
 import type {
   CommunityDetailResponse,
+  CommunityEvidenceResponse,
   CommunityGraphResponse,
   CommunityListResponse,
   CommunityTimelineResponse,
@@ -43,4 +44,10 @@ export async function getCommunityTimeline(
   return fetchApi<CommunityTimelineResponse>(
     `/timeline/community/${communityId}?limit=${limit}&offset=${offset}`
   );
+}
+
+export async function getCommunityEvidence(
+  communityId: number | string
+): Promise<CommunityEvidenceResponse> {
+  return fetchApi<CommunityEvidenceResponse>(`/communities/${communityId}/evidence`);
 }

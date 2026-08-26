@@ -303,3 +303,74 @@ class CommunityTimelineResponse(BaseModel):
     community_id: int = Field(..., description="Community ID")
     total_events: int = Field(..., description="Total chronological events")
     events: List[TimelineEvent] = Field(..., description="Chronological activity events")
+
+
+# ---------------------------------------------------------------------------
+# Evidence Intelligence Engine
+# ---------------------------------------------------------------------------
+
+
+class EvidenceItemSchema(BaseModel):
+    """A single observable evidence finding produced by the Evidence Intelligence Engine.
+
+    All fields derive exclusively from observable payment-network data.
+    Ground-truth evaluation fields (pattern_id, is_ring_member, link_type,
+    fraud_purity, max_ring_coverage, primary_ring_id, is_positive) are
+    never included.
+
+    Evidence Score vs Risk Score
+    ----------------------------
+    evidence_score = deterministic observable rule strength (this engine)
+    risk_score     = ML-derived ensemble prioritization (separate system)
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    evidence_id: str = Field(..., description="Deterministic SHA-1 based identifier")
+    entity_type: str = Field(..., description="'COMMUNITY' or 'ACCOUNT'")
+    entity_id: str = Field(..., description="Community ID (as string) or account ID")
+    type: str = Field(..., description="Evidence detector type (e.g. DEVICE_REUSE)")
+    severity: str = Field(..., description="Investigation priority: HIGH, MEDIUM, or LOW")
+    title: str = Field(..., description="Short investigator-facing title")
+    description: str = Field(..., description="Full natural-language explanation")
+    score_contribution: float = Field(..., description="Points contributed to evidence_score")
+    observed_at: Optional[str] = Field(None, description="ISO 8601 timestamp of earliest observation")
+    supporting_entities: List[str] = Field(default_factory=list, description="Sorted list of supporting entity IDs")
+    metrics: Dict[str, Any] = Field(default_factory=dict, description="Named observable measurement values")
+
+
+class CommunityEvidenceResponse(BaseModel):
+    """Observable-only evidence analysis result for a community.
+
+    evidence_score is DISTINCT from risk_score:
+      risk_score     = ML-derived ensemble prioritization
+      evidence_score = deterministic observable rule strength
+    """
+
+    community_id: int = Field(..., description="Community ID")
+    evidence_score: int = Field(..., description="Aggregate observable-rule evidence strength [0-100]")
+    evidence_count: int = Field(..., description="Total evidence items found")
+    high_count: int = Field(..., description="Number of HIGH severity evidence items")
+    medium_count: int = Field(..., description="Number of MEDIUM severity evidence items")
+    low_count: int = Field(..., description="Number of LOW severity evidence items")
+    items: List[EvidenceItemSchema] = Field(..., description="Sorted evidence items (HIGH first)")
+    runtime_ms: float = Field(..., description="Engine runtime in milliseconds")
+
+
+class AccountEvidenceResponse(BaseModel):
+    """Observable-only evidence analysis result for an account.
+
+    evidence_score is DISTINCT from risk_score:
+      risk_score     = ML-derived ensemble prioritization
+      evidence_score = deterministic observable rule strength
+    """
+
+    account_id: str = Field(..., description="Account identifier")
+    community_id: Optional[int] = Field(None, description="Assigned community ID if any")
+    evidence_score: int = Field(..., description="Aggregate observable-rule evidence strength [0-100]")
+    evidence_count: int = Field(..., description="Total evidence items found")
+    high_count: int = Field(..., description="Number of HIGH severity evidence items")
+    medium_count: int = Field(..., description="Number of MEDIUM severity evidence items")
+    low_count: int = Field(..., description="Number of LOW severity evidence items")
+    items: List[EvidenceItemSchema] = Field(..., description="Sorted evidence items (HIGH first)")
+    runtime_ms: float = Field(..., description="Engine runtime in milliseconds")

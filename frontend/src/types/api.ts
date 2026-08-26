@@ -229,3 +229,61 @@ export interface CommunityTimelineResponse {
   total_events: number;
   events: TimelineEvent[];
 }
+
+// ---------------------------------------------------------------------------
+// Evidence Intelligence Engine types
+// evidence_score is DISTINCT from risk_score:
+//   risk_score     = ML-derived ensemble prioritization
+//   evidence_score = deterministic observable rule strength
+// ---------------------------------------------------------------------------
+
+export type EvidenceSeverity = 'HIGH' | 'MEDIUM' | 'LOW';
+export type EvidenceType =
+  | 'SHARED_INSTRUMENT_CONCENTRATION'
+  | 'DEVICE_REUSE'
+  | 'IP_CONCENTRATION'
+  | 'TEMPORAL_BURST'
+  | 'RAPID_INTERACTION'
+  | 'MERCHANT_TEMPORAL_OVERLAP'
+  | 'HIGH_EVIDENCE_DENSITY'
+  | 'HUB_ACCOUNT'
+  | 'MULTI_LAYER_EVIDENCE';
+
+export interface EvidenceItem {
+  evidence_id: string;
+  entity_type: string;
+  entity_id: string;
+  type: EvidenceType;
+  severity: EvidenceSeverity;
+  title: string;
+  description: string;
+  score_contribution: number;
+  observed_at: string | null;
+  supporting_entities: string[];
+  metrics: Record<string, unknown>;
+}
+
+export interface CommunityEvidenceResponse {
+  community_id: number;
+  /** Deterministic observable-rule strength [0–100]. NOT the ML risk_score. */
+  evidence_score: number;
+  evidence_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  items: EvidenceItem[];
+  runtime_ms: number;
+}
+
+export interface AccountEvidenceResponse {
+  account_id: string;
+  community_id: number | null;
+  /** Deterministic observable-rule strength [0–100]. NOT the ML risk_score. */
+  evidence_score: number;
+  evidence_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  items: EvidenceItem[];
+  runtime_ms: number;
+}

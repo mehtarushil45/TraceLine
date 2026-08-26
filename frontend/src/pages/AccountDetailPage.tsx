@@ -5,6 +5,9 @@ import {
   ArrowDownLeft,
   ArrowLeft,
   ArrowUpRight,
+  ChevronRight,
+  ExternalLink,
+  FileText,
   Layers,
   Network,
   User,
@@ -20,12 +23,16 @@ import type {
   AccountDetailResponse,
   TransactionItem,
 } from '../types/api';
+import { RiskBadge } from '../components/common/RiskBadge';
 import { AddToInvestigationButton } from '../components/common/AddToInvestigationButton';
+import { EvidenceIntelligencePanel } from '../components/community/EvidenceIntelligencePanel';
 import { TransactionTable } from '../components/transaction/TransactionTable';
 import { ConnectionsTable } from '../components/account/ConnectionsTable';
 import { Pagination } from '../components/common/Pagination';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorState } from '../components/common/ErrorState';
+import { SarExportModal } from '../components/layout/SarExportModal';
+import { getPlaybookContext, updatePlaybookContext, updatePlaybookStep } from '../utils/playbookManager';
 
 export const AccountDetailPage: React.FC = () => {
   const { accountId } = useParams<{ accountId: string }>();
@@ -33,6 +40,7 @@ export const AccountDetailPage: React.FC = () => {
 
   const [account, setAccount] = useState<AccountDetailResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'transactions' | 'connections'>('transactions');
+  const [isSarModalOpen, setIsSarModalOpen] = useState(false);
 
   // Transactions Tab State
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
@@ -59,6 +67,14 @@ export const AccountDetailPage: React.FC = () => {
       try {
         const acc = await getAccount(accountId);
         setAccount(acc);
+        const ctx = getPlaybookContext();
+        if (ctx.isActive) {
+          updatePlaybookContext({
+            accountId: acc.account_id,
+            communityId: acc.community_id ?? ctx.communityId,
+          });
+          updatePlaybookStep(4);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : `Account '${accountId}' not found`);
       } finally {
@@ -118,10 +134,13 @@ export const AccountDetailPage: React.FC = () => {
   }
 
   const txStats = account.transaction_statistics;
+  const hasCommunity = account.community_id !== null && account.community_id !== undefined;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* 1. Breadcrumb & Action Toolbar */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+      {/* ------------------------------------------------------------------ */}
+      {/* 1. Breadcrumb & Action Toolbar                                     */}
+      {/* ------------------------------------------------------------------ */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
           <button
@@ -144,14 +163,38 @@ export const AccountDetailPage: React.FC = () => {
           <span className="font-mono text-slate-200">{account.account_id}</span>
         </div>
 
-        <AddToInvestigationButton
-          targetType="ACCOUNT"
-          targetId={account.account_id}
-          targetLabel={`Account ${account.account_id} (${account.customer_name || 'Customer'})`}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => setIsSarModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              backgroundColor: '#162447',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
+              color: 'var(--text-main)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <FileText size={13} style={{ color: 'var(--accent-cyan)' }} />
+            <span>Generate SAR</span>
+          </button>
+
+          <AddToInvestigationButton
+            targetType="ACCOUNT"
+            targetId={account.account_id}
+            targetLabel={`Account ${account.account_id} (${account.customer_name || 'Customer'})`}
+          />
+        </div>
       </div>
 
-      {/* 2. Customer Profile Hero HUD */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 2. Customer Profile Hero HUD                                       */}
+      {/* ------------------------------------------------------------------ */}
       <div
         className="dash-card"
         style={{
@@ -179,10 +222,10 @@ export const AccountDetailPage: React.FC = () => {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <h1 className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+              <h1 className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', margin: 0 }}>
                 {account.account_id}
               </h1>
-              {account.community_id !== null && (
+              {hasCommunity && (
                 <button
                   onClick={() => navigate(`/communities/${account.community_id}`)}
                   style={{
@@ -198,21 +241,50 @@ export const AccountDetailPage: React.FC = () => {
                     fontWeight: 700,
                     cursor: 'pointer',
                   }}
+                  title="View Community Workspace"
                 >
                   <Layers size={13} />
                   <span>Community #{account.community_id}</span>
+                  <ExternalLink size={11} style={{ opacity: 0.7 }} />
                 </button>
               )}
             </div>
-            <span style={{ fontSize: '14px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
               {account.customer_name || 'Individual Customer Account'} · Created on{' '}
               {account.creation_date ? new Date(account.creation_date).toLocaleDateString() : '—'}
             </span>
           </div>
         </div>
 
-        {/* Balance */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        {/* Right side stats */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          {/* Community Risk Context Badge if assigned */}
+          {hasCommunity && account.community_risk_level && (
+            <div
+              style={{
+                padding: '10px 16px',
+                borderRadius: '8px',
+                backgroundColor: '#030712',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 4,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+                  Cluster ML Risk
+                </span>
+                <RiskBadge level={account.community_risk_level} size="sm" />
+              </div>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Score: <strong style={{ color: '#f8fafc' }}>{account.community_risk_score ?? '—'}/100</strong>
+              </span>
+            </div>
+          )}
+
+          {/* Available Balance */}
           <div
             style={{
               padding: '10px 18px',
@@ -234,7 +306,9 @@ export const AccountDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Transaction Flow Metric Cards */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 3. Transaction Flow KPI Metric Cards                               */}
+      {/* ------------------------------------------------------------------ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
         {/* Total Volume */}
         <div className="dash-card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -298,121 +372,173 @@ export const AccountDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Investigation Tabs Header */}
-      <div style={{ borderBottom: '1px solid var(--border)', display: 'flex', gap: '16px' }}>
-        <button
-          onClick={() => setActiveTab('transactions')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 18px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'transactions' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
-            color: activeTab === 'transactions' ? '#f8fafc' : 'var(--text-muted)',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          <Activity size={16} style={{ color: activeTab === 'transactions' ? 'var(--accent-cyan)' : 'inherit' }} />
-          Transaction Audit Log ({txStats.total_count.toLocaleString()})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('connections')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 18px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'connections' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
-            color: activeTab === 'connections' ? '#f8fafc' : 'var(--text-muted)',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          <Network size={16} style={{ color: activeTab === 'connections' ? 'var(--accent-cyan)' : 'inherit' }} />
-          Observable Graph Connections
-        </button>
-      </div>
-
-      {/* Tab A: Transactions */}
-      {activeTab === 'transactions' && (
-        <div className="dash-card">
-          {/* Direction Filter Bar */}
-          <div
-            style={{
-              padding: '12px 18px',
-              borderBottom: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: '#070d1e',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {(['all', 'sent', 'received'] as const).map((dir) => (
-                <button
-                  key={dir}
-                  onClick={() => {
-                    setTxDirection(dir);
-                    setTxPage(1);
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    textTransform: 'capitalize',
-                    cursor: 'pointer',
-                    border: '1px solid',
-                    borderColor: txDirection === dir ? 'var(--accent-cyan)' : 'transparent',
-                    backgroundColor: txDirection === dir ? 'rgba(0, 240, 255, 0.15)' : 'transparent',
-                    color: txDirection === dir ? '#00F0FF' : 'var(--text-muted)',
-                  }}
-                >
-                  {dir}
-                </button>
-              ))}
-            </div>
-
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-              Showing {transactions.length} of {txTotal} entries
+      {/* ------------------------------------------------------------------ */}
+      {/* 4. Dedicated Evidence Intelligence Panel                           */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="dash-card" style={{ padding: '22px 26px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-cyan)' }}>
+              Account Evidence Intelligence
+            </span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontStyle: 'italic' }}>
+              Deterministic observable-rule analysis · Account-level scope
             </span>
           </div>
 
-          {loadingTx ? (
-            <LoadingSkeleton type="table" count={6} />
-          ) : (
-            <>
-              <TransactionTable transactions={transactions} />
-              <Pagination
-                currentPage={txPage}
-                totalPages={txTotalPages}
-                totalItems={txTotal}
-                pageSize={50}
-                onPageChange={(p) => setTxPage(p)}
-              />
-            </>
+          {hasCommunity && (
+            <button
+              onClick={() => navigate(`/communities/${account.community_id}`, { state: { tab: 'graph' } })}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 10px',
+                borderRadius: 4,
+                backgroundColor: 'rgba(0, 240, 255, 0.08)',
+                border: '1px solid rgba(0, 240, 255, 0.25)',
+                color: 'var(--accent-cyan)',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Network size={12} />
+              <span>Explore Cluster #{account.community_id} Topology</span>
+              <ChevronRight size={12} />
+            </button>
           )}
         </div>
-      )}
 
-      {/* Tab B: Observable Graph Connections */}
-      {activeTab === 'connections' && (
-        <div className="dash-card">
-          {loadingConns || !connections ? (
-            <LoadingSkeleton type="table" count={6} />
-          ) : (
-            <ConnectionsTable connections={connections.connections} />
-          )}
+        <EvidenceIntelligencePanel
+          accountId={account.account_id}
+          parentCommunityId={account.community_id}
+        />
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 5. Investigation Tabs (Audit Log & Connections)                   */}
+      {/* ------------------------------------------------------------------ */}
+      <div>
+        {/* Tab bar */}
+        <div style={{ borderBottom: '1px solid var(--border)', display: 'flex', gap: '4px', marginBottom: 0 }}>
+          <button
+            onClick={() => setActiveTab('transactions')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              padding: '11px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'transactions' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+              color: activeTab === 'transactions' ? '#f8fafc' : 'var(--text-muted)',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <Activity size={14} style={{ color: activeTab === 'transactions' ? 'var(--accent-cyan)' : 'inherit' }} />
+            Transaction Audit Log ({txStats.total_count.toLocaleString()})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('connections')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              padding: '11px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'connections' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+              color: activeTab === 'connections' ? '#f8fafc' : 'var(--text-muted)',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <Network size={14} style={{ color: activeTab === 'connections' ? 'var(--accent-cyan)' : 'inherit' }} />
+            Observable Graph Connections ({account.connected_account_count})
+          </button>
         </div>
-      )}
+
+        {/* Tab A: Transactions */}
+        {activeTab === 'transactions' && (
+          <div className="dash-card" style={{ marginTop: 0, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+            {/* Direction Filter Bar */}
+            <div
+              style={{
+                padding: '12px 18px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#070d1e',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {(['all', 'sent', 'received'] as const).map((dir) => (
+                  <button
+                    key={dir}
+                    onClick={() => {
+                      setTxDirection(dir);
+                      setTxPage(1);
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textTransform: 'capitalize',
+                      cursor: 'pointer',
+                      border: '1px solid',
+                      borderColor: txDirection === dir ? 'var(--accent-cyan)' : 'transparent',
+                      backgroundColor: txDirection === dir ? 'rgba(0, 240, 255, 0.15)' : 'transparent',
+                      color: txDirection === dir ? '#00F0FF' : 'var(--text-muted)',
+                    }}
+                  >
+                    {dir}
+                  </button>
+                ))}
+              </div>
+
+              <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                Showing {transactions.length} of {txTotal} entries
+              </span>
+            </div>
+
+            {loadingTx ? (
+              <LoadingSkeleton type="table" count={6} />
+            ) : (
+              <>
+                <TransactionTable transactions={transactions} />
+                <Pagination
+                  currentPage={txPage}
+                  totalPages={txTotalPages}
+                  totalItems={txTotal}
+                  pageSize={50}
+                  onPageChange={(p) => setTxPage(p)}
+                />
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Tab B: Observable Graph Connections */}
+        {activeTab === 'connections' && (
+          <div className="dash-card" style={{ marginTop: 0, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+            {loadingConns || !connections ? (
+              <LoadingSkeleton type="table" count={6} />
+            ) : (
+              <ConnectionsTable connections={connections.connections} />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* SAR Export Modal */}
+      <SarExportModal isOpen={isSarModalOpen} onClose={() => setIsSarModalOpen(false)} />
     </div>
   );
 };

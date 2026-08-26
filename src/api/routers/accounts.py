@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from src.api.schemas import (
     AccountConnectionsResponse,
     AccountDetailResponse,
+    AccountEvidenceResponse,
     PaginatedTransactionsResponse,
 )
 from src.api.service import service
@@ -61,3 +62,30 @@ def get_account_connections(account_id: str) -> AccountConnectionsResponse:
             detail=f"Account '{account_id}' not found.",
         )
     return conns
+
+
+@router.get(
+    "/{account_id}/evidence",
+    response_model=AccountEvidenceResponse,
+    summary="Get Account Evidence Intelligence",
+)
+def get_account_evidence(account_id: str) -> AccountEvidenceResponse:
+    """Return observable-only evidence analysis for an account.
+
+    Runs deterministic rule-based evidence detectors to explain WHY an
+    account requires investigator attention based on its graph relationships,
+    infrastructure sharing, and transaction behavior.
+
+    Evidence Score is DISTINCT from Risk Score:
+      - risk_score     = ML-derived ensemble prioritization
+      - evidence_score = deterministic observable rule strength
+
+    No ground-truth evaluation data is ever returned.
+    """
+    result = service.get_account_evidence(account_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account '{account_id}' not found.",
+        )
+    return result

@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Activity,
   ArrowRight,
+  Briefcase,
   ChevronRight,
   Clock,
+  Compass,
   CreditCard,
   Layers,
   Network,
   ShieldAlert,
   Smartphone,
+  Sparkles,
   TrendingUp,
   Users,
 } from 'lucide-react';
-import { getCommunities, getSummary } from '../api';
+import { getCommunities, getCommunityAccounts, getSummary } from '../api';
 import type { CommunitySummary, SummaryResponse } from '../types/api';
 import { KpiCard } from '../components/common/KpiCard';
 import { RiskBadge } from '../components/common/RiskBadge';
@@ -22,6 +25,8 @@ import { SignalBadge } from '../components/common/SignalBadge';
 import { AddToInvestigationButton } from '../components/common/AddToInvestigationButton';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorState } from '../components/common/ErrorState';
+import { getCases } from '../utils/caseManager';
+import { startPlaybook } from '../utils/playbookManager';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,14 +34,23 @@ export const DashboardPage: React.FC = () => {
   const [topCommunities, setTopCommunities] = useState<CommunitySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLaunchingDemo, setIsLaunchingDemo] = useState(false);
+
+  const cases = getCases();
+  const openCases = cases.filter((c) => c.status !== 'CLOSED');
+  const lastCase = cases[0] || null;
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [sumRes, commRes] = await Promise.all([getSummary(), getCommunities()]);
+      const [sumRes, commRes] = await Promise.all([
+        getSummary(),
+        getCommunities(),
+      ]);
       setSummary(sumRes);
-      setTopCommunities(commRes.items.slice(0, 6));
+      const sorted = [...commRes.items].sort((a, b) => b.risk_score - a.risk_score);
+      setTopCommunities(sorted.slice(0, 10));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to TraceLine API');
     } finally {
@@ -61,17 +75,61 @@ export const DashboardPage: React.FC = () => {
     return <ErrorState message={error || undefined} onRetry={loadData} />;
   }
 
+  const highestRiskComm = topCommunities[0] || {
+    community_id: 3,
+    risk_score: 92,
+    risk_level: 'HIGH',
+    member_count: 1231,
+  };
+
+  const handleStartPlaybook = () => {
+    const commId = highestRiskComm.community_id;
+    startPlaybook({
+      communityId: commId,
+      currentStep: 1,
+    });
+    navigate(`/communities/${commId}`);
+  };
+
+  const handleLaunchDemoInvestigation = async () => {
+    setIsLaunchingDemo(true);
+    try {
+      const commId = highestRiskComm.community_id;
+      // Pre-seed with real account from this community
+      const accRes = await getCommunityAccounts(String(commId), 1, 1);
+      const firstAcc = accRes.items[0];
+
+      startPlaybook({
+        communityId: commId,
+        accountId: firstAcc ? firstAcc.account_id : 'acc_100',
+        currentStep: 1,
+      });
+
+      navigate(`/communities/${commId}`);
+    } catch (_) {
+      startPlaybook({
+        communityId: highestRiskComm.community_id,
+        currentStep: 1,
+      });
+      navigate(`/communities/${highestRiskComm.community_id}`);
+    } finally {
+      setIsLaunchingDemo(false);
+    }
+  };
+
   const highPct = ((summary.high_risk_count / summary.community_count) * 100).toFixed(1);
   const medPct = ((summary.medium_risk_count / summary.community_count) * 100).toFixed(1);
   const lowPct = ((summary.low_risk_count / summary.community_count) * 100).toFixed(1);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      {/* Hero Threat Status HUD Banner */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 1. Hero Threat Status HUD Banner with Playbook Action              */}
+      {/* ------------------------------------------------------------------ */}
       <div
         className="dash-card glow-border-high"
         style={{
-          padding: '24px 28px',
+          padding: '26px 30px',
           background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(11, 19, 41, 0.95) 100%)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -80,7 +138,7 @@ export const DashboardPage: React.FC = () => {
           gap: '20px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flex: 1, minWidth: '320px' }}>
           <div
             style={{
               padding: '14px',
@@ -94,7 +152,7 @@ export const DashboardPage: React.FC = () => {
             <ShieldAlert size={32} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <span
                 style={{
                   padding: '2px 8px',
@@ -110,45 +168,234 @@ export const DashboardPage: React.FC = () => {
                 LIVE THREAT RADAR
               </span>
               <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                RAZORPAY RISK CLUSTER DETECTION
+                RAZORPAY RISK CLUSTER DETECTION · STRICT OBSERVABLE MODE
               </span>
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#fff', marginTop: '6px', letterSpacing: '-0.02em' }}>
-              17 High-Risk Louvain Clusters Identified in Payment Network
+            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#fff', marginTop: '6px', letterSpacing: '-0.02em', margin: 0 }}>
+              {summary.high_risk_count} High-Risk Louvain Clusters Identified in Payment Network
             </h1>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Ensemble ML prioritized clusters with abnormal hardware reuse, shared payment credentials, and burst transaction velocities.
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
+              Deterministic evidence engine flagged abnormal hardware reuse, shared payment credentials, and burst transaction velocities.
             </p>
           </div>
         </div>
 
-        <button
-          onClick={() => navigate('/communities/3')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '12px 20px',
-            backgroundColor: '#0284c7',
-            background: 'linear-gradient(135deg, #0284c7 0%, #00F0FF 100%)',
-            border: 'none',
-            borderRadius: '8px',
-            color: '#030712',
-            fontSize: '13px',
-            fontWeight: 800,
-            cursor: 'pointer',
-            boxShadow: '0 0 24px rgba(0, 240, 255, 0.4)',
-            transition: 'transform 0.15s ease',
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
-          onMouseOut={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-        >
-          <span>Triage Community #3 (Score 92)</span>
-          <ArrowRight size={16} />
-        </button>
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleStartPlaybook}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 22px',
+              backgroundColor: '#0284c7',
+              background: 'linear-gradient(135deg, #0284c7 0%, #00F0FF 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#030712',
+              fontSize: '13px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 0 24px rgba(0, 240, 255, 0.4)',
+              transition: 'transform 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseOut={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+          >
+            <Compass size={16} />
+            <span>START GUIDED INVESTIGATION</span>
+            <ArrowRight size={15} />
+          </button>
+
+          <button
+            onClick={handleLaunchDemoInvestigation}
+            disabled={isLaunchingDemo}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '12px 18px',
+              backgroundColor: 'rgba(56, 189, 248, 0.12)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: '8px',
+              color: 'var(--accent-cyan)',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: isLaunchingDemo ? 'wait' : 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Sparkles size={14} />
+            <span>Launch Demo Investigation</span>
+          </button>
+        </div>
       </div>
 
-      {/* Primary KPI Grid (4 Glowing Glass Cards) */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 2. Investigation Readiness & Threat Status HUD                      */}
+      {/* ------------------------------------------------------------------ */}
+      <div
+        className="dash-card"
+        style={{
+          padding: '20px 24px',
+          backgroundColor: '#070d1e',
+          border: '1px solid rgba(56, 189, 248, 0.2)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-cyan)' }}>
+              Investigation Readiness & Active Dossier Context
+            </span>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.22)', fontStyle: 'italic' }}>
+              Real telemetry snapshot
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '12px' }}>
+            <Link
+              to="/investigations"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                color: 'var(--accent-cyan)',
+                fontWeight: 700,
+                textDecoration: 'none',
+              }}
+            >
+              <Briefcase size={13} />
+              <span>{openCases.length} Active Investigation Cases</span>
+              <ChevronRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+          {/* Highest Risk Community */}
+          <div
+            onClick={() => navigate(`/communities/${highestRiskComm.community_id}`)}
+            style={{
+              padding: '12px 16px',
+              borderRadius: '8px',
+              backgroundColor: '#030712',
+              border: '1px solid rgba(244, 63, 94, 0.3)',
+              cursor: 'pointer',
+              transition: 'border-color 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.borderColor = '#f43f5e')}
+            onMouseOut={(e) => (e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.3)')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>
+                Highest Priority Cluster
+              </span>
+              <RiskBadge level={highestRiskComm.risk_level} size="sm" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span className="font-mono font-bold text-lg text-slate-100">
+                Community #{highestRiskComm.community_id}
+              </span>
+              <span className="font-mono text-xs text-rose-400 font-bold">
+                Score {highestRiskComm.risk_score}/100
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              {highestRiskComm.member_count.toLocaleString()} member accounts
+            </span>
+          </div>
+
+          {/* Observable Evidence Coverage */}
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: '8px',
+              backgroundColor: '#030712',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: 4 }}>
+              High-Risk Cluster Prioritization
+            </span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span className="font-mono font-bold text-lg text-amber-400">
+                {summary.high_risk_count} Clusters
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                ({highPct}% of network)
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Deterministic evidence rules active
+            </span>
+          </div>
+
+          {/* Accounts Available */}
+          <div
+            onClick={() => navigate('/accounts')}
+            style={{
+              padding: '12px 16px',
+              borderRadius: '8px',
+              backgroundColor: '#030712',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+              transition: 'border-color 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
+            onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+          >
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: 4 }}>
+              Accounts In Graph
+            </span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span className="font-mono font-bold text-lg text-slate-100">
+                {summary.account_count.toLocaleString()}
+              </span>
+              <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 600 }}>
+                100% indexed
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Full multi-layer topology resolution
+            </span>
+          </div>
+
+          {/* Last Investigation / Active Case */}
+          <div
+            onClick={() => navigate(lastCase ? `/investigations/${lastCase.id}` : '/investigations')}
+            style={{
+              padding: '12px 16px',
+              borderRadius: '8px',
+              backgroundColor: '#030712',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+              transition: 'border-color 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
+            onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+          >
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: 4 }}>
+              Active Case Dossier
+            </span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span className="font-mono font-bold text-sm text-cyan-300 truncate" style={{ maxWidth: '160px' }}>
+                {lastCase ? lastCase.title : 'No Active Cases'}
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              {lastCase ? `${lastCase.targets.length} targets · ${lastCase.status}` : 'Click to initialize case'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 3. Primary KPI Grid (4 Glowing Glass Cards)                        */}
+      {/* ------------------------------------------------------------------ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
         <KpiCard
           title="Observable Accounts"
@@ -180,7 +427,9 @@ export const DashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* Observable Fraud Typology Matrix */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 4. Observable Fraud Typology Matrix                                */}
+      {/* ------------------------------------------------------------------ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
         <div className="dash-card" style={{ padding: '16px', borderLeft: '4px solid #f87171' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -189,7 +438,7 @@ export const DashboardPage: React.FC = () => {
               Hardware & Device Clustering
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 }}>
             Multi-account hardware fingerprint sharing where disparate KYC profiles execute actions from identical physical devices.
           </p>
         </div>
@@ -201,7 +450,7 @@ export const DashboardPage: React.FC = () => {
               Payment Instrument Collusion
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 }}>
             Shared virtual cards, bank accounts, or funding instruments linked across dozens of high-velocity customer accounts.
           </p>
         </div>
@@ -213,7 +462,7 @@ export const DashboardPage: React.FC = () => {
               Temporal Micro-Bursting
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 }}>
             Extreme transaction clustering in narrow same-day time windows rather than organic temporal dispersion.
           </p>
         </div>
@@ -225,20 +474,22 @@ export const DashboardPage: React.FC = () => {
               Decline Velocity Spikes
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 }}>
             Elevated authorization rejection rates indicative of automated card-testing and rapid exhaustion testing.
           </p>
         </div>
       </div>
 
-      {/* Risk Distribution Breakdown */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 5. Risk Distribution Spectrum                                      */}
+      {/* ------------------------------------------------------------------ */}
       <div className="dash-card" style={{ padding: '24px 28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)' }}>
               Community Risk Spectrum
             </span>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px', margin: 0 }}>
               ML Risk Tier Partitioning (N = 59 Louvain Communities)
             </h3>
           </div>
@@ -313,7 +564,9 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Priority Investigation Leaderboard */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 6. Priority Investigation Leaderboard                              */}
+      {/* ------------------------------------------------------------------ */}
       <div className="dash-card">
         <div
           style={{
@@ -326,10 +579,10 @@ export const DashboardPage: React.FC = () => {
           }}
         >
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-main)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
               Top Flagged Risk Communities
             </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
               Ranked by explainable ML risk score and observable evidence intensity.
             </p>
           </div>
@@ -370,7 +623,10 @@ export const DashboardPage: React.FC = () => {
               {topCommunities.map((comm) => (
                 <tr
                   key={comm.community_id}
-                  onClick={() => navigate(`/communities/${comm.community_id}`)}
+                  onClick={() => {
+                    startPlaybook({ communityId: comm.community_id, currentStep: 1 });
+                    navigate(`/communities/${comm.community_id}`);
+                  }}
                   style={{
                     cursor: 'pointer',
                   }}
@@ -431,7 +687,7 @@ export const DashboardPage: React.FC = () => {
                           fontWeight: 700,
                         }}
                       >
-                        Inspect <ChevronRight size={13} />
+                        Triage <ChevronRight size={13} />
                       </div>
                     </div>
                   </td>

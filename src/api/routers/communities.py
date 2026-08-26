@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from src.api.schemas import (
     CommunityDetailResponse,
+    CommunityEvidenceResponse,
     CommunityListResponse,
     PaginatedAccountsResponse,
 )
@@ -48,3 +49,30 @@ def get_community_accounts(
             detail=f"Community {community_id} not found.",
         )
     return res
+
+
+@router.get(
+    "/{community_id}/evidence",
+    response_model=CommunityEvidenceResponse,
+    summary="Get Community Evidence Intelligence",
+)
+def get_community_evidence(community_id: int) -> CommunityEvidenceResponse:
+    """Return observable-only evidence analysis for a community.
+
+    Runs deterministic rule-based evidence detectors against the payment
+    network graph and transaction data to explain WHY a community requires
+    investigator attention.
+
+    Evidence Score is DISTINCT from Risk Score:
+      - risk_score     = ML-derived ensemble prioritization
+      - evidence_score = deterministic observable rule strength
+
+    No ground-truth evaluation data is ever returned.
+    """
+    result = service.get_community_evidence(community_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Community {community_id} not found.",
+        )
+    return result

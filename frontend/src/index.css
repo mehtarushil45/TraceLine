@@ -212,3 +212,61 @@ body {
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
 }
+
+/* Print Styles for Dossier */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    background-image: none !important;
+  }
+
+  .no-print,
+  nav,
+  aside,
+  header,
+  button,
+  .sidebar,
+  .navbar {
+    display: none !important;
+  }
+
+  .dossier-modal-container {
+    position: static !important;
+    max-height: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .dossier-printable-content {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .dossier-printable-content * {
+    background: transparent !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  .dossier-printable-content h1,
+  .dossier-printable-content h2,
+  .dossier-printable-content h3,
+  .dossier-printable-content h4 {
+    color: #0284c7 !important;
+  }
+
+  .dash-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
