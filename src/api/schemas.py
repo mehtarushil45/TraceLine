@@ -8,9 +8,9 @@ are never included in any schema.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # ---------------------------------------------------------------------------
 # Health & Summary
@@ -54,7 +54,7 @@ class CommunitySummary(BaseModel):
     top_signal_2: str = Field(..., description="Secondary observable risk signal")
     top_signal_3: str = Field(..., description="Tertiary observable risk signal")
     density: float = Field(..., description="Internal connection density")
-    mean_edge_weight: Optional[float] = Field(None, description="Average edge weight among members")
+    mean_edge_weight: float | None = Field(None, description="Average edge weight among members")
     tx_per_member: float = Field(..., description="Average transactions per member")
     total_transaction_amount: float = Field(..., description="Total transaction volume in USD")
 
@@ -63,19 +63,19 @@ class CommunityListResponse(BaseModel):
     """Response containing all detected communities sorted by risk score."""
 
     total: int = Field(..., description="Total number of communities returned")
-    items: List[CommunitySummary] = Field(..., description="Communities sorted by risk score descending")
+    items: list[CommunitySummary] = Field(..., description="Communities sorted by risk score descending")
 
 
 class TransactionStats(BaseModel):
     """Transaction behavior statistics for a community."""
 
     total_transaction_amount: float = Field(..., description="Total financial volume")
-    mean_tx_amount: Optional[float] = Field(None, description="Mean transaction amount")
-    amount_cv: Optional[float] = Field(None, description="Coefficient of variation of transaction amounts")
-    declined_rate: Optional[float] = Field(None, description="Fraction of declined transactions")
+    mean_tx_amount: float | None = Field(None, description="Mean transaction amount")
+    amount_cv: float | None = Field(None, description="Coefficient of variation of transaction amounts")
+    declined_rate: float | None = Field(None, description="Fraction of declined transactions")
     tx_per_member: float = Field(..., description="Transactions per member")
-    unique_payment_methods: Optional[float] = Field(None, description="Number of distinct payment methods used")
-    merchant_category_entropy: Optional[float] = Field(None, description="Entropy of merchant categories")
+    unique_payment_methods: float | None = Field(None, description="Number of distinct payment methods used")
+    merchant_category_entropy: float | None = Field(None, description="Entropy of merchant categories")
 
 
 class TemporalStats(BaseModel):
@@ -83,10 +83,10 @@ class TemporalStats(BaseModel):
 
     temporal_compression_score: float = Field(..., description="Temporal compression score in (0, 1]")
     unique_active_hours: float = Field(..., description="Count of distinct clock hours (0-23) active")
-    median_inter_transaction_gap_hours: Optional[float] = Field(None, description="Median gap between transactions in hours")
-    timestamp_span_hours: Optional[float] = Field(None, description="Span from first to last transaction in hours")
-    min_timestamp: Optional[str] = Field(None, description="Earliest transaction timestamp")
-    max_timestamp: Optional[str] = Field(None, description="Latest transaction timestamp")
+    median_inter_transaction_gap_hours: float | None = Field(None, description="Median gap between transactions in hours")
+    timestamp_span_hours: float | None = Field(None, description="Span from first to last transaction in hours")
+    min_timestamp: str | None = Field(None, description="Earliest transaction timestamp")
+    max_timestamp: str | None = Field(None, description="Latest transaction timestamp")
 
 
 class EntitySharingStats(BaseModel):
@@ -111,9 +111,9 @@ class CommunityDetailResponse(BaseModel):
     top_signal_1: str = Field(..., description="Primary observable signal")
     top_signal_2: str = Field(..., description="Secondary observable signal")
     top_signal_3: str = Field(..., description="Tertiary observable signal")
-    features: Dict[str, Optional[float]] = Field(..., description="Full map of 21 observable community features")
+    features: dict[str, float | None] = Field(..., description="Full map of 21 observable community features")
     density: float = Field(..., description="Internal edge density")
-    mean_edge_weight: Optional[float] = Field(None, description="Average weight of internal edges")
+    mean_edge_weight: float | None = Field(None, description="Average weight of internal edges")
     total_internal_weight: float = Field(..., description="Sum of all internal edge weights")
     internal_edge_count: int = Field(..., description="Count of internal edges between members")
     transaction_statistics: TransactionStats = Field(..., description="Transaction behavior statistics")
@@ -132,8 +132,8 @@ class AccountSummary(BaseModel):
     account_id: str = Field(..., description="Account identifier")
     customer_name: str = Field(..., description="Customer name")
     balance: float = Field(..., description="Current balance")
-    account_risk_score: Optional[float] = Field(None, description="Account baseline risk score")
-    creation_date: Optional[str] = Field(None, description="Account creation date")
+    account_risk_score: float | None = Field(None, description="Account baseline risk score")
+    creation_date: str | None = Field(None, description="Account creation date")
     community_id: int = Field(..., description="Assigned community ID")
 
 
@@ -145,7 +145,7 @@ class PaginatedAccountsResponse(BaseModel):
     page: int = Field(..., description="Current page number (1-indexed)")
     page_size: int = Field(..., description="Number of items per page")
     total_pages: int = Field(..., description="Total pages available")
-    items: List[AccountSummary] = Field(..., description="List of account records for current page")
+    items: list[AccountSummary] = Field(..., description="List of account records for current page")
 
 
 class AccountTransactionStats(BaseModel):
@@ -165,11 +165,11 @@ class AccountDetailResponse(BaseModel):
     account_id: str = Field(..., description="Account identifier")
     customer_name: str = Field(..., description="Customer name")
     balance: float = Field(..., description="Current balance")
-    account_risk_score: Optional[float] = Field(None, description="Account baseline risk score")
-    creation_date: Optional[str] = Field(None, description="Account creation date")
-    community_id: Optional[int] = Field(None, description="Assigned community ID")
-    community_risk_score: Optional[int] = Field(None, description="Risk score of the assigned community")
-    community_risk_level: Optional[str] = Field(None, description="Risk tier of the assigned community")
+    account_risk_score: float | None = Field(None, description="Account baseline risk score")
+    creation_date: str | None = Field(None, description="Account creation date")
+    community_id: int | None = Field(None, description="Assigned community ID")
+    community_risk_score: int | None = Field(None, description="Risk score of the assigned community")
+    community_risk_level: str | None = Field(None, description="Risk tier of the assigned community")
     connected_account_count: int = Field(..., description="Number of connected accounts in the evidence graph")
     transaction_statistics: AccountTransactionStats = Field(..., description="Transaction metrics for this account")
 
@@ -179,10 +179,10 @@ class ConnectionItem(BaseModel):
 
     connected_account_id: str = Field(..., description="Connected account identifier")
     edge_weight: float = Field(..., description="Evidence weight of connection")
-    shared_devices: List[str] = Field(default_factory=list, description="Shared device IDs")
-    shared_payment_instruments: List[str] = Field(default_factory=list, description="Shared payment instrument IDs")
-    shared_ips: List[str] = Field(default_factory=list, description="Shared IP addresses")
-    shared_merchants: List[str] = Field(default_factory=list, description="Shared merchant IDs")
+    shared_devices: list[str] = Field(default_factory=list, description="Shared device IDs")
+    shared_payment_instruments: list[str] = Field(default_factory=list, description="Shared payment instrument IDs")
+    shared_ips: list[str] = Field(default_factory=list, description="Shared IP addresses")
+    shared_merchants: list[str] = Field(default_factory=list, description="Shared merchant IDs")
     temporal_overlap: int = Field(0, description="Calendar days with co-occurring activity")
 
 
@@ -191,7 +191,7 @@ class AccountConnectionsResponse(BaseModel):
 
     account_id: str = Field(..., description="Target account ID")
     total_connections: int = Field(..., description="Total connected accounts")
-    connections: List[ConnectionItem] = Field(..., description="List of connections")
+    connections: list[ConnectionItem] = Field(..., description="List of connections")
 
 
 # ---------------------------------------------------------------------------
@@ -207,24 +207,24 @@ class TransactionItem(BaseModel):
     amount: float = Field(..., description="Transaction amount")
     src_account_id: str = Field(..., description="Source account ID")
     dst_account_id: str = Field(..., description="Destination account ID")
-    merchant_id: Optional[str] = Field(None, description="Merchant identifier")
-    device_id: Optional[str] = Field(None, description="Device identifier")
-    payment_instrument_id: Optional[str] = Field(None, description="Payment instrument identifier")
-    ip_address: Optional[str] = Field(None, description="IP address")
-    payment_method: Optional[str] = Field(None, description="Payment method used")
-    account_age_days: Optional[int] = Field(None, description="Age of account in days at transaction time")
+    merchant_id: str | None = Field(None, description="Merchant identifier")
+    device_id: str | None = Field(None, description="Device identifier")
+    payment_instrument_id: str | None = Field(None, description="Payment instrument identifier")
+    ip_address: str | None = Field(None, description="IP address")
+    payment_method: str | None = Field(None, description="Payment method used")
+    account_age_days: int | None = Field(None, description="Age of account in days at transaction time")
     transaction_status: str = Field(..., description="Status: settled, pending, declined, etc.")
 
 
 class PaginatedTransactionsResponse(BaseModel):
     """Paginated list of transactions."""
 
-    account_id: Optional[str] = Field(None, description="Account ID filter if applicable")
+    account_id: str | None = Field(None, description="Account ID filter if applicable")
     total: int = Field(..., description="Total matching transactions")
     page: int = Field(..., description="Current page number (1-indexed)")
     page_size: int = Field(..., description="Number of transactions per page")
     total_pages: int = Field(..., description="Total pages available")
-    items: List[TransactionItem] = Field(..., description="Transaction records for current page")
+    items: list[TransactionItem] = Field(..., description="Transaction records for current page")
 
 
 class TransactionDetailResponse(BaseModel):
@@ -235,14 +235,14 @@ class TransactionDetailResponse(BaseModel):
     amount: float = Field(..., description="Transaction amount")
     src_account_id: str = Field(..., description="Source account ID")
     dst_account_id: str = Field(..., description="Destination account ID")
-    merchant_id: Optional[str] = Field(None, description="Merchant identifier")
-    merchant_name: Optional[str] = Field(None, description="Merchant name if available")
-    merchant_category: Optional[str] = Field(None, description="Merchant category if available")
-    device_id: Optional[str] = Field(None, description="Device identifier")
-    payment_instrument_id: Optional[str] = Field(None, description="Payment instrument identifier")
-    ip_address: Optional[str] = Field(None, description="IP address")
-    payment_method: Optional[str] = Field(None, description="Payment method used")
-    account_age_days: Optional[int] = Field(None, description="Age of account in days")
+    merchant_id: str | None = Field(None, description="Merchant identifier")
+    merchant_name: str | None = Field(None, description="Merchant name if available")
+    merchant_category: str | None = Field(None, description="Merchant category if available")
+    device_id: str | None = Field(None, description="Device identifier")
+    payment_instrument_id: str | None = Field(None, description="Payment instrument identifier")
+    ip_address: str | None = Field(None, description="IP address")
+    payment_method: str | None = Field(None, description="Payment method used")
+    account_age_days: int | None = Field(None, description="Age of account in days")
     transaction_status: str = Field(..., description="Transaction status")
 
 
@@ -256,8 +256,8 @@ class GraphNode(BaseModel):
 
     id: str = Field(..., description="Account ID")
     label: str = Field(..., description="Display label")
-    customer_name: Optional[str] = Field(None, description="Customer name")
-    balance: Optional[float] = Field(None, description="Current balance")
+    customer_name: str | None = Field(None, description="Customer name")
+    balance: float | None = Field(None, description="Current balance")
     degree: int = Field(0, description="Connection degree within community")
 
 
@@ -267,10 +267,10 @@ class GraphEdge(BaseModel):
     source: str = Field(..., description="Source account ID")
     target: str = Field(..., description="Target account ID")
     weight: float = Field(..., description="Evidence weight")
-    shared_instruments: List[str] = Field(default_factory=list, description="Shared payment instruments")
-    shared_devices: List[str] = Field(default_factory=list, description="Shared devices")
-    shared_ips: List[str] = Field(default_factory=list, description="Shared IPs")
-    shared_merchants: List[str] = Field(default_factory=list, description="Shared merchants")
+    shared_instruments: list[str] = Field(default_factory=list, description="Shared payment instruments")
+    shared_devices: list[str] = Field(default_factory=list, description="Shared devices")
+    shared_ips: list[str] = Field(default_factory=list, description="Shared IPs")
+    shared_merchants: list[str] = Field(default_factory=list, description="Shared merchants")
     temporal_overlap: int = Field(0, description="Temporal co-occurrence days")
 
 
@@ -280,8 +280,8 @@ class CommunityGraphResponse(BaseModel):
     community_id: int = Field(..., description="Community ID")
     total_nodes: int = Field(..., description="Total nodes in community")
     total_edges: int = Field(..., description="Total edges in community")
-    nodes: List[GraphNode] = Field(..., description="Graph nodes")
-    edges: List[GraphEdge] = Field(..., description="Graph edges")
+    nodes: list[GraphNode] = Field(..., description="Graph nodes")
+    edges: list[GraphEdge] = Field(..., description="Graph edges")
 
 
 class TimelineEvent(BaseModel):
@@ -293,8 +293,8 @@ class TimelineEvent(BaseModel):
     dst_account_id: str = Field(..., description="Destination account ID")
     amount: float = Field(..., description="Transaction amount")
     transaction_status: str = Field(..., description="Status (settled, declined, etc.)")
-    merchant_id: Optional[str] = Field(None, description="Merchant ID")
-    payment_method: Optional[str] = Field(None, description="Payment method")
+    merchant_id: str | None = Field(None, description="Merchant ID")
+    payment_method: str | None = Field(None, description="Payment method")
 
 
 class CommunityTimelineResponse(BaseModel):
@@ -302,7 +302,7 @@ class CommunityTimelineResponse(BaseModel):
 
     community_id: int = Field(..., description="Community ID")
     total_events: int = Field(..., description="Total chronological events")
-    events: List[TimelineEvent] = Field(..., description="Chronological activity events")
+    events: list[TimelineEvent] = Field(..., description="Chronological activity events")
 
 
 # ---------------------------------------------------------------------------
@@ -334,9 +334,9 @@ class EvidenceItemSchema(BaseModel):
     title: str = Field(..., description="Short investigator-facing title")
     description: str = Field(..., description="Full natural-language explanation")
     score_contribution: float = Field(..., description="Points contributed to evidence_score")
-    observed_at: Optional[str] = Field(None, description="ISO 8601 timestamp of earliest observation")
-    supporting_entities: List[str] = Field(default_factory=list, description="Sorted list of supporting entity IDs")
-    metrics: Dict[str, Any] = Field(default_factory=dict, description="Named observable measurement values")
+    observed_at: str | None = Field(None, description="ISO 8601 timestamp of earliest observation")
+    supporting_entities: list[str] = Field(default_factory=list, description="Sorted list of supporting entity IDs")
+    metrics: dict[str, Any] = Field(default_factory=dict, description="Named observable measurement values")
 
 
 class CommunityEvidenceResponse(BaseModel):
@@ -353,7 +353,7 @@ class CommunityEvidenceResponse(BaseModel):
     high_count: int = Field(..., description="Number of HIGH severity evidence items")
     medium_count: int = Field(..., description="Number of MEDIUM severity evidence items")
     low_count: int = Field(..., description="Number of LOW severity evidence items")
-    items: List[EvidenceItemSchema] = Field(..., description="Sorted evidence items (HIGH first)")
+    items: list[EvidenceItemSchema] = Field(..., description="Sorted evidence items (HIGH first)")
     runtime_ms: float = Field(..., description="Engine runtime in milliseconds")
 
 
@@ -366,11 +366,11 @@ class AccountEvidenceResponse(BaseModel):
     """
 
     account_id: str = Field(..., description="Account identifier")
-    community_id: Optional[int] = Field(None, description="Assigned community ID if any")
+    community_id: int | None = Field(None, description="Assigned community ID if any")
     evidence_score: int = Field(..., description="Aggregate observable-rule evidence strength [0-100]")
     evidence_count: int = Field(..., description="Total evidence items found")
     high_count: int = Field(..., description="Number of HIGH severity evidence items")
     medium_count: int = Field(..., description="Number of MEDIUM severity evidence items")
     low_count: int = Field(..., description="Number of LOW severity evidence items")
-    items: List[EvidenceItemSchema] = Field(..., description="Sorted evidence items (HIGH first)")
+    items: list[EvidenceItemSchema] = Field(..., description="Sorted evidence items (HIGH first)")
     runtime_ms: float = Field(..., description="Engine runtime in milliseconds")

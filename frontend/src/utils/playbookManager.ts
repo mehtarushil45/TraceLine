@@ -114,7 +114,7 @@ export function exitPlaybook() {
   });
 }
 
-export function usePlaybookWatcher(callback: () => void) {
+export function subscribeToPlaybookUpdates(callback: () => void) {
   if (typeof window === 'undefined') return () => {};
   window.addEventListener(EVENT_NAME, callback);
   return () => {

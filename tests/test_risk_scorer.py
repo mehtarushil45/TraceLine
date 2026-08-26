@@ -28,10 +28,7 @@ Test coverage:
 
 from __future__ import annotations
 
-import io
-import math
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 import pandas as pd

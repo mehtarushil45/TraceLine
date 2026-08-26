@@ -1,7 +1,7 @@
 """Communities router."""
 
-from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, status
+
 from src.api.schemas import (
     CommunityDetailResponse,
     CommunityEvidenceResponse,

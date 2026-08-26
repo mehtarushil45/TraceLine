@@ -36,8 +36,7 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -47,7 +46,6 @@ from src.intelligence.evidence_rules import (
     EvidenceItem,
     EvidenceSeverity,
     EvidenceType,
-    classify_burst_severity,
     classify_density_severity,
     classify_gap_severity,
     classify_hub_severity,
@@ -78,10 +76,10 @@ class CommunityEvidenceSummary:
     high_count: int
     medium_count: int
     low_count: int
-    items: List[EvidenceItem]
+    items: list[EvidenceItem]
     runtime_ms: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "community_id": self.community_id,
             "evidence_score": self.evidence_score,
@@ -99,16 +97,16 @@ class AccountEvidenceSummary:
     """Evidence analysis result for one account."""
 
     account_id: str
-    community_id: Optional[int]
+    community_id: int | None
     evidence_score: int
     evidence_count: int
     high_count: int
     medium_count: int
     low_count: int
-    items: List[EvidenceItem]
+    items: list[EvidenceItem]
     runtime_ms: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "account_id": self.account_id,
             "community_id": self.community_id,
@@ -128,10 +126,10 @@ class AccountEvidenceSummary:
 
 
 def _build_entity_index(
-    connections: List[Dict[str, Any]],
+    connections: list[dict[str, Any]],
     field: str,
-    member_set: Set[str],
-) -> Dict[str, Set[str]]:
+    member_set: set[str],
+) -> dict[str, set[str]]:
     """Build entity -> set of connected account IDs from connection records.
 
     Args:
@@ -143,7 +141,7 @@ def _build_entity_index(
     Returns:
         entity_id -> {account_id, ...} (only accounts in member_set).
     """
-    index: Dict[str, Set[str]] = defaultdict(set)
+    index: dict[str, set[str]] = defaultdict(set)
     for conn in connections:
         peer = conn.get("connected_account_id", "")
         if peer not in member_set:
@@ -154,10 +152,10 @@ def _build_entity_index(
 
 
 def _build_community_entity_index(
-    community_accounts: List[str],
-    connections_map: Dict[str, List[Dict[str, Any]]],
+    community_accounts: list[str],
+    connections_map: dict[str, list[dict[str, Any]]],
     field: str,
-) -> Dict[str, Set[str]]:
+) -> dict[str, set[str]]:
     """Build a community-wide entity -> accounts index.
 
     Iterates over all member accounts' connection lists, restricting
@@ -166,7 +164,7 @@ def _build_community_entity_index(
     Returns entity_id -> set of account IDs that share it.
     """
     member_set = set(community_accounts)
-    entity_to_accounts: Dict[str, Set[str]] = defaultdict(set)
+    entity_to_accounts: dict[str, set[str]] = defaultdict(set)
 
     for account_id in sorted(community_accounts):  # sorted for determinism
         for conn in connections_map.get(account_id, []):
@@ -187,18 +185,18 @@ def _build_community_entity_index(
 
 
 def _detect_shared_instrument_concentration(
-    community_accounts: List[str],
-    connections_map: Dict[str, List[Dict[str, Any]]],
+    community_accounts: list[str],
+    connections_map: dict[str, list[dict[str, Any]]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """A. SHARED_INSTRUMENT_CONCENTRATION.
 
     Detects payment instruments reused across multiple accounts in the community.
     High instrument sharing across many unrelated customer profiles is strong
     observable evidence of shared infrastructure or coordinated account use.
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
     idx = _build_community_entity_index(community_accounts, connections_map, "shared_payment_instruments")
 
     for instrument_id in sorted(idx.keys()):
@@ -239,18 +237,18 @@ def _detect_shared_instrument_concentration(
 
 
 def _detect_device_reuse(
-    community_accounts: List[str],
-    connections_map: Dict[str, List[Dict[str, Any]]],
+    community_accounts: list[str],
+    connections_map: dict[str, list[dict[str, Any]]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """B. DEVICE_REUSE.
 
     Detects hardware device fingerprints associated with multiple accounts.
     Device sharing across many distinct customer profiles is a strong
     indicator of shared infrastructure evidence.
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
     idx = _build_community_entity_index(community_accounts, connections_map, "shared_devices")
 
     for device_id in sorted(idx.keys()):
@@ -290,18 +288,18 @@ def _detect_device_reuse(
 
 
 def _detect_ip_concentration(
-    community_accounts: List[str],
-    connections_map: Dict[str, List[Dict[str, Any]]],
+    community_accounts: list[str],
+    connections_map: dict[str, list[dict[str, Any]]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """C. IP_CONCENTRATION.
 
     Detects IP addresses associated with many accounts in the community.
     High IP reuse across many accounts indicates shared network origin
     (VPN, datacenter, or coordinated network infrastructure).
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
     idx = _build_community_entity_index(community_accounts, connections_map, "shared_ips")
 
     for ip_addr in sorted(idx.keys()):
@@ -342,24 +340,23 @@ def _detect_ip_concentration(
 
 
 def _detect_temporal_burst(
-    community_accounts: List[str],
+    community_accounts: list[str],
     transactions_df: pd.DataFrame,
-    account_sent_indices: Dict[str, List[int]],
-    account_recv_indices: Dict[str, List[int]],
+    account_sent_indices: dict[str, list[int]],
+    account_recv_indices: dict[str, list[int]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """D. TEMPORAL_BURST.
 
     Detects unusually dense transaction activity within short time windows.
     Collects all community transactions, sorts by timestamp, and finds the
     highest-density 60-minute sliding window (HIGH/MEDIUM) and 24-hour window (LOW).
     """
-    items: List[EvidenceItem] = []
-    member_set = set(community_accounts)
+    items: list[EvidenceItem] = []
 
     # Collect transaction row indices for all community members
-    comm_indices: Set[int] = set()
+    comm_indices: set[int] = set()
     for acc in community_accounts:
         comm_indices.update(account_sent_indices.get(acc, []))
         comm_indices.update(account_recv_indices.get(acc, []))
@@ -405,7 +402,7 @@ def _detect_temporal_burst(
         end_ts = timestamps[best_60min_end_idx].isoformat()
         window_minutes = max(
             1,
-            int(round((timestamps[best_60min_end_idx] - timestamps[best_60min_start_idx]).total_seconds() / 60)),
+            round((timestamps[best_60min_end_idx] - timestamps[best_60min_start_idx]).total_seconds() / 60),
         )
         ev_id = make_evidence_id(entity_type, entity_id, EvidenceType.TEMPORAL_BURST, "60min")
         items.append(
@@ -425,9 +422,11 @@ def _detect_temporal_burst(
                 ),
                 score_contribution=SCORE_CONTRIBUTION[severity_60],
                 observed_at=start_ts,
-                supporting_entities=sorted(set(str(tx_ids[i]) for i in range(
-                    best_60min_start_idx, min(best_60min_end_idx + 1, best_60min_start_idx + 20)
-                ))),
+                supporting_entities=sorted({
+                    str(tx_ids[i]) for i in range(
+                        best_60min_start_idx, min(best_60min_end_idx + 1, best_60min_start_idx + 20)
+                    )
+                }),
                 metrics={
                     "transaction_count": best_60min_count,
                     "window_minutes": window_minutes,
@@ -460,7 +459,7 @@ def _detect_temporal_burst(
             end_ts = timestamps[best_24h_end_idx].isoformat()
             window_hours = max(
                 1,
-                int(round((timestamps[best_24h_end_idx] - timestamps[best_24h_start_idx]).total_seconds() / 3600)),
+                round((timestamps[best_24h_end_idx] - timestamps[best_24h_start_idx]).total_seconds() / 3600),
             )
             ev_id = make_evidence_id(entity_type, entity_id, EvidenceType.TEMPORAL_BURST, "24h")
             items.append(
@@ -493,22 +492,22 @@ def _detect_temporal_burst(
 
 
 def _detect_rapid_interaction(
-    community_accounts: List[str],
+    community_accounts: list[str],
     transactions_df: pd.DataFrame,
-    account_sent_indices: Dict[str, List[int]],
-    account_recv_indices: Dict[str, List[int]],
+    account_sent_indices: dict[str, list[int]],
+    account_recv_indices: dict[str, list[int]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """E. RAPID_INTERACTION.
 
     Detects unusually small inter-transaction gaps within the community.
     Computes the median gap between consecutive transaction timestamps
     for all community-related transactions.
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
 
-    comm_indices: Set[int] = set()
+    comm_indices: set[int] = set()
     for acc in community_accounts:
         comm_indices.update(account_sent_indices.get(acc, []))
         comm_indices.update(account_recv_indices.get(acc, []))
@@ -565,11 +564,11 @@ def _detect_rapid_interaction(
 
 
 def _detect_merchant_temporal_overlap(
-    community_accounts: List[str],
-    connections_map: Dict[str, List[Dict[str, Any]]],
+    community_accounts: list[str],
+    connections_map: dict[str, list[dict[str, Any]]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """F. MERCHANT_TEMPORAL_OVERLAP.
 
     Detects merchants visited by many accounts in the same community.
@@ -577,7 +576,7 @@ def _detect_merchant_temporal_overlap(
     which already incorporates the memory-safe temporal (merchant-day)
     logic from projection.py.
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
     idx = _build_community_entity_index(community_accounts, connections_map, "shared_merchants")
 
     for merchant_id in sorted(idx.keys()):
@@ -621,14 +620,14 @@ def _detect_high_evidence_density(
     features_df: pd.DataFrame,
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """G. HIGH_EVIDENCE_DENSITY.
 
     Detects communities with unusually high relationship evidence concentration
     using weight_per_member, mean_edge_weight, and density from the pre-computed
     community features matrix.
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
 
     if features_df.empty or community_id not in features_df.index:
         return items
@@ -676,24 +675,23 @@ def _detect_high_evidence_density(
 
 
 def _detect_hub_accounts(
-    community_accounts: List[str],
-    community_edges: List[Dict[str, Any]],
+    community_accounts: list[str],
+    community_edges: list[dict[str, Any]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """H. HUB_ACCOUNT.
 
     Detects accounts with unusually high graph degree relative to other
     members of the same community. High-degree hub accounts are often
     focal points of shared infrastructure or transaction relay patterns.
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
 
     if not community_accounts or not community_edges:
         return items
 
-    member_set = set(community_accounts)
-    degrees: Dict[str, int] = {acc: 0 for acc in community_accounts}
+    degrees: dict[str, int] = {acc: 0 for acc in community_accounts}
 
     for edge in community_edges:
         src = edge.get("source", "")
@@ -753,11 +751,11 @@ def _detect_hub_accounts(
 
 
 def _detect_multi_layer_evidence(
-    community_accounts: List[str],
-    connections_map: Dict[str, List[Dict[str, Any]]],
+    community_accounts: list[str],
+    connections_map: dict[str, list[dict[str, Any]]],
     entity_type: str = "COMMUNITY",
     entity_id: str = "",
-) -> List[EvidenceItem]:
+) -> list[EvidenceItem]:
     """I. MULTI_LAYER_EVIDENCE.
 
     Detects account pairs where multiple independent observable evidence
@@ -771,11 +769,11 @@ def _detect_multi_layer_evidence(
       3. Shared IP addresses
       4. Shared merchants
     """
-    items: List[EvidenceItem] = []
+    items: list[EvidenceItem] = []
     member_set = set(community_accounts)
 
     # Collect evidence counts per (a, b) pair — canonical (min, max) ordering
-    pair_layers: Dict[Tuple[str, str], Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    pair_layers: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
     for account_id in sorted(community_accounts):
         for conn in connections_map.get(account_id, []):
@@ -864,13 +862,13 @@ class EvidenceEngine:
     def __init__(
         self,
         transactions_df: pd.DataFrame,
-        community_to_accounts: Dict[int, List[str]],
-        account_to_community: Dict[str, int],
-        account_connections_map: Dict[str, List[Dict[str, Any]]],
-        community_edges_map: Dict[int, List[Dict[str, Any]]],
+        community_to_accounts: dict[int, list[str]],
+        account_to_community: dict[str, int],
+        account_connections_map: dict[str, list[dict[str, Any]]],
+        community_edges_map: dict[int, list[dict[str, Any]]],
         community_features_df: pd.DataFrame,
-        account_sent_tx_indices: Dict[str, List[int]],
-        account_recv_tx_indices: Dict[str, List[int]],
+        account_sent_tx_indices: dict[str, list[int]],
+        account_recv_tx_indices: dict[str, list[int]],
     ) -> None:
         self._transactions_df = transactions_df
         self._community_to_accounts = community_to_accounts
@@ -900,7 +898,7 @@ class EvidenceEngine:
         entity_id = str(community_id)
         entity_type = "COMMUNITY"
 
-        all_items: List[EvidenceItem] = []
+        all_items: list[EvidenceItem] = []
 
         if accounts:
             # A. Shared instrument concentration
@@ -944,8 +942,8 @@ class EvidenceEngine:
         )
 
         # Deduplicate by evidence_id (deterministic)
-        seen: Set[str] = set()
-        unique_items: List[EvidenceItem] = []
+        seen: set[str] = set()
+        unique_items: list[EvidenceItem] = []
         for item in all_items:
             if item.evidence_id not in seen:
                 seen.add(item.evidence_id)
@@ -986,7 +984,7 @@ class EvidenceEngine:
         entity_type = "ACCOUNT"
         entity_id = account_id
 
-        all_items: List[EvidenceItem] = []
+        all_items: list[EvidenceItem] = []
 
         # Use the account's community accounts as the membership context,
         # but restrict evidence to edges directly involving this account.
@@ -994,11 +992,8 @@ class EvidenceEngine:
         account_conns = self._connections_map.get(account_id, [])
 
         if account_conns:
-            peer_set = {c["connected_account_id"] for c in account_conns} | {account_id}
-            peer_list = sorted(peer_set)
-
             # A. Instrument sharing (account-centric: only edges involving this account)
-            instr_idx: Dict[str, Set[str]] = defaultdict(set)
+            instr_idx: dict[str, set[str]] = defaultdict(set)
             for conn in account_conns:
                 for instr in conn.get("shared_payment_instruments", []):
                     instr_idx[instr].add(account_id)
@@ -1030,7 +1025,7 @@ class EvidenceEngine:
                 )
 
             # B. Device reuse (account-centric)
-            dev_idx: Dict[str, Set[str]] = defaultdict(set)
+            dev_idx: dict[str, set[str]] = defaultdict(set)
             for conn in account_conns:
                 for dev in conn.get("shared_devices", []):
                     dev_idx[dev].add(account_id)
@@ -1062,7 +1057,7 @@ class EvidenceEngine:
                 )
 
             # C. IP concentration (account-centric)
-            ip_idx: Dict[str, Set[str]] = defaultdict(set)
+            ip_idx: dict[str, set[str]] = defaultdict(set)
             for conn in account_conns:
                 for ip in conn.get("shared_ips", []):
                     ip_idx[ip].add(account_id)
@@ -1096,7 +1091,7 @@ class EvidenceEngine:
             # I. Multi-layer evidence (account-centric)
             for conn in sorted(account_conns, key=lambda c: c.get("connected_account_id", "")):
                 peer = conn.get("connected_account_id", "")
-                layers: Dict[str, int] = {}
+                layers: dict[str, int] = {}
                 if conn.get("shared_payment_instruments"):
                     layers["instruments"] = len(conn["shared_payment_instruments"])
                 if conn.get("shared_devices"):
@@ -1191,8 +1186,8 @@ class EvidenceEngine:
                     all_items.append(scoped)
 
         # Deduplicate and sort
-        seen: Set[str] = set()
-        unique_items: List[EvidenceItem] = []
+        seen: set[str] = set()
+        unique_items: list[EvidenceItem] = []
         for item in all_items:
             if item.evidence_id not in seen:
                 seen.add(item.evidence_id)

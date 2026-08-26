@@ -19,8 +19,8 @@ from src.features.community_features import (
 )
 
 __all__ = [
-    "compute_community_features",
-    "FEATURE_NAMES",
     "FEATURE_GROUPS",
+    "FEATURE_NAMES",
     "FORBIDDEN_COLUMNS",
+    "compute_community_features",
 ]

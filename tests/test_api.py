@@ -21,20 +21,15 @@ Covers:
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.api.service import service
-from src.features.community_features import FORBIDDEN_COLUMNS
 
 client = TestClient(app)
 
-FORBIDDEN_EVALUATION_KEYS: Set[str] = {
+FORBIDDEN_EVALUATION_KEYS: set[str] = {
     "pattern_id",
     "is_ring_member",
     "link_type",

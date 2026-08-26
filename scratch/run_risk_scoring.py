@@ -6,7 +6,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 
 from src.ml.risk_scorer import (
     RiskScorerConfig,
@@ -104,7 +103,7 @@ def main():
 
     # Tier summary
     tier_counts = scores["risk_level"].value_counts()
-    print(f"\nRisk tier distribution:")
+    print("\nRisk tier distribution:")
     for tier in ["HIGH", "MEDIUM", "LOW"]:
         n = tier_counts.get(tier, 0)
         pct = n / len(scores) * 100

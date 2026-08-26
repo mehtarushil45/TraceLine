@@ -33,15 +33,16 @@ Temporal metric definitions
 from __future__ import annotations
 
 import argparse
+import itertools
 import statistics
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import networkx as nx
 
-from src.graph.builder import EdgeType, EvidenceGraph, NodeType, _REPO_ROOT
+from src.graph.builder import _REPO_ROOT, EdgeType, EvidenceGraph
 from src.graph.projection import AccountEdge, AccountGraph
 
 __all__ = [
@@ -64,7 +65,7 @@ class CommunityTemporalStats:
 
     transaction_count: int
     unique_active_hours: int
-    median_inter_transaction_gap_hours: Optional[float]
+    median_inter_transaction_gap_hours: float | None
     timestamp_span_hours: float
     temporal_compression_score: float
 
@@ -74,17 +75,17 @@ class Community:
     """A detected community with structure, evidence and temporal statistics."""
 
     community_id: int
-    member_account_ids: Tuple[str, ...]
+    member_account_ids: tuple[str, ...]
     member_count: int
     internal_edge_count: int
     total_internal_weight: float
     density: float
-    min_timestamp: Optional[str]
-    max_timestamp: Optional[str]
-    duration_hours: Optional[float]
+    min_timestamp: str | None
+    max_timestamp: str | None
+    duration_hours: float | None
     temporal_stats: CommunityTemporalStats
     # Original account-edge evidence preserved verbatim (sorted by ids).
-    internal_edges: Tuple[AccountEdge, ...]
+    internal_edges: tuple[AccountEdge, ...]
 
     def to_canonical(self) -> str:
         """Deterministic canonical JSON string of this community."""
@@ -118,18 +119,18 @@ class Community:
 
 def extract_account_activity(
     evidence: EvidenceGraph,
-) -> Dict[str, Tuple[str, ...]]:
+) -> dict[str, tuple[str, ...]]:
     """Build account -> sorted unique ISO-timestamp tuples from the graph.
 
     An account's activity includes every transaction it sends or receives;
     timestamps come verbatim from observable transaction edges.
     """
-    tx_accounts: Dict[str, Set[str]] = {}
+    tx_accounts: dict[str, set[str]] = {}
     for edge_type in (EdgeType.FROM_ACCOUNT, EdgeType.TO_ACCOUNT):
         for edge in evidence.edges(edge_type):
             tx_accounts.setdefault(edge.src_id, set()).add(edge.dst_id)
 
-    activity: Dict[str, Set[str]] = {}
+    activity: dict[str, set[str]] = {}
     for edge in evidence.edges(EdgeType.FROM_ACCOUNT) + evidence.edges(
         EdgeType.TO_ACCOUNT
     ):
@@ -147,17 +148,17 @@ def _hours_between(start: datetime, end: datetime) -> float:
 
 def compute_temporal_stats(
     member_account_ids: Iterable[str],
-    account_activity: Optional[Dict[str, Sequence[str]]],
-) -> Tuple[CommunityTemporalStats, Optional[str], Optional[str], Optional[float]]:
+    account_activity: Mapping[str, Sequence[str]] | None,
+) -> tuple[CommunityTemporalStats, str | None, str | None, float | None]:
     """Compute temporal concentration statistics for a set of accounts.
 
     Returns:
         ``(stats, min_timestamp, max_timestamp, duration_hours)``. All values
         degrade safely to zero/``None`` when there is no activity.
     """
-    stamps: List[str] = []
+    stamps: list[str] = []
     if account_activity:
-        seen: Set[str] = set()
+        seen: set[str] = set()
         for account in member_account_ids:
             for stamp in account_activity.get(account, ()):
                 if stamp not in seen:
@@ -179,9 +180,9 @@ def compute_temporal_stats(
     unique_hours = len({s[11:13] for s in stamps})
     parsed = [datetime.fromisoformat(s) for s in stamps]
     span_hours = _hours_between(parsed[0], parsed[-1])
-    median_gap: Optional[float] = None
+    median_gap: float | None = None
     if count >= 2:
-        gaps = [_hours_between(a, b) for a, b in zip(parsed, parsed[1:])]
+        gaps = [_hours_between(a, b) for a, b in itertools.pairwise(parsed)]
         median_gap = round(statistics.median(gaps), 6)
     compression = (
         round(count / (count + span_hours), 6) if (count + span_hours) > 0 else 0.0
@@ -216,8 +217,8 @@ def detect_communities(
     *,
     seed: int = 42,
     resolution: float = 1.0,
-    account_activity: Optional[Dict[str, Sequence[str]]] = None,
-) -> List[Community]:
+    account_activity: Mapping[str, Sequence[str]] | None = None,
+) -> list[Community]:
     """Run Louvain community detection on the weighted account graph.
 
     Community ids are deterministic: raw Louvain partitions are re-ordered by
@@ -240,11 +241,11 @@ def detect_communities(
     )
 
     # Deterministic id assignment: order partitions by sorted members.
-    ordered: List[List[str]] = sorted(
+    ordered: list[list[str]] = sorted(
         (sorted(members) for members in raw_partitions), key=tuple
     )
 
-    communities: List[Community] = []
+    communities: list[Community] = []
     for community_id, members in enumerate(ordered):
         member_set = set(members)
 
@@ -286,7 +287,7 @@ def detect_communities(
     return communities
 
 
-def summarize_communities(communities: Sequence[Community]) -> Dict[str, object]:
+def summarize_communities(communities: Sequence[Community]) -> dict[str, object]:
     """Aggregate summary statistics over a list of communities."""
     sizes = [c.member_count for c in communities]
     compressions = [
@@ -323,7 +324,7 @@ def summarize_communities(communities: Sequence[Community]) -> Dict[str, object]
     }
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point: build graphs, run detection, print a report."""
     import json
     import time

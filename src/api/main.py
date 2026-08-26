@@ -6,12 +6,14 @@ and investigation platform.
 
 from __future__ import annotations
 
+import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.config import settings
 from src.api.routers import (
     accounts,
     communities,
@@ -23,38 +25,37 @@ from src.api.routers import (
 )
 from src.api.service import service
 
+logger = logging.getLogger("traceline.api")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Lifespan event handler to preload and index data on startup."""
-    service.load_data()
+    try:
+        service.load_data()
+    except (FileNotFoundError, ValueError, KeyError, OSError, RuntimeError) as e:
+        logger.error("Failed to preload datasets during startup: %s", e)
     yield
 
 
 app = FastAPI(
-    title="TraceLine Investigator API",
+    title=settings.APP_NAME,
     description=(
         "Production-grade RESTful API for TraceLine payment network fraud ring "
         "detection and entity-resolution investigation. Exposes strictly observable "
         "evidence and ML community risk scores."
     ),
-    version="1.0.0",
+    version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
 
-# CORS Configuration for local React / Vite frontend development
+# CORS Configuration from environment or defaults
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "*",
-    ],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -72,5 +73,22 @@ app.include_router(timeline.router, prefix="/api")
 
 @app.get("/", include_in_schema=False)
 def root_redirect():
-    """Root redirect to OpenAPI documentation."""
-    return {"message": "TraceLine API is running. Access interactive documentation at /docs"}
+    """Root redirect message with API status."""
+    return {
+        "status": "online",
+        "service": settings.APP_NAME,
+        "version": settings.VERSION,
+        "docs": "/docs",
+        "api_root": "/api",
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "src.api.main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=False,
+    )

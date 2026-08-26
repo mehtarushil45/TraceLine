@@ -26,15 +26,12 @@ Test groups:
 
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import pandas as pd
-import pytest
 
 from src.intelligence.evidence_engine import (
     AccountEvidenceSummary,
-    CommunityEvidenceSummary,
     EvidenceEngine,
     _detect_device_reuse,
     _detect_high_evidence_density,
@@ -47,29 +44,20 @@ from src.intelligence.evidence_engine import (
     _detect_temporal_burst,
 )
 from src.intelligence.evidence_rules import (
-    EVIDENCE_SCORE_MAX,
     SCORE_CONTRIBUTION,
     EvidenceItem,
     EvidenceSeverity,
     EvidenceType,
-    classify_burst_severity,
-    classify_density_severity,
-    classify_gap_severity,
-    classify_hub_severity,
-    classify_ip_severity,
-    classify_merchant_severity,
-    classify_multilayer_severity,
-    classify_sharing_severity,
     compute_evidence_score,
-    sort_evidence,
     make_evidence_id,
+    sort_evidence,
 )
 
 # ---------------------------------------------------------------------------
 # Forbidden ground-truth fields — must NEVER appear in evidence output
 # ---------------------------------------------------------------------------
 
-FORBIDDEN_FIELDS: Set[str] = {
+FORBIDDEN_FIELDS: set[str] = {
     "pattern_id",
     "is_ring_member",
     "link_type",
@@ -105,13 +93,13 @@ def _assert_no_forbidden_fields(obj: Any, path: str = "") -> None:
 
 def _make_connection(
     peer: str,
-    instruments: Optional[List[str]] = None,
-    devices: Optional[List[str]] = None,
-    ips: Optional[List[str]] = None,
-    merchants: Optional[List[str]] = None,
+    instruments: list[str] | None = None,
+    devices: list[str] | None = None,
+    ips: list[str] | None = None,
+    merchants: list[str] | None = None,
     weight: float = 1.0,
     temporal_overlap: int = 0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "connected_account_id": peer,
         "edge_weight": weight,
@@ -123,20 +111,20 @@ def _make_connection(
     }
 
 
-def _make_community_edge(src: str, dst: str, **kwargs) -> Dict[str, Any]:
+def _make_community_edge(src: str, dst: str, **kwargs) -> dict[str, Any]:
     return {"source": src, "target": dst, **kwargs}
 
 
 def _minimal_engine(
-    accounts: Optional[List[str]] = None,
-    connections_map: Optional[Dict[str, List[Dict]]] = None,
-    community_to_accounts: Optional[Dict[int, List[str]]] = None,
-    account_to_community: Optional[Dict[str, int]] = None,
-    community_edges_map: Optional[Dict[int, List[Dict]]] = None,
-    transactions_df: Optional[pd.DataFrame] = None,
-    features_df: Optional[pd.DataFrame] = None,
-    sent_idx: Optional[Dict[str, List[int]]] = None,
-    recv_idx: Optional[Dict[str, List[int]]] = None,
+    accounts: list[str] | None = None,
+    connections_map: dict[str, list[dict]] | None = None,
+    community_to_accounts: dict[int, list[str]] | None = None,
+    account_to_community: dict[str, int] | None = None,
+    community_edges_map: dict[int, list[dict]] | None = None,
+    transactions_df: pd.DataFrame | None = None,
+    features_df: pd.DataFrame | None = None,
+    sent_idx: dict[str, list[int]] | None = None,
+    recv_idx: dict[str, list[int]] | None = None,
 ) -> EvidenceEngine:
     """Construct a minimal EvidenceEngine with empty defaults."""
     accs = accounts or []
@@ -317,7 +305,7 @@ class TestIPConcentration:
 
 
 class TestTemporalBurst:
-    def _make_tx_df(self, timestamps: List[str], accounts: Optional[List[str]] = None) -> pd.DataFrame:
+    def _make_tx_df(self, timestamps: list[str], accounts: list[str] | None = None) -> pd.DataFrame:
         n = len(timestamps)
         accs = accounts or ["acc_1"] * n
         return pd.DataFrame({
@@ -330,11 +318,10 @@ class TestTemporalBurst:
 
     def test_high_burst_fifteen_in_60min(self):
         """15 transactions within 60 minutes -> HIGH."""
-        base = "2024-01-15T10:00:00"
         timestamps = [f"2024-01-15T10:{i:02d}:00" for i in range(15)]
         df = self._make_tx_df(timestamps)
         sent_idx = {"acc_1": list(range(15))}
-        recv_idx: Dict[str, List[int]] = {}
+        recv_idx: dict[str, list[int]] = {}
         items = _detect_temporal_burst(["acc_1"], df, sent_idx, recv_idx, "COMMUNITY", "0")
         burst_items = [i for i in items if i.type == EvidenceType.TEMPORAL_BURST]
         assert burst_items
@@ -400,7 +387,7 @@ class TestTemporalBurst:
 
 
 class TestRapidInteraction:
-    def _make_tx_df(self, timestamps: List[str]) -> pd.DataFrame:
+    def _make_tx_df(self, timestamps: list[str]) -> pd.DataFrame:
         n = len(timestamps)
         return pd.DataFrame({
             "transaction_id": [f"tx_{i}" for i in range(n)],
@@ -560,7 +547,7 @@ class TestHighEvidenceDensity:
 
 
 class TestHubAccount:
-    def _make_edges(self, hub: str, peers: List[str]) -> List[Dict[str, Any]]:
+    def _make_edges(self, hub: str, peers: list[str]) -> list[dict[str, Any]]:
         return [_make_community_edge(hub, p) for p in peers]
 
     def test_high_hub_detected(self):
@@ -734,7 +721,7 @@ class TestSeverityOrdering:
 
 
 class TestDeterministicOutput:
-    def _connections(self) -> Dict[str, List[Dict]]:
+    def _connections(self) -> dict[str, list[dict]]:
         return {
             "acc_1": [
                 _make_connection("acc_2", instruments=["I1", "I2"], devices=["D1"]),
@@ -905,9 +892,8 @@ class TestLeakageProtection:
                 # Check that no line is an actual import of src.evaluation
                 for line in lines:
                     stripped = line.strip()
-                    assert not (
-                        stripped.startswith("import src.evaluation")
-                        or stripped.startswith("from src.evaluation")
+                    assert not stripped.startswith(
+                        ("import src.evaluation", "from src.evaluation")
                     ), f"evidence_engine.py imports src.evaluation: {line.strip()}"
                 # Also check fraud_cases.csv is not opened/referenced as a path
                 content = "".join(lines)
@@ -981,7 +967,7 @@ class TestEvidenceScoreCalculation:
 
     def test_sum_multiple_items(self):
         items = [self._make_item(EvidenceSeverity.HIGH)] * 2 + [self._make_item(EvidenceSeverity.MEDIUM)]
-        expected = min(100, int(round(25.0 * 2 + 12.0)))
+        expected = min(100, round(25.0 * 2 + 12.0))
         assert compute_evidence_score(items) == expected
 
     def test_score_capped_at_100(self):
@@ -1020,6 +1006,7 @@ class TestAPIIntegration:
     def test_community_evidence_endpoint_exists(self):
         """Verify the evidence endpoint is registered."""
         from fastapi.testclient import TestClient
+
         from src.api.main import app
 
         client = TestClient(app)
@@ -1031,6 +1018,7 @@ class TestAPIIntegration:
     def test_account_evidence_endpoint_exists(self):
         """Verify the account evidence endpoint is registered."""
         from fastapi.testclient import TestClient
+
         from src.api.main import app
 
         client = TestClient(app)
@@ -1040,6 +1028,7 @@ class TestAPIIntegration:
     def test_community_evidence_200_has_required_fields(self):
         """If community evidence returns 200, verify schema structure."""
         from fastapi.testclient import TestClient
+
         from src.api.main import app
         from src.api.service import service
 
@@ -1067,6 +1056,7 @@ class TestAPIIntegration:
     def test_account_evidence_200_has_required_fields(self):
         """If account evidence returns 200, verify schema structure."""
         from fastapi.testclient import TestClient
+
         from src.api.main import app
         from src.api.service import service
 

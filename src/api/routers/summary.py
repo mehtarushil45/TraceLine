@@ -1,6 +1,7 @@
 """Summary router."""
 
 from fastapi import APIRouter
+
 from src.api.schemas import SummaryResponse
 from src.api.service import service
 

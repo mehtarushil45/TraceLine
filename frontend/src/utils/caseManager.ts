@@ -148,10 +148,11 @@ export function getOrCreateActiveCase(defaultTarget?: InvestigationTarget): Inve
   );
 }
 
-export function useCaseWatcher(callback: () => void) {
+export function subscribeToCaseUpdates(callback: () => void) {
   if (typeof window === 'undefined') return () => {};
   window.addEventListener(EVENT_NAME, callback);
   return () => {
     window.removeEventListener(EVENT_NAME, callback);
   };
 }
+

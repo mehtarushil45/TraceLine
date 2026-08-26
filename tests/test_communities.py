@@ -15,11 +15,9 @@ from src.detection.communities import (
     Community,
     compute_temporal_stats,
     detect_communities,
-    extract_account_activity,
     summarize_communities,
 )
 from src.graph.projection import AccountEdge, AccountGraph
-
 
 # ---------------------------------------------------------------------------
 # Fixture builders

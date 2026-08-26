@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -40,7 +39,7 @@ from src.detection.communities import Community
 #: Default threshold for positive community labeling: at least 50% of a ring.
 DEFAULT_THETA: float = 0.5
 
-LABEL_COLUMNS: List[str] = [
+LABEL_COLUMNS: list[str] = [
     "is_positive",
     "max_ring_coverage",
     "primary_ring_id",
@@ -57,16 +56,16 @@ class CommunityLabelResult:
     community_id: int
     is_positive: int
     max_ring_coverage: float
-    primary_ring_id: Optional[str]
+    primary_ring_id: str | None
     num_rings_intersected: int
     fraud_account_count: int
     fraud_purity: float
-    ring_coverages: Dict[str, float]
+    ring_coverages: dict[str, float]
 
 
 def load_fraud_rings(
-    fraud_cases: Union[pd.DataFrame, str, Path],
-) -> Dict[str, Set[str]]:
+    fraud_cases: pd.DataFrame | str | Path,
+) -> dict[str, set[str]]:
     """Parse fraud ring definitions from a DataFrame or CSV file path.
 
     Args:
@@ -100,7 +99,7 @@ def load_fraud_rings(
             f"Found: {list(df.columns)}"
         )
 
-    rings: Dict[str, Set[str]] = {}
+    rings: dict[str, set[str]] = {}
     for _, row in df.iterrows():
         pid = str(row["pattern_id"])
         inv = row["involved_accounts"]
@@ -119,8 +118,8 @@ def load_fraud_rings(
 
 
 def create_community_labels(
-    communities: List[Community],
-    fraud_cases: Union[pd.DataFrame, str, Path, Dict[str, Set[str]]],
+    communities: list[Community],
+    fraud_cases: pd.DataFrame | str | Path | dict[str, set[str]],
     theta: float = DEFAULT_THETA,
 ) -> pd.DataFrame:
     """Compute ground-truth binary labels and ring attribution for communities.
@@ -157,12 +156,12 @@ def create_community_labels(
         rings = load_fraud_rings(fraud_cases)
 
     # Pre-collect all fraud accounts across all rings for rapid purity checks.
-    all_fraud_accounts: Set[str] = set()
+    all_fraud_accounts: set[str] = set()
     for accs in rings.values():
         all_fraud_accounts.update(accs)
 
-    records: List[Dict[str, Union[int, float, Optional[str]]]] = []
-    community_ids: List[int] = []
+    records: list[dict[str, int | float | str | None]] = []
+    community_ids: list[int] = []
 
     for c in communities:
         members_set = set(c.member_account_ids)
@@ -171,7 +170,7 @@ def create_community_labels(
         purity = fraud_count / c.member_count if c.member_count > 0 else 0.0
 
         max_cov = 0.0
-        primary_ring: Optional[str] = None
+        primary_ring: str | None = None
         rings_touched = 0
 
         for pid, ring_accs in rings.items():
@@ -205,8 +204,8 @@ def create_community_labels(
 
 
 def get_binary_labels(
-    communities: List[Community],
-    fraud_cases: Union[pd.DataFrame, str, Path, Dict[str, Set[str]]],
+    communities: list[Community],
+    fraud_cases: pd.DataFrame | str | Path | dict[str, set[str]],
     theta: float = DEFAULT_THETA,
 ) -> pd.Series:
     """Return a binary 0/1 Series indexed by community_id.

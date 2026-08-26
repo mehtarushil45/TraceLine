@@ -1,6 +1,7 @@
 """Transactions router."""
 
 from fastapi import APIRouter, HTTPException, status
+
 from src.api.schemas import TransactionDetailResponse
 from src.api.service import service
 

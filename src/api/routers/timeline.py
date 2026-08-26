@@ -1,6 +1,7 @@
 """Timeline router."""
 
 from fastapi import APIRouter, HTTPException, Query, status
+
 from src.api.schemas import CommunityTimelineResponse
 from src.api.service import service
 

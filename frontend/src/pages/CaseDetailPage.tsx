@@ -24,7 +24,7 @@ import {
   removeTargetFromCase,
   updateCase,
   addTargetToCase,
-  useCaseWatcher,
+  subscribeToCaseUpdates,
 } from '../utils/caseManager';
 import {
   getAccount,
@@ -86,7 +86,7 @@ export const CaseDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadCase();
-    const unsub = useCaseWatcher(loadCase);
+    const unsub = subscribeToCaseUpdates(loadCase);
     return unsub;
   }, [caseId]);
 

@@ -21,8 +21,8 @@ Covers:
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -36,7 +36,6 @@ from src.features.community_features import (
 )
 from src.graph.projection import AccountEdge
 
-
 # ---------------------------------------------------------------------------
 # Fixture helpers
 # ---------------------------------------------------------------------------
@@ -46,10 +45,10 @@ def _make_account_edge(
     src: str,
     dst: str,
     *,
-    shared_instruments: Tuple[str, ...] = (),
-    shared_devices: Tuple[str, ...] = (),
-    shared_ips: Tuple[str, ...] = (),
-    shared_merchants: Tuple[str, ...] = (),
+    shared_instruments: tuple[str, ...] = (),
+    shared_devices: tuple[str, ...] = (),
+    shared_ips: tuple[str, ...] = (),
+    shared_merchants: tuple[str, ...] = (),
     temporal_overlap: int = 0,
     weight: float = 1.0,
 ) -> AccountEdge:
@@ -70,7 +69,7 @@ def _make_account_edge(
 def _make_temporal_stats(
     tx_count: int = 0,
     active_hours: int = 0,
-    median_gap: Optional[float] = None,
+    median_gap: float | None = None,
     span: float = 0.0,
     compression: float = 0.0,
 ) -> CommunityTemporalStats:
@@ -85,17 +84,17 @@ def _make_temporal_stats(
 
 def _make_community(
     community_id: int,
-    members: List[str],
-    edges: List[AccountEdge] = (),
+    members: list[str],
+    edges: Sequence[AccountEdge] = (),
     *,
     tx_count: int = 0,
     active_hours: int = 0,
-    median_gap: Optional[float] = None,
+    median_gap: float | None = None,
     span: float = 0.0,
     compression: float = 0.0,
-    min_ts: Optional[str] = None,
-    max_ts: Optional[str] = None,
-    duration: Optional[float] = None,
+    min_ts: str | None = None,
+    max_ts: str | None = None,
+    duration: float | None = None,
 ) -> Community:
     member_tuple = tuple(sorted(members))
     member_set = set(member_tuple)

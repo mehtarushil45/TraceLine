@@ -17,9 +17,7 @@ Covers:
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -27,14 +25,11 @@ import pytest
 
 from src.detection.communities import Community, CommunityTemporalStats
 from src.evaluation.labeler import (
-    DEFAULT_THETA,
     LABEL_COLUMNS,
     create_community_labels,
     get_binary_labels,
     load_fraud_rings,
 )
-from src.features.community_features import FEATURE_NAMES, FORBIDDEN_COLUMNS
-
 
 # ---------------------------------------------------------------------------
 # Fixtures & Helpers
@@ -43,7 +38,7 @@ from src.features.community_features import FEATURE_NAMES, FORBIDDEN_COLUMNS
 
 def _make_dummy_community(
     community_id: int,
-    members: List[str],
+    members: list[str],
 ) -> Community:
     """Construct a minimal Community object for labeling tests."""
     member_tuple = tuple(sorted(members))
@@ -70,7 +65,7 @@ def _make_dummy_community(
 
 
 @pytest.fixture
-def fraud_rings_dict() -> Dict[str, Set[str]]:
+def fraud_rings_dict() -> dict[str, set[str]]:
     """Hand-crafted fraud rings:
     - ring_1: 4 accounts {acc_f1, acc_f2, acc_f3, acc_f4}
     - ring_2: 5 accounts {acc_g1, acc_g2, acc_g3, acc_g4, acc_g5}
@@ -134,7 +129,7 @@ def test_load_fraud_rings_missing_columns() -> None:
         load_fraud_rings(bad_df)
 
 
-def test_labeling_threshold_cases(fraud_rings_dict: Dict[str, Set[str]]) -> None:
+def test_labeling_threshold_cases(fraud_rings_dict: dict[str, set[str]]) -> None:
     """Test sub-threshold, exact threshold, and super-threshold labeling under theta=0.5."""
     # c0: contains 1/4 of ring_1 -> cov = 0.25 < 0.5 -> label 0
     c0 = _make_dummy_community(0, ["acc_f1", "acc_clean_1", "acc_clean_2"])
@@ -183,7 +178,7 @@ def test_labeling_threshold_cases(fraud_rings_dict: Dict[str, Set[str]]) -> None
     assert df.loc[3, "fraud_purity"] == pytest.approx(0.0)
 
 
-def test_multi_ring_primary_attribution(fraud_rings_dict: Dict[str, Set[str]]) -> None:
+def test_multi_ring_primary_attribution(fraud_rings_dict: dict[str, set[str]]) -> None:
     """Community touching multiple rings attributes primary_ring_id to the max coverage ring."""
     # c: contains 1/4 of ring_1 (cov=0.25) and 3/5 of ring_2 (cov=0.60)
     c = _make_dummy_community(
@@ -200,7 +195,7 @@ def test_multi_ring_primary_attribution(fraud_rings_dict: Dict[str, Set[str]]) -
     assert df.loc[10, "fraud_purity"] == pytest.approx(4 / 5)
 
 
-def test_get_binary_labels_series(fraud_rings_dict: Dict[str, Set[str]]) -> None:
+def test_get_binary_labels_series(fraud_rings_dict: dict[str, set[str]]) -> None:
     """get_binary_labels returns a pd.Series named 'label'."""
     c0 = _make_dummy_community(0, ["acc_clean_1"])
     c1 = _make_dummy_community(1, ["acc_f1", "acc_f2", "acc_f3"])  # 3/4 = 0.75 >= 0.5 -> 1

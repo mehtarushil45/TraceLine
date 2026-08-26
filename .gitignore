@@ -1,11 +1,41 @@
+# Python & Environment
 .venv/
-.pytest_cache/
+env/
+venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node & Frontend
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.log
+
+# Data (Raw & Generated large datasets)
 data/raw/
 data/processed/
-*.log
-regen_error.txt
 data/validation_run/
 data/validation_enriched/
+regen_error.txt
 gen-fraud-graph/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

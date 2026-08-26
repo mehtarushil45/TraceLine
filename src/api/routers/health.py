@@ -1,7 +1,9 @@
 """Health check router."""
 
 from datetime import datetime, timezone
+
 from fastapi import APIRouter
+
 from src.api.schemas import HealthResponse
 
 router = APIRouter(tags=["Health"])

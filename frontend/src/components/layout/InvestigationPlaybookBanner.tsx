@@ -12,7 +12,7 @@ import {
   getPlaybookContext,
   PLAYBOOK_STEPS,
   updatePlaybookStep,
-  usePlaybookWatcher,
+  subscribeToPlaybookUpdates,
   type PlaybookContext,
 } from '../../utils/playbookManager';
 
@@ -27,7 +27,7 @@ export const InvestigationPlaybookBanner: React.FC = () => {
 
   useEffect(() => {
     loadCtx();
-    const unsub = usePlaybookWatcher(loadCtx);
+    const unsub = subscribeToPlaybookUpdates(loadCtx);
     return unsub;
   }, []);
 

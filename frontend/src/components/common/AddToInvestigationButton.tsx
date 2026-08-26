@@ -7,7 +7,7 @@ import {
   addTargetToCase,
   getOrCreateActiveCase,
   isTargetInAnyCase,
-  useCaseWatcher,
+  subscribeToCaseUpdates,
 } from '../../utils/caseManager';
 
 interface AddToInvestigationButtonProps {
@@ -39,7 +39,7 @@ export const AddToInvestigationButton: React.FC<AddToInvestigationButtonProps> =
 
   useEffect(() => {
     checkStatus();
-    const unsub = useCaseWatcher(checkStatus);
+    const unsub = subscribeToCaseUpdates(checkStatus);
     return unsub;
   }, [targetType, targetId]);
 

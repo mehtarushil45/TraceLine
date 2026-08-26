@@ -25,8 +25,8 @@ Usage::
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -44,7 +44,7 @@ from src.data.entities import (
 # ---------------------------------------------------------------------------
 
 #: Fields a downstream model may observe / use as features.
-OBSERVABLE_COLUMNS: Tuple[str, ...] = (
+OBSERVABLE_COLUMNS: tuple[str, ...] = (
     "transaction_id",
     "timestamp",
     "amount",
@@ -60,15 +60,15 @@ OBSERVABLE_COLUMNS: Tuple[str, ...] = (
 )
 
 #: Evaluation-only fields. NEVER use these as model features.
-EVALUATION_COLUMNS: Tuple[str, ...] = (
+EVALUATION_COLUMNS: tuple[str, ...] = (
     "pattern_id",
     "is_ring_member",
 )
 
 #: Full output order: observables first, evaluation columns strictly last.
-ENRICHED_COLUMNS: Tuple[str, ...] = OBSERVABLE_COLUMNS + EVALUATION_COLUMNS
+ENRICHED_COLUMNS: tuple[str, ...] = OBSERVABLE_COLUMNS + EVALUATION_COLUMNS
 
-VALID_STATUSES: Tuple[str, ...] = ("settled", "pending", "declined")
+VALID_STATUSES: tuple[str, ...] = ("settled", "pending", "declined")
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -98,7 +98,7 @@ def load_accounts(path: Path) -> pd.DataFrame:
     return df
 
 
-def load_fraud_cases(path: Path) -> Tuple[pd.DataFrame, Dict[str, str]]:
+def load_fraud_cases(path: Path) -> tuple[pd.DataFrame, dict[str, str]]:
     """Load fraud patterns and build an account -> pattern-label mapping.
 
     Returns:
@@ -107,7 +107,7 @@ def load_fraud_cases(path: Path) -> Tuple[pd.DataFrame, Dict[str, str]]:
         belong to several patterns). Accounts not in the dict are legitimate.
     """
     cases = pd.read_csv(path, dtype=str)
-    account_to_patterns: Dict[str, str] = {}
+    account_to_patterns: dict[str, str] = {}
     for row in cases.itertuples(index=False):
         pid = str(row.pattern_id)
         for acc in str(row.involved_accounts).split("|"):
@@ -158,15 +158,15 @@ class EnrichmentContext:
     :meth:`attach_evaluation_columns`, never by observable-field generation.
     """
 
-    def __init__(self, world: PaymentWorld, account_creation_ns: Dict[str, int]) -> None:
+    def __init__(self, world: PaymentWorld, account_creation_ns: dict[str, int]) -> None:
         self.world = world
         self.account_creation_ns = account_creation_ns
-        self.device_of: Dict[str, str] = world.account_device
-        self.instrument_of: Dict[str, str] = world.account_instrument
-        self.ip_of: Dict[str, str] = world.account_ip
-        self.pref_merchant: Dict[str, int] = world.pref_merchant
-        self.alt_merchant: Dict[str, int] = world.alt_merchant
-        self.ring_profile_of: Dict[str, RingProfile] = world.account_ring
+        self.device_of: dict[str, str] = world.account_device
+        self.instrument_of: dict[str, str] = world.account_instrument
+        self.ip_of: dict[str, str] = world.account_ip
+        self.pref_merchant: dict[str, int] = world.pref_merchant
+        self.alt_merchant: dict[str, int] = world.alt_merchant
+        self.ring_profile_of: dict[str, RingProfile] = world.account_ring
 
     @property
     def n_shared_devices(self) -> int:
@@ -178,7 +178,7 @@ def attach_evaluation_columns(
     enriched: pd.DataFrame,
     src_ids: pd.Series,
     dst_ids: pd.Series,
-    account_patterns: Dict[str, str],
+    account_patterns: dict[str, str],
 ) -> pd.DataFrame:
     """Append evaluation-only columns to an enriched chunk.
 
@@ -373,7 +373,7 @@ def enrich_chunk(chunk: pd.DataFrame, ctx: EnrichmentContext) -> pd.DataFrame:
 
 def _build_context(
     accounts: pd.DataFrame, fraud_cases: pd.DataFrame, seed: int
-) -> Tuple[PaymentWorld, EnrichmentContext]:
+) -> tuple[PaymentWorld, EnrichmentContext]:
     """Generate the payment world and wrap it in an enrichment context."""
     world = generate_world(accounts, fraud_cases, seed)
     creation_ns = {
@@ -387,9 +387,9 @@ def _write_transaction_file(
     path: Path,
     out_handle_path: Path,
     ctx: EnrichmentContext,
-    account_patterns: Dict[str, str],
+    account_patterns: dict[str, str],
     header: bool,
-    remaining_limit: Optional[int],
+    remaining_limit: int | None,
 ) -> int:
     """Stream one raw transaction file through enrichment and append it.
 
@@ -432,8 +432,8 @@ def run_pipeline(
     raw_dir: Path,
     out_dir: Path,
     seed: int = 42,
-    limit: Optional[int] = None,
-) -> Dict[str, int]:
+    limit: int | None = None,
+) -> dict[str, int]:
     """Run the full enrichment pipeline and write all outputs.
 
     Args:
@@ -506,7 +506,7 @@ def run_pipeline(
 # ---------------------------------------------------------------------------
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point for the enrichment pipeline."""
     parser = argparse.ArgumentParser(
         description="Build the TraceLine synthetic payment-world enrichment layer."

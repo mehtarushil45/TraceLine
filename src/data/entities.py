@@ -27,10 +27,8 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
 
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # Deterministic primitives
@@ -47,7 +45,7 @@ def stable_int(key: str, salt: str = "") -> int:
     Returns:
         An integer in ``[0, 2**64)`` derived from SHA-256.
     """
-    payload = f"{salt}|{key}".encode("utf-8")
+    payload = f"{salt}|{key}".encode()
     return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
 
 
@@ -68,35 +66,35 @@ def _account_num(account_id: str) -> int:
 # Catalog value pools
 # ---------------------------------------------------------------------------
 
-_MERCHANT_BRANDS: Tuple[str, ...] = (
+_MERCHANT_BRANDS: tuple[str, ...] = (
     "Nova", "Zenith", "Orbit", "Kavya", "Sundara", "Meridian", "Pulse",
     "Ananya", "Vertex", "Bluepeak", "Trident", "Lotus", "Quartz", "Indus",
     "Aurora", "Silverline",
 )
 
-_MERCHANT_SUFFIXES: Tuple[str, ...] = (
+_MERCHANT_SUFFIXES: tuple[str, ...] = (
     "Mart", "Bazaar", "Retail", "Stores", "Digital", "Services", "Trade",
     "Hub",
 )
 
-_MERCHANT_CATEGORIES: Tuple[str, ...] = (
+_MERCHANT_CATEGORIES: tuple[str, ...] = (
     "grocery", "electronics", "travel", "utilities", "restaurants",
     "apparel", "fuel", "pharmacy", "entertainment", "insurance",
     "education", "jewellery",
 )
 
-_DEVICE_OS: Tuple[str, ...] = (
+_DEVICE_OS: tuple[str, ...] = (
     "android-13", "android-14", "ios-16", "ios-17", "windows-11", "macos-14",
 )
 
-_ISPS: Tuple[str, ...] = (
+_ISPS: tuple[str, ...] = (
     "JioNet", "AirtelBB", "BSNL Fiber", "Vodafone-India", "ACT Fibernet",
     "Hathway", "Tata Play Fiber",
 )
 
-_INSTRUMENT_NETWORKS: Tuple[str, ...] = ("visa", "mastercard", "rupay", "amex")
+_INSTRUMENT_NETWORKS: tuple[str, ...] = ("visa", "mastercard", "rupay", "amex")
 
-_INSTRUMENT_TYPES: Tuple[str, ...] = (
+_INSTRUMENT_TYPES: tuple[str, ...] = (
     "card", "card", "card",  # weighted toward cards
     "upi", "upi",
     "netbanking",
@@ -116,7 +114,7 @@ class RingProfile:
     device_id: str
     ip_address: str
     instrument_id: str | None
-    merchant_indices: Tuple[int, ...]
+    merchant_indices: tuple[int, ...]
     p_device_use: float
     p_ip_use: float
     p_instrument_use: float
@@ -133,14 +131,14 @@ class PaymentWorld:
     devices: pd.DataFrame
     instruments: pd.DataFrame
     ips: pd.DataFrame
-    account_device: Dict[str, str]
-    account_instrument: Dict[str, str]
-    account_ip: Dict[str, str]
-    pref_merchant: Dict[str, int]
-    alt_merchant: Dict[str, int]
-    instrument_type: Dict[str, str]
-    ring_profiles: Dict[str, RingProfile]
-    account_ring: Dict[str, RingProfile]
+    account_device: dict[str, str]
+    account_instrument: dict[str, str]
+    account_ip: dict[str, str]
+    pref_merchant: dict[str, int]
+    alt_merchant: dict[str, int]
+    instrument_type: dict[str, str]
+    ring_profiles: dict[str, RingProfile]
+    account_ring: dict[str, RingProfile]
 
     @property
     def n_shared_devices(self) -> int:
@@ -181,7 +179,7 @@ def _build_merchants(n_merchants: int, seed: int) -> pd.DataFrame:
 
 
 def _build_instruments(
-    n_accounts: int, n_shared: int, ring_profiles: List[RingProfile], seed: int
+    n_accounts: int, n_shared: int, ring_profiles: list[RingProfile], seed: int
 ) -> pd.DataFrame:
     """Create the payment-instrument catalog (cards/UPI/wallet/netbanking)."""
     rows = []
@@ -219,10 +217,10 @@ def _build_instruments(
     return pd.DataFrame(rows)
 
 
-def _ip_pool(n_ips: int, seed: int) -> List[str]:
+def _ip_pool(n_ips: int, seed: int) -> list[str]:
     """Generate a pool of unique private IPs (small => heavily shared)."""
     seen = set()
-    pool: List[str] = []
+    pool: list[str] = []
     attempt = 0
     while len(pool) < n_ips:
         h = stable_int(str(attempt), f"{seed}|ippool")
@@ -234,7 +232,7 @@ def _ip_pool(n_ips: int, seed: int) -> List[str]:
     return pool
 
 
-def _build_ips(ip_pool: List[str], ring_profiles: List[RingProfile], seed: int) -> pd.DataFrame:
+def _build_ips(ip_pool: list[str], ring_profiles: list[RingProfile], seed: int) -> pd.DataFrame:
     """Create the IP-address table from the shared pool plus ring IPs."""
     rows = []
     for ip in ip_pool:
@@ -259,7 +257,7 @@ def _build_ips(ip_pool: List[str], ring_profiles: List[RingProfile], seed: int) 
 
 
 def _build_devices(
-    n_personal: int, n_shared: int, ring_profiles: List[RingProfile], seed: int
+    n_personal: int, n_shared: int, ring_profiles: list[RingProfile], seed: int
 ) -> pd.DataFrame:
     """Create the device catalog: personal, shared-pool and ring devices."""
     rows = []
@@ -312,18 +310,18 @@ def _build_devices(
 
 def build_ring_profiles(
     fraud_cases: pd.DataFrame, n_merchants: int, seed: int
-) -> Dict[str, RingProfile]:
+) -> dict[str, RingProfile]:
     """Build one probabilistic shared-entity bundle per fraud pattern.
 
     The ``p_*`` adoption probabilities are jittered per pattern so that ring
     behaviour cannot be reproduced from any single threshold on one feature.
     """
-    profiles: Dict[str, RingProfile] = {}
+    profiles: dict[str, RingProfile] = {}
     for row in fraud_cases.itertuples(index=False):
         pid = str(row.pattern_id)
         has_instrument = stable_float(pid, f"{seed}-ring-has-inst") < 0.55
         target = 5 + stable_int(pid, f"{seed}-ring-mcount") % 4
-        cluster: List[int] = []
+        cluster: list[int] = []
         attempt = 0
         while len(cluster) < min(target, n_merchants):
             cand = stable_int(pid, f"{seed}-ring-m{attempt}") % n_merchants
@@ -347,10 +345,6 @@ def build_ring_profiles(
     return profiles
 
 
-
-    return pd.DataFrame(rows)
-
-
 # ---------------------------------------------------------------------------
 # World assembly
 # ---------------------------------------------------------------------------
@@ -371,7 +365,7 @@ def generate_world(
     Returns:
         A fully assigned :class:`PaymentWorld`.
     """
-    account_ids: List[str] = accounts["account_id"].astype(str).tolist()
+    account_ids: list[str] = accounts["account_id"].astype(str).tolist()
     n_accounts = len(account_ids)
     n_merchants = max(50, n_accounts // 25)
 
@@ -379,12 +373,12 @@ def generate_world(
 
     # Which ring profile governs each account (an account may appear in more
     # than one pattern; pick its lexicographically-first pattern deterministically).
-    pattern_memberships: Dict[str, List[str]] = {}
+    pattern_memberships: dict[str, list[str]] = {}
     for row in fraud_cases.itertuples(index=False):
         pid = str(row.pattern_id)
         for acc in str(row.involved_accounts).split("|"):
             pattern_memberships.setdefault(acc, []).append(pid)
-    account_ring: Dict[str, RingProfile] = {
+    account_ring: dict[str, RingProfile] = {
         acc: ring_profiles[min(pids)] for acc, pids in pattern_memberships.items()
     }
 
@@ -392,7 +386,7 @@ def generate_world(
 
     # --- devices: ~88% personal & unique, rest share a small household pool ---
     n_shared_dev = max(4, n_accounts // 30)
-    account_device: Dict[str, str] = {}
+    account_device: dict[str, str] = {}
     for acc in account_ids:
         num = _account_num(acc)
         if stable_float(acc, f"{seed}-share-dev") < 0.12:
@@ -409,7 +403,7 @@ def generate_world(
 
     # --- instruments: ~92% personal, rest share a family-card style pool ---
     n_shared_ins = max(4, n_accounts // 22)
-    account_instrument: Dict[str, str] = {}
+    account_instrument: dict[str, str] = {}
     for acc in account_ids:
         num = _account_num(acc)
         if stable_float(acc, f"{seed}-share-ins") < 0.08:
@@ -431,7 +425,7 @@ def generate_world(
     # Doubling the pool halves average accounts-per-IP (≈4 → ≈2), making shared
     # IP a useful weak signal without dominating the whole account graph.
     ip_pool = _ip_pool(max(8, n_accounts // 2), seed)
-    account_ip: Dict[str, str] = {
+    account_ip: dict[str, str] = {
         acc: ip_pool[stable_int(acc, f"{seed}-pick-ip") % len(ip_pool)]
         for acc in account_ids
     }
@@ -440,8 +434,8 @@ def generate_world(
             account_ip[acc] = profile.ip_address
 
     # --- per-account merchant preferences (Account -> Merchant via txs) ---
-    pref_merchant: Dict[str, int] = {}
-    alt_merchant: Dict[str, int] = {}
+    pref_merchant: dict[str, int] = {}
+    alt_merchant: dict[str, int] = {}
     for acc in account_ids:
         p = stable_int(acc, f"{seed}-pref-mch") % n_merchants
         a = (p + 1 + stable_int(acc, f"{seed}-alt-mch") % max(n_merchants - 1, 1)) % n_merchants
@@ -479,7 +473,7 @@ def generate_world(
     )
 
 
-def relationship_frames(world: PaymentWorld) -> Dict[str, pd.DataFrame]:
+def relationship_frames(world: PaymentWorld) -> dict[str, pd.DataFrame]:
     """Materialise Account->Device / Instrument / IP relationship tables.
 
     Account -> Merchant edges are intentionally *not* materialised here; they

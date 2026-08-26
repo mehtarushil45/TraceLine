@@ -25,8 +25,6 @@ Mathematical definitions for every feature are documented in
 
 from __future__ import annotations
 
-from typing import Dict, FrozenSet, List, Optional, Set
-
 import numpy as np
 import pandas as pd
 
@@ -38,7 +36,7 @@ from src.detection.communities import Community
 
 #: Columns that must NEVER appear in the tx_df argument.  The validation guard
 #: :func:`_validate_tx_df` rejects any DataFrame that carries these columns.
-FORBIDDEN_COLUMNS: FrozenSet[str] = frozenset(
+FORBIDDEN_COLUMNS: frozenset[str] = frozenset(
     {
         "pattern_id",    # evaluation-only ground-truth label
         "is_ring_member",  # evaluation-only ground-truth label
@@ -48,7 +46,7 @@ FORBIDDEN_COLUMNS: FrozenSet[str] = frozenset(
 
 #: Observable transaction columns consumed by the feature engine.
 #: tx_df must contain at minimum ``src_account_id`` and ``amount``.
-_OBSERVABLE_TX_COLUMNS: List[str] = [
+_OBSERVABLE_TX_COLUMNS: list[str] = [
     "src_account_id",
     "dst_account_id",
     "amount",
@@ -62,7 +60,7 @@ _OBSERVABLE_TX_COLUMNS: List[str] = [
 # ---------------------------------------------------------------------------
 
 #: Canonical column order for the output DataFrame.
-FEATURE_NAMES: List[str] = [
+FEATURE_NAMES: list[str] = [
     # F1 – Graph structure (4 features)
     "member_count",
     "density",
@@ -91,7 +89,7 @@ FEATURE_NAMES: List[str] = [
 ]
 
 #: Feature names grouped by family.
-FEATURE_GROUPS: Dict[str, List[str]] = {
+FEATURE_GROUPS: dict[str, list[str]] = {
     "graph_structure": FEATURE_NAMES[0:4],
     "entity_sharing": FEATURE_NAMES[4:10],
     "temporal_concentration": FEATURE_NAMES[10:15],
@@ -134,7 +132,7 @@ def _validate_tx_df(tx_df: pd.DataFrame) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _compute_f1_graph(community: Community) -> Dict[str, float]:
+def _compute_f1_graph(community: Community) -> dict[str, float]:
     """Compute F1 graph-structure features from the Community object.
 
     Definitions
@@ -171,7 +169,7 @@ def _compute_f1_graph(community: Community) -> Dict[str, float]:
 # ---------------------------------------------------------------------------
 
 
-def _compute_f2_entity_sharing(community: Community) -> Dict[str, float]:
+def _compute_f2_entity_sharing(community: Community) -> dict[str, float]:
     """Compute F2 entity-sharing features from internal AccountEdge evidence.
 
     Each internal edge carries sets of entities shared between exactly one
@@ -198,10 +196,10 @@ def _compute_f2_entity_sharing(community: Community) -> Dict[str, float]:
     device_sharing_ratio
         unique_shared_devices / N.
     """
-    instruments: Set[str] = set()
-    devices: Set[str] = set()
-    ips: Set[str] = set()
-    merchants: Set[str] = set()
+    instruments: set[str] = set()
+    devices: set[str] = set()
+    ips: set[str] = set()
+    merchants: set[str] = set()
 
     for edge in community.internal_edges:
         instruments.update(edge.shared_instruments)
@@ -228,7 +226,7 @@ def _compute_f2_entity_sharing(community: Community) -> Dict[str, float]:
 # ---------------------------------------------------------------------------
 
 
-def _compute_f3_temporal(community: Community) -> Dict[str, float]:
+def _compute_f3_temporal(community: Community) -> dict[str, float]:
     """Compute F3 temporal-concentration features from Community temporal stats.
 
     Definitions
@@ -319,8 +317,8 @@ def _shannon_entropy_bits(categories: pd.Series) -> float:
 
 def _compute_f4_transaction(
     member_txs: pd.DataFrame,
-    merchant_cat: Optional[Dict[str, str]],
-) -> Dict[str, float]:
+    merchant_cat: dict[str, str] | None,
+) -> dict[str, float]:
     """Compute F4 transaction-behavior and financial-exposure features.
 
     Args:
@@ -359,7 +357,7 @@ def _compute_f4_transaction(
         Sum of all transaction amounts for community member transactions.
         NaN when no transactions.
     """
-    _empty: Dict[str, float] = {
+    _empty: dict[str, float] = {
         "mean_tx_amount": _NAN,
         "amount_cv": _NAN,
         "declined_rate": _NAN,
@@ -420,9 +418,9 @@ def _compute_f4_transaction(
 
 
 def compute_community_features(
-    communities: List[Community],
+    communities: list[Community],
     tx_df: pd.DataFrame,
-    merchant_df: Optional[pd.DataFrame] = None,
+    merchant_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Compute the feature matrix for a list of detected communities.
 
@@ -454,7 +452,7 @@ def compute_community_features(
         return empty
 
     # Build merchant_id -> category lookup (observable catalog columns only).
-    merchant_cat: Optional[Dict[str, str]] = None
+    merchant_cat: dict[str, str] | None = None
     if (
         merchant_df is not None
         and not merchant_df.empty
@@ -477,10 +475,10 @@ def compute_community_features(
     # When both endpoints are in the same community the transaction is
     # counted once (seen_comm guard below).
     # ------------------------------------------------------------------
-    community_tx_rows: Dict[int, List[int]] = {
+    community_tx_rows: dict[int, list[int]] = {
         c.community_id: [] for c in communities
     }
-    account_to_cid: Dict[str, int] = {
+    account_to_cid: dict[str, int] = {
         acc: c.community_id
         for c in communities
         for acc in c.member_account_ids
@@ -492,7 +490,7 @@ def compute_community_features(
         dst_col = tx_df["dst_account_id"].astype(str).values if has_dst else None
 
         for row_idx, src in enumerate(src_col):
-            seen_cid: Set[int] = set()
+            seen_cid: set[int] = set()
             for acct in (src,) + ((dst_col[row_idx],) if dst_col is not None else ()):
                 cid = account_to_cid.get(acct)
                 if cid is not None and cid not in seen_cid:
@@ -502,8 +500,8 @@ def compute_community_features(
     # ------------------------------------------------------------------
     # Compute per-community feature rows.
     # ------------------------------------------------------------------
-    records: List[Dict[str, float]] = []
-    community_ids: List[int] = []
+    records: list[dict[str, float]] = []
+    community_ids: list[int] = []
 
     for community in communities:
         row_indices = community_tx_rows[community.community_id]
@@ -511,7 +509,7 @@ def compute_community_features(
             tx_df.iloc[row_indices] if row_indices else tx_df.iloc[0:0]
         )
 
-        row: Dict[str, float] = {}
+        row: dict[str, float] = {}
         row.update(_compute_f1_graph(community))
         row.update(_compute_f2_entity_sharing(community))
         row.update(_compute_f3_temporal(community))

@@ -8,7 +8,9 @@ that removing the label columns changes nothing.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -25,13 +27,12 @@ from src.graph.projection import (
     temporal_multiplier,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixture: small processed dataset with crafted evidence
 # ---------------------------------------------------------------------------
 
 
-def _write_csv(path: Path, header: list[str], rows: list[list[object]]) -> None:
+def _write_csv(path: Path, header: Sequence[Any], rows: Sequence[Sequence[Any]]) -> None:
     """Write a CSV file with the given header and rows."""
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [",".join(header)]
@@ -45,11 +46,9 @@ def processed_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Build a tiny processed dataset with precisely-known shared entities."""
     root = tmp_path_factory.mktemp("processed")
 
-    accounts = [
-        ["account_id", "customer_name", "balance", "risk_score", "creation_date"],
-        *[[f"acc_{i}", f"C{i}", 1000.0 + i, i / 100, "2023-01-01"] for i in range(13)],
-    ]
-    _write_csv(root / "accounts.csv", accounts[0], accounts[1:])
+    accounts_header = ["account_id", "customer_name", "balance", "risk_score", "creation_date"]
+    accounts_rows = [[f"acc_{i}", f"C{i}", 1000.0 + i, i / 100, "2023-01-01"] for i in range(13)]
+    _write_csv(root / "accounts.csv", accounts_header, accounts_rows)
 
     merchants = [
         ["merchant_id", "name", "category", "country", "risk_tier"],
@@ -74,11 +73,9 @@ def processed_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     ip_map = {i: f"10.0.0.{i}" for i in range(13)}
     ip_map[5] = "10.9.9.9"  # shared between acc_5 and acc_6
     ip_map[6] = "10.9.9.9"
-    ips = [
-        ["ip_address", "isp", "country", "is_mobile_isp"],
-        *[[ip, "isp-x", "IN", False] for ip in sorted(set(ip_map.values()))],
-    ]
-    _write_csv(root / "ip_addresses.csv", ips[0], ips[1:])
+    ips_header = ["ip_address", "isp", "country", "is_mobile_isp"]
+    ips_rows = [[ip, "isp-x", "IN", False] for ip in sorted(set(ip_map.values()))]
+    _write_csv(root / "ip_addresses.csv", ips_header, ips_rows)
 
     # Account assignments:
     #   pair A (acc_1, acc_2): share instrument ONLY
@@ -282,7 +279,7 @@ def test_labels_never_enter_graph_construction(
     assert "pattern" not in canon.lower()
     assert "is_ring_member" not in canon.lower()
     for node in evidence.nodes():
-        assert not any(k.startswith("pattern") or k.startswith("is_ring") for k in node.attrs)
+        assert not any(k.startswith(("pattern", "is_ring")) for k in node.attrs)
 
     # Rebuild from a copy of the input with the label columns removed:
     # the graphs must be identical, proving labels are never consulted.

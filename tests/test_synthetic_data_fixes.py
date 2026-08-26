@@ -27,7 +27,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 
 # ---------------------------------------------------------------------------
 # Path setup -- make gen_fraud_graph importable if not installed as a package.
@@ -41,14 +40,10 @@ if str(_GFG_SRC) not in sys.path:
 from gen_fraud_graph.generator import (
     _LEGIT_AMOUNT_MAX,
     _LEGIT_AMOUNT_MIN,
-    _LEGIT_AMOUNT_MU,
-    _LEGIT_AMOUNT_SIGMA,
-    _TX_WINDOW_DAYS,
     _legit_amount,
     _legit_timestamp,
 )
 from gen_fraud_graph.typologies import (
-    _TS_WINDOW_DAYS,
     _decoy_burst_timestamps,
     _ring_burst_timestamps,
 )
@@ -157,7 +152,7 @@ def test_fraud_amount_does_not_fully_separate() -> None:
 
 
 def test_status_not_hard_threshold_fraud_oracle() -> None:
-    from src.data.enrichment import enrich_chunk, EnrichmentContext
+    from src.data.enrichment import EnrichmentContext, enrich_chunk
     from src.data.entities import generate_world
 
     accounts_df = pd.DataFrame(
@@ -315,8 +310,9 @@ def test_ip_pool_size_is_n_over_2() -> None:
 
 
 def test_ip_sharing_density_reduced() -> None:
-    from src.data.entities import generate_world
     from collections import Counter
+
+    from src.data.entities import generate_world
 
     n_accounts = 1_000
     accounts_df = pd.DataFrame(
@@ -381,7 +377,12 @@ def test_ip_pool_large_scale_determinism() -> None:
 
 
 def test_enrich_chunk_produces_only_observable_columns() -> None:
-    from src.data.enrichment import OBSERVABLE_COLUMNS, EVALUATION_COLUMNS, enrich_chunk, EnrichmentContext
+    from src.data.enrichment import (
+        EVALUATION_COLUMNS,
+        OBSERVABLE_COLUMNS,
+        EnrichmentContext,
+        enrich_chunk,
+    )
     from src.data.entities import generate_world
 
     accounts_df = pd.DataFrame(
@@ -409,13 +410,17 @@ def test_enrich_chunk_produces_only_observable_columns() -> None:
 
 
 def test_observable_and_evaluation_columns_disjoint() -> None:
-    from src.data.enrichment import OBSERVABLE_COLUMNS, EVALUATION_COLUMNS, ENRICHED_COLUMNS
+    from src.data.enrichment import (
+        ENRICHED_COLUMNS,
+        EVALUATION_COLUMNS,
+        OBSERVABLE_COLUMNS,
+    )
     assert set(OBSERVABLE_COLUMNS).isdisjoint(set(EVALUATION_COLUMNS))
     assert list(ENRICHED_COLUMNS) == list(OBSERVABLE_COLUMNS) + list(EVALUATION_COLUMNS)
 
 
 def test_transaction_status_is_valid() -> None:
-    from src.data.enrichment import VALID_STATUSES, enrich_chunk, EnrichmentContext
+    from src.data.enrichment import VALID_STATUSES, EnrichmentContext, enrich_chunk
     from src.data.entities import generate_world
 
     accounts_df = pd.DataFrame(

@@ -15,16 +15,16 @@ from __future__ import annotations
 import json
 import logging
 import math
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
-import numpy as np
 import pandas as pd
 
+from src.api.config import settings
 from src.api.schemas import (
     AccountConnectionsResponse,
     AccountDetailResponse,
+    AccountEvidenceResponse,
     AccountSummary,
     AccountTransactionStats,
     CommunityDetailResponse,
@@ -34,7 +34,6 @@ from src.api.schemas import (
     CommunitySummary,
     CommunityTimelineResponse,
     ConnectionItem,
-    AccountEvidenceResponse,
     EntitySharingStats,
     EvidenceItemSchema,
     GraphEdge,
@@ -52,10 +51,8 @@ from src.features.community_features import FEATURE_NAMES, FORBIDDEN_COLUMNS
 
 logger = logging.getLogger("traceline.service")
 
-DEFAULT_DATA_DIR = Path("data/processed/payment_network")
 
-
-def _sanitize_float(val: Any) -> Optional[float]:
+def _sanitize_float(val: Any) -> float | None:
     """Convert float value, returning None for NaN or Inf."""
     if val is None:
         return None
@@ -71,8 +68,8 @@ def _sanitize_float(val: Any) -> Optional[float]:
 class TraceLineService:
     """Singleton service providing fast in-memory query capabilities."""
 
-    def __init__(self, data_dir: Path | str = DEFAULT_DATA_DIR) -> None:
-        self.data_dir = Path(data_dir)
+    def __init__(self, data_dir: Path | str | None = None) -> None:
+        self.data_dir = Path(data_dir) if data_dir is not None else settings.DATA_DIR
         self._is_loaded = False
 
         # In-memory datasets
@@ -83,13 +80,13 @@ class TraceLineService:
         self.community_risk_scores_df: pd.DataFrame = pd.DataFrame()
 
         # Indexes & lookup tables
-        self.community_to_accounts: Dict[int, List[str]] = {}
-        self.account_to_community: Dict[str, int] = {}
-        self.account_sent_tx_indices: Dict[str, List[int]] = {}
-        self.account_recv_tx_indices: Dict[str, List[int]] = {}
-        self.tx_id_to_index: Dict[str, int] = {}
-        self.account_connections_map: Dict[str, List[Dict[str, Any]]] = {}
-        self.community_edges_map: Dict[int, List[Dict[str, Any]]] = {}
+        self.community_to_accounts: dict[int, list[str]] = {}
+        self.account_to_community: dict[str, int] = {}
+        self.account_sent_tx_indices: dict[str, list[int]] = {}
+        self.account_recv_tx_indices: dict[str, list[int]] = {}
+        self.tx_id_to_index: dict[str, int] = {}
+        self.account_connections_map: dict[str, list[dict[str, Any]]] = {}
+        self.community_edges_map: dict[int, list[dict[str, Any]]] = {}
 
         # System counts
         self.total_accounts: int = 0
@@ -215,7 +212,7 @@ class TraceLineService:
                                     "temporal_overlap": e.get("temporal_overlap", 0),
                                 }
                             )
-            except Exception as e:
+            except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as e:
                 logger.warning("Could not load community_edges.json: %s", e)
 
         self._is_loaded = True
@@ -262,7 +259,7 @@ class TraceLineService:
         merged = self.community_risk_scores_df.join(self.community_features_df, how="left")
         merged.sort_values(by=["risk_score", "risk_probability"], ascending=[False, False], inplace=True)
 
-        items: List[CommunitySummary] = []
+        items: list[CommunitySummary] = []
         for cid, row in merged.iterrows():
             cid_int = int(cid)
             items.append(
@@ -284,7 +281,7 @@ class TraceLineService:
 
         return CommunityListResponse(total=len(items), items=items)
 
-    def get_community_detail(self, community_id: int) -> Optional[CommunityDetailResponse]:
+    def get_community_detail(self, community_id: int) -> CommunityDetailResponse | None:
         """Return detailed metrics and features for a single community."""
         self.load_data()
 
@@ -302,7 +299,7 @@ class TraceLineService:
         )
 
         # Build feature dict
-        features: Dict[str, Optional[float]] = {}
+        features: dict[str, float | None] = {}
         for feat in FEATURE_NAMES:
             features[feat] = _sanitize_float(feat_row.get(feat))
 
@@ -313,7 +310,7 @@ class TraceLineService:
         total_internal_weight = weight_per_member * member_count
 
         possible_pairs = member_count * (member_count - 1) / 2.0 if member_count > 1 else 0
-        internal_edge_count = int(round(density * possible_pairs))
+        internal_edge_count = round(density * possible_pairs)
 
         # Build detailed responses
         tx_stats = TransactionStats(
@@ -365,7 +362,7 @@ class TraceLineService:
 
     def get_community_accounts(
         self, community_id: int, page: int = 1, page_size: int = 50
-    ) -> Optional[PaginatedAccountsResponse]:
+    ) -> PaginatedAccountsResponse | None:
         """Return paginated list of accounts in a community."""
         self.load_data()
 
@@ -385,7 +382,7 @@ class TraceLineService:
         end_idx = start_idx + page_size
         page_account_ids = account_ids[start_idx:end_idx]
 
-        items: List[AccountSummary] = []
+        items: list[AccountSummary] = []
         for acc_id in page_account_ids:
             acc_row = (
                 self.accounts_df.loc[acc_id]
@@ -424,7 +421,7 @@ class TraceLineService:
             items=items,
         )
 
-    def get_account(self, account_id: str) -> Optional[AccountDetailResponse]:
+    def get_account(self, account_id: str) -> AccountDetailResponse | None:
         """Return detail information for an account."""
         self.load_data()
 
@@ -491,7 +488,7 @@ class TraceLineService:
         page: int = 1,
         page_size: int = 50,
         direction: str = "all",
-    ) -> Optional[PaginatedTransactionsResponse]:
+    ) -> PaginatedTransactionsResponse | None:
         """Return paginated transaction history for an account."""
         self.load_data()
 
@@ -506,7 +503,7 @@ class TraceLineService:
         elif direction == "received":
             all_indices = recv_idx
         else:
-            all_indices = sorted(list(set(sent_idx + recv_idx)))
+            all_indices = sorted(set(sent_idx + recv_idx))
 
         total = len(all_indices)
         page = max(1, page)
@@ -517,7 +514,7 @@ class TraceLineService:
         end_idx = start_idx + page_size
         page_indices = all_indices[start_idx:end_idx]
 
-        items: List[TransactionItem] = []
+        items: list[TransactionItem] = []
         if page_indices and not self.transactions_df.empty:
             sub_df = self.transactions_df.iloc[page_indices]
             for _, row in sub_df.iterrows():
@@ -547,7 +544,7 @@ class TraceLineService:
             items=items,
         )
 
-    def get_account_connections(self, account_id: str) -> Optional[AccountConnectionsResponse]:
+    def get_account_connections(self, account_id: str) -> AccountConnectionsResponse | None:
         """Return observable connections and shared evidence for an account."""
         self.load_data()
 
@@ -555,7 +552,7 @@ class TraceLineService:
             return None
 
         raw_conns = self.account_connections_map.get(account_id, [])
-        items: List[ConnectionItem] = []
+        items: list[ConnectionItem] = []
         for c in raw_conns:
             items.append(
                 ConnectionItem(
@@ -575,7 +572,7 @@ class TraceLineService:
             connections=items,
         )
 
-    def get_transaction(self, transaction_id: str) -> Optional[TransactionDetailResponse]:
+    def get_transaction(self, transaction_id: str) -> TransactionDetailResponse | None:
         """Return detail information for a single transaction."""
         self.load_data()
 
@@ -613,7 +610,7 @@ class TraceLineService:
 
     def get_community_graph(
         self, community_id: int, max_nodes: int = 200, max_edges: int = 500
-    ) -> Optional[CommunityGraphResponse]:
+    ) -> CommunityGraphResponse | None:
         """Return graph nodes and edges for community visualization."""
         self.load_data()
 
@@ -627,7 +624,7 @@ class TraceLineService:
         all_edges = self.community_edges_map.get(community_id, [])
 
         # Calculate degrees within community
-        degrees: Dict[str, int] = {acc: 0 for acc in member_accounts}
+        degrees: dict[str, int] = {acc: 0 for acc in member_accounts}
         for e in all_edges:
             src = e["source"]
             dst = e["target"]
@@ -640,7 +637,7 @@ class TraceLineService:
         sorted_members = sorted(member_accounts, key=lambda a: degrees.get(a, 0), reverse=True)
         selected_nodes_set = set(sorted_members[:max_nodes])
 
-        nodes: List[GraphNode] = []
+        nodes: list[GraphNode] = []
         for acc in selected_nodes_set:
             acc_row = self.accounts_df.loc[acc] if acc in self.accounts_df.index else None
             name = str(acc_row.get("customer_name", acc)) if acc_row is not None else acc
@@ -656,7 +653,7 @@ class TraceLineService:
             )
 
         # Select edges between selected nodes
-        edges: List[GraphEdge] = []
+        edges: list[GraphEdge] = []
         for e in all_edges:
             src = e["source"]
             dst = e["target"]
@@ -686,7 +683,7 @@ class TraceLineService:
 
     def get_community_timeline(
         self, community_id: int, limit: int = 100, offset: int = 0
-    ) -> Optional[CommunityTimelineResponse]:
+    ) -> CommunityTimelineResponse | None:
         """Return chronological transaction timeline for a community."""
         self.load_data()
 
@@ -701,7 +698,7 @@ class TraceLineService:
             return CommunityTimelineResponse(community_id=community_id, total_events=0, events=[])
 
         # Collect transaction indices for members
-        comm_tx_indices: Set[int] = set()
+        comm_tx_indices: set[int] = set()
         for acc in member_set:
             comm_tx_indices.update(self.account_sent_tx_indices.get(acc, []))
             comm_tx_indices.update(self.account_recv_tx_indices.get(acc, []))
@@ -711,7 +708,7 @@ class TraceLineService:
             return CommunityTimelineResponse(community_id=community_id, total_events=0, events=[])
 
         sorted_indices = sorted(
-            list(comm_tx_indices),
+            comm_tx_indices,
             key=lambda idx: self.transactions_df.iloc[idx]["timestamp"],
         )
 
@@ -719,7 +716,7 @@ class TraceLineService:
         offset = max(0, offset)
         page_indices = sorted_indices[offset : offset + limit]
 
-        events: List[TimelineEvent] = []
+        events: list[TimelineEvent] = []
         if page_indices:
             sub_df = self.transactions_df.iloc[page_indices]
             for _, row in sub_df.iterrows():
@@ -742,7 +739,7 @@ class TraceLineService:
             events=events,
         )
 
-    def get_community_evidence(self, community_id: int) -> Optional[CommunityEvidenceResponse]:
+    def get_community_evidence(self, community_id: int) -> CommunityEvidenceResponse | None:
         """Run observable evidence analysis for a community.
 
         Uses the Evidence Intelligence Engine with in-memory indexed data.
@@ -801,7 +798,7 @@ class TraceLineService:
             ],
         )
 
-    def get_account_evidence(self, account_id: str) -> Optional[AccountEvidenceResponse]:
+    def get_account_evidence(self, account_id: str) -> AccountEvidenceResponse | None:
         """Run observable evidence analysis for an account.
 
         Uses the Evidence Intelligence Engine with in-memory indexed data.

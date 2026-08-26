@@ -8,7 +8,7 @@ import {
   X,
 } from 'lucide-react';
 import type { CasePriority, CaseStatus, InvestigationCase } from '../types/cases';
-import { createCase, deleteCase, getCases, useCaseWatcher } from '../utils/caseManager';
+import { createCase, deleteCase, getCases, subscribeToCaseUpdates } from '../utils/caseManager';
 
 export const InvestigationsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ export const InvestigationsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const unsub = useCaseWatcher(loadData);
+    const unsub = subscribeToCaseUpdates(loadData);
     return unsub;
   }, []);
 

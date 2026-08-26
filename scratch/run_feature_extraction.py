@@ -11,7 +11,6 @@ import pandas as pd
 from src.data.enrichment import OBSERVABLE_COLUMNS
 from src.detection.communities import detect_communities, extract_account_activity
 from src.evaluation.labeler import (
-    DEFAULT_THETA,
     create_community_labels,
     get_binary_labels,
     load_fraud_rings,
@@ -22,8 +21,9 @@ from src.features.community_features import (
     FORBIDDEN_COLUMNS,
     compute_community_features,
 )
-from src.graph.builder import EvidenceGraph, build_evidence_graph
+from src.graph.builder import build_evidence_graph
 from src.graph.projection import project_account_graph
+
 
 def main():
     print("=" * 70, flush=True)
@@ -45,7 +45,7 @@ def main():
     # Check forbidden columns guard
     forbidden_present = FORBIDDEN_COLUMNS & set(tx_df.columns)
     assert not forbidden_present, f"FATAL: Forbidden columns in tx_df: {forbidden_present}"
-    print(f"Verified tx_df has 0 forbidden columns (strictly observable)", flush=True)
+    print("Verified tx_df has 0 forbidden columns (strictly observable)", flush=True)
 
     # Load merchant catalog
     merchant_path = processed_dir / "merchants.csv"
@@ -109,13 +109,13 @@ def main():
     print("RESULTS & QUALITY AUDIT", flush=True)
     print("=" * 70, flush=True)
 
-    print(f"\n1. FEATURE MATRIX SUMMARY:")
+    print("\n1. FEATURE MATRIX SUMMARY:")
     print(f"   Shape: {features_df.shape[0]} communities x {features_df.shape[1]} features")
     print(f"   Feature Names ({len(FEATURE_NAMES)}):")
     for grp, feats in FEATURE_GROUPS.items():
         print(f"     * {grp} ({len(feats)}): {', '.join(feats)}")
 
-    print(f"\n2. MISSING VALUES AUDIT:")
+    print("\n2. MISSING VALUES AUDIT:")
     nan_counts = features_df.isna().sum()
     if nan_counts.sum() == 0:
         print("   0 NaNs across all 21 features!")
@@ -124,7 +124,7 @@ def main():
             pct = (cnt / len(features_df)) * 100
             print(f"   - {col}: {cnt} NaNs ({pct:.1f}%)")
 
-    print(f"\n3. LABEL DISTRIBUTION (theta=0.5):")
+    print("\n3. LABEL DISTRIBUTION (theta=0.5):")
     pos_count = int((y == 1).sum())
     neg_count = int((y == 0).sum())
     total_count = len(y)
@@ -137,15 +137,15 @@ def main():
     print(f"   Negative (Clean / Background):          {neg_count} ({neg_pct:.2f}%)")
     print(f"   Class Imbalance Ratio (Neg : Pos):      {imbalance_ratio:.2f} : 1")
 
-    print(f"\n4. GROUND-TRUTH RING ATTRIBUTION DETAILS (Positive Communities):")
+    print("\n4. GROUND-TRUTH RING ATTRIBUTION DETAILS (Positive Communities):")
     pos_df = labels_df[labels_df["is_positive"] == 1]
     print(f"   {'Community':<10} {'Primary Ring':<15} {'Max Coverage':<14} {'Fraud Accts':<12} {'Fraud Purity':<12} {'Member Count':<12}")
     print(f"   {'-'*10} {'-'*15} {'-'*14} {'-'*12} {'-'*12} {'-'*12}")
     for cid, row in pos_df.iterrows():
         c_obj = next(c for c in communities if c.community_id == cid)
-        print(f"   {cid:<10} {str(row['primary_ring_id']):<15} {row['max_ring_coverage']:<14.4f} {row['fraud_account_count']:<12} {row['fraud_purity']*100:<11.2f}% {c_obj.member_count:<12}")
+        print(f"   {cid:<10} {row['primary_ring_id']!s:<15} {row['max_ring_coverage']:<14.4f} {row['fraud_account_count']:<12} {row['fraud_purity']*100:<11.2f}% {c_obj.member_count:<12}")
 
-    print(f"\n5. FEATURE CONTRAST: POSITIVE VS NEGATIVE COMMUNITIES (Means):")
+    print("\n5. FEATURE CONTRAST: POSITIVE VS NEGATIVE COMMUNITIES (Means):")
     merged = features_df.copy()
     merged["label"] = y
     pos_means = merged[merged["label"] == 1].mean()
@@ -160,7 +160,7 @@ def main():
         print(f"   {col:<35} {pm:<18.4f} {nm:<18.4f} {ratio:<15.2f}")
 
     print("\n" + "=" * 70, flush=True)
-    print(f"COMPLETE: Feature extraction and labeling pipeline validated successfully.", flush=True)
+    print("COMPLETE: Feature extraction and labeling pipeline validated successfully.", flush=True)
     print("=" * 70, flush=True)
 
 if __name__ == "__main__":

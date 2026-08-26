@@ -47,7 +47,6 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -68,7 +67,7 @@ from src.features.community_features import FEATURE_NAMES, FORBIDDEN_COLUMNS
 #: Columns forbidden in X (feature matrix) by the leakage contract.
 #: Note: ``community_id`` is NOT listed here because load_feature_matrix uses it
 #: as the CSV index_col; it is never present as a DataFrame column after loading.
-EVALUATION_FORBIDDEN_COLUMNS: FrozenSet[str] = FORBIDDEN_COLUMNS | frozenset(
+EVALUATION_FORBIDDEN_COLUMNS: frozenset[str] = FORBIDDEN_COLUMNS | frozenset(
     {
         # src.evaluation.labeler output columns
         "is_positive",
@@ -88,7 +87,7 @@ EVALUATION_FORBIDDEN_COLUMNS: FrozenSet[str] = FORBIDDEN_COLUMNS | frozenset(
 
 #: Mapping of risk tier name -> minimum probability threshold.
 #: See module docstring for interpretation notes.
-RISK_TIER_THRESHOLDS: Dict[str, float] = {
+RISK_TIER_THRESHOLDS: dict[str, float] = {
     "HIGH": 0.60,
     "MEDIUM": 0.35,
     "LOW": 0.00,
@@ -100,7 +99,7 @@ RISK_TIER_THRESHOLDS: Dict[str, float] = {
 
 #: Human-readable description for each feature, used in explanations.
 #: Written to avoid claiming fraud certainty.
-_SIGNAL_DESCRIPTIONS: Dict[str, str] = {
+_SIGNAL_DESCRIPTIONS: dict[str, str] = {
     "member_count": "large community size",
     "density": "high intra-community connectivity density",
     "mean_edge_weight": "elevated mean shared-evidence weight per account pair",
@@ -125,7 +124,7 @@ _SIGNAL_DESCRIPTIONS: Dict[str, str] = {
 }
 
 # Features where a LOWER value is the suspicious signal
-_LOW_IS_SUSPICIOUS: FrozenSet[str] = frozenset(
+_LOW_IS_SUSPICIOUS: frozenset[str] = frozenset(
     {
         "density",                          # ring members co-connected sparsely
         "median_inter_transaction_gap_hours",  # shorter gap = more rapid pacing
@@ -163,9 +162,9 @@ class RiskScorerConfig:
     lr_C: float = 1.0
     lr_max_iter: int = 2000
     rf_n_estimators: int = 200
-    rf_max_depth: Optional[int] = 6
+    rf_max_depth: int | None = 6
     class_weight: str = "balanced"
-    risk_tier_thresholds: Dict[str, float] = field(
+    risk_tier_thresholds: dict[str, float] = field(
         default_factory=lambda: dict(RISK_TIER_THRESHOLDS)
     )
     top_n_signals: int = 3
@@ -405,8 +404,8 @@ def _run_cv(
 def train_evaluate(
     X: pd.DataFrame,
     y: pd.Series,
-    cfg: Optional[RiskScorerConfig] = None,
-) -> Dict[str, EvaluationResult]:
+    cfg: RiskScorerConfig | None = None,
+) -> dict[str, EvaluationResult]:
     """Train and cross-validate baseline models; return evaluation metrics.
 
     Uses RepeatedStratifiedKFold (default: 10 folds × 10 repeats) to obtain
@@ -446,7 +445,7 @@ def train_evaluate(
     if len(X_aligned) == 0:
         raise ValueError("X and y have no overlapping community_id indices.")
 
-    results: Dict[str, EvaluationResult] = {}
+    results: dict[str, EvaluationResult] = {}
 
     # Logistic Regression (primary, interpretable baseline)
     results["LogisticRegression"] = _run_cv(
@@ -466,7 +465,7 @@ def train_evaluate(
 # ---------------------------------------------------------------------------
 
 
-def _assign_tier(probability: float, thresholds: Dict[str, float]) -> str:
+def _assign_tier(probability: float, thresholds: dict[str, float]) -> str:
     """Map a probability in [0,1] to a risk tier string."""
     if probability >= thresholds["HIGH"]:
         return "HIGH"
@@ -480,7 +479,7 @@ def _build_explanation(
     feature_row: pd.Series,
     coef_series: pd.Series,
     cfg: RiskScorerConfig,
-) -> Tuple[str, str, str]:
+) -> tuple[str, str, str]:
     """Build top-N observable signal strings for a community.
 
     Uses the signed coefficient × feature-z-score to identify the features
@@ -503,7 +502,7 @@ def _build_explanation(
     top_features = contributions.nlargest(cfg.top_n_signals)
 
     signals = []
-    for feat_name, _ in top_features.items():
+    for feat_name in top_features.index:
         desc = _SIGNAL_DESCRIPTIONS.get(str(feat_name), str(feat_name))
         signals.append(desc)
 
@@ -516,7 +515,7 @@ def _build_explanation(
 def score_communities(
     X: pd.DataFrame,
     y: pd.Series,
-    cfg: Optional[RiskScorerConfig] = None,
+    cfg: RiskScorerConfig | None = None,
 ) -> pd.DataFrame:
     """Fit a final Logistic Regression on all labelled data and score every community.
 
@@ -590,7 +589,7 @@ def score_communities(
     records = []
     for i, comm_id in enumerate(X.index):
         prob = float(probabilities[i])
-        risk_score = int(round(prob * 100))
+        risk_score = round(prob * 100)
         risk_level = _assign_tier(prob, cfg.risk_tier_thresholds)
 
         # z-score row for explanation
@@ -622,7 +621,7 @@ def score_communities(
 def get_feature_importance(
     X: pd.DataFrame,
     y: pd.Series,
-    cfg: Optional[RiskScorerConfig] = None,
+    cfg: RiskScorerConfig | None = None,
 ) -> pd.DataFrame:
     """Return a ranked table of feature importances from both models.
 

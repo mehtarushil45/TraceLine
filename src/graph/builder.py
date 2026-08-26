@@ -27,13 +27,12 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
 #: Observable transaction columns loaded into the graph. Evaluation-only
 #: columns (``pattern_id``, ``is_ring_member``) are deliberately absent.
-_OBSERVABLE_TX_COLUMNS: List[str] = [
+_OBSERVABLE_TX_COLUMNS: list[str] = [
     "transaction_id",
     "timestamp",
     "amount",
@@ -79,7 +78,7 @@ class Node:
 
     id: str
     type: NodeType
-    attrs: Dict[str, object] = field(default_factory=dict)
+    attrs: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -89,7 +88,7 @@ class Edge:
     src_id: str
     dst_id: str
     type: EdgeType
-    attrs: Dict[str, object] = field(default_factory=dict)
+    attrs: dict[str, object] = field(default_factory=dict)
 
 
 class EvidenceGraph:
@@ -101,8 +100,8 @@ class EvidenceGraph:
     """
 
     def __init__(self) -> None:
-        self._nodes: Dict[str, Node] = {}
-        self._edges: Dict[Tuple[str, str, str], Edge] = {}
+        self._nodes: dict[str, Node] = {}
+        self._edges: dict[tuple[str, str, str], Edge] = {}
 
     # -- mutation -----------------------------------------------------------
 
@@ -128,7 +127,7 @@ class EvidenceGraph:
         """Return True if ``node_id`` exists."""
         return node_id in self._nodes
 
-    def get_node(self, node_id: str) -> Optional[Node]:
+    def get_node(self, node_id: str) -> Node | None:
         """Return the node with ``node_id`` or ``None``."""
         return self._nodes.get(node_id)
 
@@ -136,14 +135,14 @@ class EvidenceGraph:
         """Return True if the typed edge exists."""
         return (src_id, dst_id, edge_type.value) in self._edges
 
-    def nodes(self, node_type: Optional[NodeType] = None) -> List[Node]:
+    def nodes(self, node_type: NodeType | None = None) -> list[Node]:
         """All nodes (optionally of one type), sorted by id."""
         selected = [
             n for n in self._nodes.values() if node_type is None or n.type == node_type
         ]
         return sorted(selected, key=lambda n: n.id)
 
-    def edges(self, edge_type: Optional[EdgeType] = None) -> List[Edge]:
+    def edges(self, edge_type: EdgeType | None = None) -> list[Edge]:
         """All edges (optionally of one type), sorted by (src, dst, type)."""
         selected = [
             e
@@ -152,13 +151,13 @@ class EvidenceGraph:
         ]
         return sorted(selected, key=lambda e: (e.src_id, e.dst_id, e.type.value))
 
-    def node_count(self, node_type: Optional[NodeType] = None) -> int:
+    def node_count(self, node_type: NodeType | None = None) -> int:
         """Number of nodes, optionally restricted to one type."""
         if node_type is None:
             return len(self._nodes)
         return sum(1 for n in self._nodes.values() if n.type == node_type)
 
-    def edge_count(self, edge_type: Optional[EdgeType] = None) -> int:
+    def edge_count(self, edge_type: EdgeType | None = None) -> int:
         """Number of edges, optionally restricted to one type."""
         if edge_type is None:
             return len(self._edges)
@@ -196,7 +195,7 @@ def _add_table_nodes(
     csv_path: Path,
     id_column: str,
     node_type: NodeType,
-    attr_columns: List[str],
+    attr_columns: list[str],
 ) -> int:
     """Load a catalog CSV into typed nodes. Returns number of rows read."""
     frame = pd.read_csv(csv_path)
@@ -241,7 +240,7 @@ def _add_relation_edges(
 
 
 def _add_transactions(
-    graph: EvidenceGraph, csv_path: Path, limit: Optional[int], chunk_size: int
+    graph: EvidenceGraph, csv_path: Path, limit: int | None, chunk_size: int
 ) -> int:
     """Stream enriched transactions into transaction/account/merchant nodes.
 
@@ -284,7 +283,7 @@ def _add_transactions(
 
 
 def build_evidence_graph(
-    processed_dir: Path, limit: Optional[int] = None, chunk_size: int = 100_000
+    processed_dir: Path, limit: int | None = None, chunk_size: int = 100_000
 ) -> EvidenceGraph:
     """Build the heterogeneous evidence graph from processed payment data.
 
@@ -364,7 +363,7 @@ def build_evidence_graph(
     return graph
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point: build both graphs and print summaries."""
     parser = argparse.ArgumentParser(
         description="Build TraceLine evidence and account graphs."

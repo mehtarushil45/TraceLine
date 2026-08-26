@@ -20,5 +20,6 @@ for ep in endpoints:
     try:
         r = client.get(ep)
         print(f"{ep:55} -> {r.status_code} ({len(r.content)} bytes)")
-    except Exception as e:
+    except httpx.HTTPError as e:
         print(f"{ep:55} -> ERROR: {e}")
+

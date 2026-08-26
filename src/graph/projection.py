@@ -30,12 +30,11 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Tuple
 
 from src.graph.builder import EdgeType, EvidenceGraph, NodeType
 
 #: Base weights per evidence kind, strongest to weakest.
-EVIDENCE_BASE_WEIGHTS: Dict[str, float] = {
+EVIDENCE_BASE_WEIGHTS: dict[str, float] = {
     "instrument": 4.0,
     "device": 3.0,
     "merchant": 2.0,
@@ -102,10 +101,10 @@ class AccountEdge:
 
     src: str
     dst: str
-    shared_devices: Tuple[str, ...]
-    shared_instruments: Tuple[str, ...]
-    shared_ips: Tuple[str, ...]
-    shared_merchants: Tuple[str, ...]
+    shared_devices: tuple[str, ...]
+    shared_instruments: tuple[str, ...]
+    shared_ips: tuple[str, ...]
+    shared_merchants: tuple[str, ...]
     temporal_overlap: int
     weight: float
 
@@ -115,17 +114,17 @@ class AccountGraph:
 
     def __init__(
         self,
-        nodes: Tuple[str, ...],
-        edges: Dict[Tuple[str, str], AccountEdge],
+        nodes: tuple[str, ...],
+        edges: dict[tuple[str, str], AccountEdge],
     ) -> None:
         self.nodes = nodes
         self.edges = edges
 
-    def edge(self, a: str, b: str) -> Optional[AccountEdge]:
+    def edge(self, a: str, b: str) -> AccountEdge | None:
         """Return the edge between accounts ``a`` and ``b`` if one exists."""
         return self.edges.get((a, b) if a < b else (b, a))
 
-    def top_edges(self, n: int) -> List[AccountEdge]:
+    def top_edges(self, n: int) -> list[AccountEdge]:
         """The ``n`` highest-weight edges (deterministic tie-break by ids)."""
         ordered = sorted(
             self.edges.values(), key=lambda e: (-e.weight, e.src, e.dst)
@@ -175,16 +174,16 @@ class AccountGraph:
 class _PairEvidence:
     """Compact memory-bounded evidence accumulator for one account pair."""
 
-    __slots__ = ("instruments", "devices", "merchants", "ips")
+    __slots__ = ("devices", "instruments", "ips", "merchants")
 
     def __init__(self) -> None:
-        self.instruments: Set[str] = set()
-        self.devices: Set[str] = set()
-        self.merchants: Set[str] = set()
-        self.ips: Set[str] = set()
+        self.instruments: set[str] = set()
+        self.devices: set[str] = set()
+        self.merchants: set[str] = set()
+        self.ips: set[str] = set()
 
 
-def _to_sorted_tuple(s: Set[str]) -> Tuple[str, ...]:
+def _to_sorted_tuple(s: set[str]) -> tuple[str, ...]:
     """Convert a set of strings to a sorted tuple (fast paths for 0 and 1 items)."""
     n = len(s)
     if n == 0:
@@ -210,9 +209,9 @@ def project_account_graph(evidence: EvidenceGraph) -> AccountGraph:
     """
     accounts = {n.id for n in evidence.nodes(NodeType.ACCOUNT)}
 
-    def _index_uses(edge_type: EdgeType) -> Dict[str, Set[str]]:
+    def _index_uses(edge_type: EdgeType) -> dict[str, set[str]]:
         """Inverted index entity -> accounts for one USES_* relation."""
-        index: Dict[str, Set[str]] = {}
+        index: dict[str, set[str]] = {}
         for edge in evidence.edges(edge_type):
             index.setdefault(edge.dst_id, set()).add(edge.src_id)
         return index
@@ -222,7 +221,7 @@ def project_account_graph(evidence: EvidenceGraph) -> AccountGraph:
     ip_index = _index_uses(EdgeType.USES_IP)
 
     # Participant accounts per transaction.
-    tx_accounts: Dict[str, Set[str]] = {}
+    tx_accounts: dict[str, set[str]] = {}
     for edge_type in (EdgeType.FROM_ACCOUNT, EdgeType.TO_ACCOUNT):
         for edge in evidence.edges(edge_type):
             tx_accounts.setdefault(edge.src_id, set()).add(edge.dst_id)
@@ -230,7 +229,7 @@ def project_account_graph(evidence: EvidenceGraph) -> AccountGraph:
     # Merchant co-occurrence indexed temporally: (merchant_id, date) -> accounts.
     # Same-day merchant co-occurrence captures coordinated bursts while preventing
     # unconstrained bipartite clique explosion.
-    merchant_day_index: Dict[Tuple[str, str], Set[str]] = {}
+    merchant_day_index: dict[tuple[str, str], set[str]] = {}
     for edge in evidence.edges(EdgeType.AT_MERCHANT):
         tx_id = edge.src_id
         merchant = edge.dst_id
@@ -240,7 +239,7 @@ def project_account_graph(evidence: EvidenceGraph) -> AccountGraph:
             merchant_day_index.setdefault((merchant, day), set()).update(participants)
 
     # Temporal activity: calendar days per account from transaction timestamps.
-    account_days: Dict[str, Set[str]] = {}
+    account_days: dict[str, set[str]] = {}
     for edge_type in (EdgeType.FROM_ACCOUNT, EdgeType.TO_ACCOUNT):
         for edge in evidence.edges(edge_type):
             day = str(edge.attrs.get("timestamp", ""))[:10]
@@ -248,7 +247,7 @@ def project_account_graph(evidence: EvidenceGraph) -> AccountGraph:
                 account_days.setdefault(edge.dst_id, set()).add(day)
 
     # Accumulate pair evidence over sorted ids (deterministic order).
-    pair_evidence: Dict[Tuple[str, str], _PairEvidence] = {}
+    pair_evidence: dict[tuple[str, str], _PairEvidence] = {}
 
     # Primary entity indexes: instrument, device, IP
     for entity in sorted(instrument_index):
@@ -280,7 +279,7 @@ def project_account_graph(evidence: EvidenceGraph) -> AccountGraph:
         for a, b in _pairs(sorted(participants)):
             pair_evidence.setdefault((a, b), _PairEvidence()).merchants.add(merchant)
 
-    edges: Dict[Tuple[str, str], AccountEdge] = {}
+    edges: dict[tuple[str, str], AccountEdge] = {}
     for (a, b) in sorted(pair_evidence.keys()):
         ev = pair_evidence[(a, b)]
         days_a = account_days.get(a)
@@ -307,7 +306,7 @@ def project_account_graph(evidence: EvidenceGraph) -> AccountGraph:
     return AccountGraph(nodes=tuple(sorted(accounts)), edges=edges)
 
 
-def _pairs(sorted_ids: List[str]) -> List[Tuple[str, str]]:
+def _pairs(sorted_ids: list[str]) -> list[tuple[str, str]]:
     """All unique pairs of a sorted id list, in lexicographic order."""
     return [
         (sorted_ids[i], sorted_ids[j])

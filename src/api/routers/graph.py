@@ -1,6 +1,7 @@
 """Graph router."""
 
 from fastapi import APIRouter, HTTPException, Query, status
+
 from src.api.schemas import CommunityGraphResponse
 from src.api.service import service
 

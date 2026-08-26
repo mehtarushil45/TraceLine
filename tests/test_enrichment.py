@@ -17,8 +17,8 @@ from src.data.enrichment import (
     EVALUATION_COLUMNS,
     OBSERVABLE_COLUMNS,
     VALID_STATUSES,
-    enrich_chunk,
     attach_evaluation_columns,
+    enrich_chunk,
     run_pipeline,
 )
 
@@ -98,9 +98,9 @@ def raw_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     # Fraud transactions inside pattern rings (compressed timing).
     fraud_rows = []
     for i in range(40):
-        members = pat_a if i < 30 else pat_b
-        src = members[i % len(members)]
-        dst = members[(i + 1) % len(members)]
+        ring_members = pat_a if i < 30 else pat_b
+        src = ring_members[i % len(ring_members)]
+        dst = ring_members[(i + 1) % len(ring_members)]
         amount = 8000.0 + i * 111.0
         ts = "2024-01-05T12:00:00" if i < 30 else "2024-01-06T03:00:00"
         fraud_rows.append((f"tx_fraud_{i}", src, dst, amount, ts))
@@ -236,6 +236,7 @@ def test_ring_members_correlated_but_not_identical(runs: dict[str, Path]) -> Non
     shared_devices = legit_df.groupby("device_id").size()
     shared_ips = legit_df.groupby("ip_address").size()
     assert (shared_devices > 1).any(), "Legit accounts should sometimes share devices"
+    assert (shared_ips > 1).any(), "Legit accounts should sometimes share IPs"
 
     # Shared IPs must be more common than shared devices: measured on the
     # Account->entity relationship tables (the ground truth of assignment).
@@ -313,8 +314,10 @@ def test_labels_kept_separate_from_features(
 def test_small_transaction_limit(raw_dir: Path, tmp_path: Path) -> None:
     """--limit truncates the main file but keeps fraud/decoy complete."""
     out = tmp_path / "limited"
-    n_fraud = sum(1 for _ in open(raw_dir / "fraud" / "transactions_fraud.csv")) - 1
-    n_decoy = sum(1 for _ in open(raw_dir / "transactions" / "transactions_decoy.csv")) - 1
+    with open(raw_dir / "fraud" / "transactions_fraud.csv", encoding="utf-8") as f:
+        n_fraud = sum(1 for _ in f) - 1
+    with open(raw_dir / "transactions" / "transactions_decoy.csv", encoding="utf-8") as f:
+        n_decoy = sum(1 for _ in f) - 1
 
     summary = run_pipeline(raw_dir, out, seed=SEED, limit=25)
 

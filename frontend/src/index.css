@@ -109,18 +109,21 @@ body {
 .gradient-text-cyan {
   background: linear-gradient(135deg, #00F0FF 0%, #38bdf8 50%, #818cf8 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .gradient-text-razorpay {
   background: linear-gradient(135deg, #3395FF 0%, #00F0FF 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .gradient-text-gold {
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 

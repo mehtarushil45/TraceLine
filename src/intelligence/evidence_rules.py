@@ -34,10 +34,9 @@ Do NOT combine or conflate the two.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Evidence type and severity enumerations
@@ -67,7 +66,7 @@ class EvidenceSeverity(str, Enum):
 
 
 # Severity ordering for deterministic sort (lower number = higher priority).
-_SEVERITY_ORDER: Dict[str, int] = {
+_SEVERITY_ORDER: dict[str, int] = {
     EvidenceSeverity.HIGH: 0,
     EvidenceSeverity.MEDIUM: 1,
     EvidenceSeverity.LOW: 2,
@@ -75,7 +74,7 @@ _SEVERITY_ORDER: Dict[str, int] = {
 
 # Score contribution per severity level (points added to evidence_score).
 # Thresholds are heuristics, not calibrated probabilities.
-SCORE_CONTRIBUTION: Dict[str, float] = {
+SCORE_CONTRIBUTION: dict[str, float] = {
     EvidenceSeverity.HIGH: 25.0,
     EvidenceSeverity.MEDIUM: 12.0,
     EvidenceSeverity.LOW: 5.0,
@@ -138,11 +137,11 @@ class EvidenceItem:
     title: str
     description: str
     score_contribution: float
-    observed_at: Optional[str]
-    supporting_entities: List[str]
-    metrics: Dict[str, Any]
+    observed_at: str | None
+    supporting_entities: list[str]
+    metrics: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict (JSON-safe)."""
         return {
             "evidence_id": self.evidence_id,
@@ -185,7 +184,7 @@ def make_evidence_id(entity_type: str, entity_id: str, ev_type: str, subkey: str
 # ---------------------------------------------------------------------------
 
 
-def classify_sharing_severity(account_count: int) -> Optional[EvidenceSeverity]:
+def classify_sharing_severity(account_count: int) -> EvidenceSeverity | None:
     """Classify severity for instrument/device sharing by account count.
 
     Thresholds (heuristic, not calibrated):
@@ -204,7 +203,7 @@ def classify_sharing_severity(account_count: int) -> Optional[EvidenceSeverity]:
     return None
 
 
-def classify_ip_severity(account_count: int) -> Optional[EvidenceSeverity]:
+def classify_ip_severity(account_count: int) -> EvidenceSeverity | None:
     """Classify severity for IP concentration by account count.
 
     IP sharing is weaker evidence than instrument/device sharing, so
@@ -224,7 +223,7 @@ def classify_ip_severity(account_count: int) -> Optional[EvidenceSeverity]:
     return None
 
 
-def classify_burst_severity(tx_count: int) -> Optional[EvidenceSeverity]:
+def classify_burst_severity(tx_count: int) -> EvidenceSeverity | None:
     """Classify severity for temporal burst by transaction count in window.
 
     Thresholds (heuristic, not calibrated):
@@ -241,7 +240,7 @@ def classify_burst_severity(tx_count: int) -> Optional[EvidenceSeverity]:
     return None
 
 
-def classify_gap_severity(median_gap_hours: float) -> Optional[EvidenceSeverity]:
+def classify_gap_severity(median_gap_hours: float) -> EvidenceSeverity | None:
     """Classify severity for rapid interaction by median inter-transaction gap.
 
     Thresholds (heuristic, not calibrated):
@@ -258,7 +257,7 @@ def classify_gap_severity(median_gap_hours: float) -> Optional[EvidenceSeverity]
     return None
 
 
-def classify_merchant_severity(account_count: int) -> Optional[EvidenceSeverity]:
+def classify_merchant_severity(account_count: int) -> EvidenceSeverity | None:
     """Classify severity for merchant temporal overlap by account count.
 
     Thresholds (heuristic, not calibrated):
@@ -275,7 +274,7 @@ def classify_merchant_severity(account_count: int) -> Optional[EvidenceSeverity]
     return None
 
 
-def classify_density_severity(weight_per_member: float) -> Optional[EvidenceSeverity]:
+def classify_density_severity(weight_per_member: float) -> EvidenceSeverity | None:
     """Classify severity for evidence density by weight_per_member.
 
     Thresholds (heuristic, not calibrated):
@@ -292,7 +291,7 @@ def classify_density_severity(weight_per_member: float) -> Optional[EvidenceSeve
     return None
 
 
-def classify_hub_severity(degree: int, p95: float, p75: float, p50: float) -> Optional[EvidenceSeverity]:
+def classify_hub_severity(degree: int, p95: float, p75: float, p50: float) -> EvidenceSeverity | None:
     """Classify severity for hub account by degree percentile.
 
     Thresholds (heuristic, not calibrated):
@@ -309,7 +308,7 @@ def classify_hub_severity(degree: int, p95: float, p75: float, p50: float) -> Op
     return None
 
 
-def classify_multilayer_severity(layer_count: int) -> Optional[EvidenceSeverity]:
+def classify_multilayer_severity(layer_count: int) -> EvidenceSeverity | None:
     """Classify severity for multi-layer evidence by convergent dimension count.
 
     Thresholds (heuristic, not calibrated):
@@ -328,7 +327,7 @@ def classify_multilayer_severity(layer_count: int) -> Optional[EvidenceSeverity]
 # ---------------------------------------------------------------------------
 
 
-def sort_evidence(items: List[EvidenceItem]) -> List[EvidenceItem]:
+def sort_evidence(items: list[EvidenceItem]) -> list[EvidenceItem]:
     """Sort evidence items deterministically.
 
     Order:
@@ -346,7 +345,7 @@ def sort_evidence(items: List[EvidenceItem]) -> List[EvidenceItem]:
     )
 
 
-def compute_evidence_score(items: List[EvidenceItem]) -> int:
+def compute_evidence_score(items: list[EvidenceItem]) -> int:
     """Compute the aggregate evidence score from a list of items.
 
     This score is DISTINCT from the ML risk_score. It represents the
@@ -355,4 +354,4 @@ def compute_evidence_score(items: List[EvidenceItem]) -> int:
     Returns an integer in [0, 100].
     """
     total = sum(item.score_contribution for item in items)
-    return min(int(round(total)), int(EVIDENCE_SCORE_MAX))
+    return min(round(total), int(EVIDENCE_SCORE_MAX))

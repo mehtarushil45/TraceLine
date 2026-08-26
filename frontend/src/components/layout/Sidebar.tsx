@@ -10,7 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import { getHealth } from '../../api';
-import { getCases, useCaseWatcher } from '../../utils/caseManager';
+import { getCases, subscribeToCaseUpdates } from '../../utils/caseManager';
 
 interface NavItem {
   label: string;
@@ -38,7 +38,7 @@ export const Sidebar: React.FC = () => {
 
   useEffect(() => {
     updateCasesCount();
-    const unsub = useCaseWatcher(updateCasesCount);
+    const unsub = subscribeToCaseUpdates(updateCasesCount);
     return unsub;
   }, []);
 

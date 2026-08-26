@@ -9,7 +9,7 @@ interface ErrorStateProps {
 
 export const ErrorState: React.FC<ErrorStateProps> = ({
   title = 'Failed to load data',
-  message = 'An unexpected network error occurred. Please verify that the TraceLine API is running at http://127.0.0.1:8000.',
+  message = 'An unexpected network error occurred. Please verify that the TraceLine API is running and reachable.',
   onRetry,
 }) => {
   return (
