@@ -1,30 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Activity,
   ArrowLeft,
-  Briefcase,
+  ArrowRight,
   CheckCircle2,
-  ExternalLink,
+  Edit2,
   FileText,
   Layers,
   Network,
   Plus,
+  Printer,
   Save,
-  ScanSearch,
-  Shield,
   Trash2,
   User,
-  X,
 } from 'lucide-react';
 import type { CasePriority, CaseStatus, InvestigationCase, InvestigationTarget } from '../types/cases';
 import {
+  addTargetToCase,
   deleteCase,
   getCase,
   removeTargetFromCase,
-  updateCase,
-  addTargetToCase,
   subscribeToCaseUpdates,
+  updateCase,
 } from '../utils/caseManager';
 import {
   getAccount,
@@ -37,13 +34,24 @@ import type {
   AccountDetailResponse,
   CommunityDetailResponse,
   EvidenceItem,
-  EvidenceSeverity,
   TransactionDetailResponse,
 } from '../types/api';
-import { RiskBadge } from '../components/common/RiskBadge';
-import { ErrorState } from '../components/common/ErrorState';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import {
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  EntityLink,
+  ErrorState,
+  FilterBar,
+  Metric,
+  PageHeader,
+  Panel,
+  RiskBadge,
+} from '../components/common';
+import type { Column, FilterOption } from '../components/common';
 import { CaseDossierModal } from '../components/layout/CaseDossierModal';
+import { SarExportModal } from '../components/layout/SarExportModal';
 
 export const CaseDetailPage: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
@@ -57,6 +65,7 @@ export const CaseDetailPage: React.FC = () => {
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [addTargetInput, setAddTargetInput] = useState('');
   const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
+  const [isSarModalOpen, setIsSarModalOpen] = useState(false);
 
   // Enriched details fetched from backend
   const [communityDetails, setCommunityDetails] = useState<Map<string, CommunityDetailResponse>>(new Map());
@@ -65,8 +74,8 @@ export const CaseDetailPage: React.FC = () => {
   const [evidenceMap, setEvidenceMap] = useState<Map<string, EvidenceItem[]>>(new Map());
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // Evidence filter in case dossier
-  const [evidenceFilter, setEvidenceFilter] = useState<EvidenceSeverity | 'ALL'>('ALL');
+  // Evidence filter
+  const [evidenceFilter, setEvidenceFilter] = useState<string>('ALL');
   const [selectedCommunityForGraph, setSelectedCommunityForGraph] = useState<string>('');
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,7 +101,10 @@ export const CaseDetailPage: React.FC = () => {
 
   // Fetch enriched details for all targets
   useEffect(() => {
-    if (!investigationCase || investigationCase.targets.length === 0) return;
+    if (!investigationCase || investigationCase.targets.length === 0) {
+      setLoadingDetails(false);
+      return;
+    }
 
     let isMounted = true;
     setLoadingDetails(true);
@@ -119,11 +131,8 @@ export const CaseDetailPage: React.FC = () => {
             ]);
             if (detail.status === 'fulfilled') {
               accMap.set(target.id, detail.value);
-              // Also store community ID reference if available
-              if (detail.value.community_id !== null) {
-                if (!selectedCommunityForGraph) {
-                  setSelectedCommunityForGraph(String(detail.value.community_id));
-                }
+              if (detail.value.community_id !== null && !selectedCommunityForGraph) {
+                setSelectedCommunityForGraph(String(detail.value.community_id));
               }
             }
             if (ev.status === 'fulfilled') evMap.set(`ACCOUNT_${target.id}`, ev.value.items);
@@ -145,7 +154,6 @@ export const CaseDetailPage: React.FC = () => {
         setEvidenceMap(evMap);
         setLoadingDetails(false);
 
-        // Set default community for graph if available
         const firstComm = investigationCase.targets.find((t) => t.type === 'COMMUNITY');
         if (firstComm) {
           setSelectedCommunityForGraph(firstComm.id);
@@ -174,7 +182,6 @@ export const CaseDetailPage: React.FC = () => {
       });
     });
 
-    // Sort by severity (HIGH -> MEDIUM -> LOW) and score contribution
     return items.sort((a, b) => {
       const order = { HIGH: 0, MEDIUM: 1, LOW: 2 };
       const diff = order[a.severity] - order[b.severity];
@@ -212,7 +219,8 @@ export const CaseDetailPage: React.FC = () => {
   if (!investigationCase) {
     return (
       <ErrorState
-        message={`No investigation case found matching ID '${caseId}'. It may have been removed or closed.`}
+        title="Investigation Dossier Unavailable"
+        message={`No investigation case file was found matching ID '${caseId}'.`}
         onRetry={() => navigate('/investigations')}
       />
     );
@@ -279,40 +287,9 @@ export const CaseDetailPage: React.FC = () => {
   };
 
   const handleDeleteThisCase = () => {
-    if (window.confirm('Delete this investigation case dossier permanently?')) {
+    if (window.confirm('Delete this investigation case permanently?')) {
       deleteCase(investigationCase.id);
       navigate('/investigations');
-    }
-  };
-
-  const handleOpenInvestigationGraph = () => {
-    let targetCommId = selectedCommunityForGraph;
-
-    if (!targetCommId) {
-      const comm = investigationCase.targets.find((t) => t.type === 'COMMUNITY');
-      if (comm) targetCommId = comm.id;
-    }
-
-    if (!targetCommId) {
-      // Find an account target with community_id
-      for (const t of investigationCase.targets) {
-        if (t.type === 'ACCOUNT') {
-          const acc = accountDetails.get(t.id);
-          if (acc && acc.community_id !== null) {
-            targetCommId = String(acc.community_id);
-            break;
-          }
-        }
-      }
-    }
-
-    if (targetCommId) {
-      const topEvidence = aggregatedEvidence[0] || null;
-      navigate(`/communities/${targetCommId}`, {
-        state: { tab: 'graph', evidenceFocus: topEvidence },
-      });
-    } else {
-      alert('No community cluster or assigned accounts attached to open a graph for.');
     }
   };
 
@@ -320,7 +297,7 @@ export const CaseDetailPage: React.FC = () => {
   const accountTargets = investigationCase.targets.filter((t) => t.type === 'ACCOUNT');
   const transactionTargets = investigationCase.targets.filter((t) => t.type === 'TRANSACTION');
 
-  // Compute highest risk score observed among attached targets
+  // Compute highest risk score observed
   let maxObservedRiskScore: number | null = null;
   communityTargets.forEach((t) => {
     const detail = communityDetails.get(t.id);
@@ -337,1044 +314,572 @@ export const CaseDetailPage: React.FC = () => {
     }
   });
 
-  // Calculate high/medium/low evidence counts
   const highEvidenceCount = aggregatedEvidence.filter((e) => e.severity === 'HIGH').length;
   const medEvidenceCount = aggregatedEvidence.filter((e) => e.severity === 'MEDIUM').length;
-  const lowEvidenceCount = aggregatedEvidence.filter((e) => e.severity === 'LOW').length;
 
-  // Filtered evidence for display
+  const evidenceFilterOptions: FilterOption<string>[] = [
+    { label: 'All Severity', value: 'ALL', count: aggregatedEvidence.length },
+    { label: 'High', value: 'HIGH', count: highEvidenceCount },
+    { label: 'Medium', value: 'MEDIUM', count: medEvidenceCount },
+    { label: 'Low', value: 'LOW', count: aggregatedEvidence.filter((e) => e.severity === 'LOW').length },
+  ];
+
   const filteredEvidence = aggregatedEvidence.filter(
     (item) => evidenceFilter === 'ALL' || item.severity === evidenceFilter
   );
 
-  // Available communities for graph dropdown
-  const availableCommunities: { id: string; label: string }[] = [];
-  communityTargets.forEach((t) => {
-    availableCommunities.push({ id: t.id, label: `Community #${t.id}` });
-  });
-  accountDetails.forEach((acc) => {
-    if (acc.community_id !== null) {
-      const cid = String(acc.community_id);
-      if (!availableCommunities.some((c) => c.id === cid)) {
-        availableCommunities.push({ id: cid, label: `Community #${cid} (Account ${acc.account_id})` });
-      }
-    }
-  });
+  // Target Table Columns
+  const targetColumns: Column<InvestigationTarget>[] = [
+    {
+      key: 'type',
+      header: 'Target Entity Type',
+      width: '140px',
+      render: (t) => {
+        if (t.type === 'COMMUNITY') {
+          return (
+            <Badge variant="accent" size="sm">
+              <Layers size={11} style={{ marginRight: '4px' }} />
+              COMMUNITY
+            </Badge>
+          );
+        }
+        if (t.type === 'ACCOUNT') {
+          return (
+            <Badge variant="neutral" size="sm">
+              <User size={11} style={{ marginRight: '4px' }} />
+              ACCOUNT
+            </Badge>
+          );
+        }
+        return (
+          <Badge variant="neutral" size="sm">
+            TRANSACTION
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'id',
+      header: 'Entity ID',
+      width: '160px',
+      render: (t) => {
+        if (t.type === 'COMMUNITY') {
+          return <EntityLink type="community" id={t.id} label={`Community #${t.id}`} />;
+        }
+        if (t.type === 'ACCOUNT') {
+          return <EntityLink type="account" id={t.id} />;
+        }
+        return <EntityLink type="transaction" id={t.id} />;
+      },
+    },
+    {
+      key: 'label',
+      header: 'Forensic Context / Detail',
+      render: (t) => {
+        if (t.type === 'COMMUNITY') {
+          const comm = communityDetails.get(t.id);
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {t.label}
+              </span>
+              {comm && (
+                <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  · {comm.member_count} members · Score {comm.risk_score}/100
+                </span>
+              )}
+            </div>
+          );
+        }
+        if (t.type === 'ACCOUNT') {
+          const acc = accountDetails.get(t.id);
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {t.label}
+              </span>
+              {acc && (
+                <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  · Balance ${acc.balance.toLocaleString()} · {acc.transaction_statistics.total_count} txs
+                </span>
+              )}
+            </div>
+          );
+        }
+        const tx = transactionDetails.get(t.id);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {t.label}
+            </span>
+            {tx && (
+              <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                · ${tx.amount.toFixed(2)} · {tx.transaction_status}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'addedAt',
+      header: 'Added Timestamp',
+      width: '150px',
+      render: (t) => (
+        <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          {new Date(t.addedAt).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      width: '180px',
+      align: 'right',
+      render: (t) => (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={ArrowRight}
+            iconPosition="right"
+            onClick={() => {
+              if (t.type === 'COMMUNITY') navigate(`/communities/${t.id}`);
+              else if (t.type === 'ACCOUNT') navigate(`/accounts/${t.id}`);
+              else navigate(`/transactions/${t.id}`);
+            }}
+          >
+            Inspect
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Trash2}
+            onClick={() => handleRemoveTarget(t)}
+            title="Remove entity from case"
+          />
+        </div>
+      ),
+    },
+  ];
 
-  // Build Chronological Timeline Events
-  interface TimelineItem {
-    id: string;
-    timestamp: string;
-    title: string;
-    subtitle: string;
-    type: 'CASE' | 'COMMUNITY' | 'ACCOUNT' | 'TRANSACTION' | 'EVIDENCE';
-    link?: string;
-  }
-
-  const timelineItems: TimelineItem[] = [];
-
-  // Case creation
-  timelineItems.push({
-    id: 'case_created',
-    timestamp: investigationCase.createdAt,
-    title: 'Investigation Case Created',
-    subtitle: `Initial priority: ${investigationCase.priority} · Status: ${investigationCase.status}`,
-    type: 'CASE',
-  });
-
-  // Targets added
-  investigationCase.targets.forEach((t) => {
-    timelineItems.push({
-      id: `target_${t.type}_${t.id}`,
-      timestamp: t.addedAt,
-      title: `${t.type === 'COMMUNITY' ? 'Community Cluster' : t.type === 'ACCOUNT' ? 'Account Target' : 'Transaction Target'} Attached: ${t.label}`,
-      subtitle: `Target added to dossier for evidence aggregation`,
-      type: t.type,
-      link: t.type === 'COMMUNITY' ? `/communities/${t.id}` : t.type === 'ACCOUNT' ? `/accounts/${t.id}` : `/transactions/${t.id}`,
-    });
-  });
-
-  // Transactions executed
-  transactionDetails.forEach((tx) => {
-    timelineItems.push({
-      id: `tx_${tx.transaction_id}`,
-      timestamp: tx.timestamp,
-      title: `Transaction Operation: $${tx.amount.toLocaleString()} (${tx.transaction_status})`,
-      subtitle: `${tx.src_account_id} → ${tx.dst_account_id}${tx.merchant_name ? ` · Merchant: ${tx.merchant_name}` : ''}`,
-      type: 'TRANSACTION',
-      link: `/transactions/${tx.transaction_id}`,
-    });
-  });
-
-  // Sort timeline chronologically (newest first)
-  timelineItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  // Aggregated Evidence Columns
+  const evidenceColumns: Column<EvidenceItem>[] = [
+    {
+      key: 'severity',
+      header: 'Severity',
+      width: '100px',
+      render: (item) => <RiskBadge level={item.severity} size="sm" />,
+    },
+    {
+      key: 'title',
+      header: 'Observable Rule / Indicator',
+      render: (item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            {item.title}
+          </span>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+            {item.description}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'score_contribution',
+      header: 'Rule Weight',
+      width: '110px',
+      align: 'right',
+      render: (item) => (
+        <span className="font-mono" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>
+          +{item.score_contribution.toFixed(1)} pts
+        </span>
+      ),
+    },
+    {
+      key: 'supporting_entities',
+      header: 'Affected Entities',
+      width: '160px',
+      render: (item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+            {item.supporting_entities.length} entit{item.supporting_entities.length === 1 ? 'y' : 'ies'}
+          </span>
+          {item.supporting_entities.length > 0 && (
+            <span className="font-mono truncate" style={{ fontSize: '10px', color: 'var(--text-dim)', maxWidth: '140px' }}>
+              {item.supporting_entities.slice(0, 2).join(', ')}
+              {item.supporting_entities.length > 2 ? '...' : ''}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      width: '150px',
+      align: 'right',
+      render: (item) => {
+        const commTarget = investigationCase.targets.find((t) => t.type === 'COMMUNITY');
+        const commId = commTarget ? commTarget.id : selectedCommunityForGraph;
+        if (!commId) return null;
+        return (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Network}
+            onClick={() =>
+              navigate(`/communities/${commId}`, {
+                state: { tab: 'graph', evidenceFocus: item },
+              })
+            }
+          >
+            Explore in Graph
+          </Button>
+        );
+      },
+    },
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1600px', margin: '0 auto' }}>
       {/* ------------------------------------------------------------------ */}
-      {/* 1. Breadcrumb & Action Toolbar                                     */}
+      {/* 1. PAGE HEADER                                                     */}
       {/* ------------------------------------------------------------------ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+      <PageHeader
+        title={
+          isEditingTitle ? (
+            <form onSubmit={handleSaveTitle} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--accent)',
+                  color: 'var(--text-primary)',
+                  fontSize: '18px',
+                  fontWeight: 800,
+                  outline: 'none',
+                }}
+                autoFocus
+              />
+              <Button variant="primary" size="sm" type="submit">Save</Button>
+              <Button variant="secondary" size="sm" onClick={() => setIsEditingTitle(false)}>Cancel</Button>
+            </form>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>{investigationCase.title}</span>
+              <button
+                type="button"
+                onClick={() => setIsEditingTitle(true)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0 }}
+                title="Edit case title"
+              >
+                <Edit2 size={14} />
+              </button>
+            </div>
+          )
+        }
+        description="Multi-entity forensic dossier with aggregated deterministic evidence, target telemetry, and investigator audit notes."
+        breadcrumbs={
           <button
             onClick={() => navigate('/investigations')}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '5px',
               background: 'none',
               border: 'none',
               color: 'var(--text-muted)',
+              fontSize: '12px',
               cursor: 'pointer',
               padding: 0,
+              marginBottom: '6px',
             }}
+            onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
-            <ArrowLeft size={14} />
-            Investigations
+            <ArrowLeft size={13} />
+            <span>Back to Investigations</span>
           </button>
-          <span>/</span>
-          <span className="font-mono text-slate-200">{investigationCase.id}</span>
-        </div>
+        }
+        badge={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <Badge variant="neutral">CASE {investigationCase.id}</Badge>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {/* Open Investigation Graph Button */}
-          {availableCommunities.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {availableCommunities.length > 1 && (
-                <select
-                  value={selectedCommunityForGraph}
-                  onChange={(e) => setSelectedCommunityForGraph(e.target.value)}
-                  style={{
-                    backgroundColor: '#070d1e',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: '6px',
-                    color: 'var(--text-main)',
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {availableCommunities.map((c) => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-              )}
-
-              <button
-                onClick={handleOpenInvestigationGraph}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '7px 14px',
-                  backgroundColor: 'rgba(0, 240, 255, 0.12)',
-                  border: '1px solid rgba(0, 240, 255, 0.35)',
-                  borderRadius: '6px',
-                  color: 'var(--accent-cyan)',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-                title="Launch topology graph with case accounts focused"
-              >
-                <Network size={14} />
-                <span>Open Investigation Graph</span>
-              </button>
-            </div>
-          )}
-
-          {/* Export Dossier Button */}
-          <button
-            onClick={() => setIsDossierModalOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 14px',
-              backgroundColor: '#162447',
-              border: '1px solid var(--border-light)',
-              borderRadius: '6px',
-              color: 'var(--text-main)',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            <FileText size={13} style={{ color: 'var(--accent-cyan)' }} />
-            <span>Export Case Dossier</span>
-          </button>
-
-          {/* Delete Case */}
-          <button
-            onClick={handleDeleteThisCase}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 14px',
-              backgroundColor: 'rgba(244, 63, 94, 0.08)',
-              border: '1px solid rgba(244, 63, 94, 0.25)',
-              borderRadius: '6px',
-              color: '#fca5a5',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            <Trash2 size={13} />
-            <span>Delete</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 2. Case Workspace Header HUD                                       */}
-      {/* ------------------------------------------------------------------ */}
-      <div
-        className="dash-card"
-        style={{
-          padding: '24px 28px',
-          backgroundColor: '#070d1e',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: '20px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1, minWidth: '320px' }}>
-          <div
-            style={{
-              padding: '14px',
-              borderRadius: '10px',
-              backgroundColor: 'rgba(0, 240, 255, 0.15)',
-              border: '1px solid rgba(0, 240, 255, 0.3)',
-              color: 'var(--accent-cyan)',
-              boxShadow: '0 0 16px rgba(0, 240, 255, 0.2)',
-            }}
-          >
-            <Briefcase size={26} />
-          </div>
-
-          <div style={{ flex: 1 }}>
-            {isEditingTitle ? (
-              <form onSubmit={handleSaveTitle} style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '540px' }}>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '6px 12px',
-                    backgroundColor: '#030712',
-                    border: '1px solid var(--accent-cyan)',
-                    borderRadius: '4px',
-                    color: '#fff',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    outline: 'none',
-                  }}
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: '#0284c7',
-                    border: 'none',
-                    borderRadius: '4px',
-                    color: '#fff',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingTitle(false)}
-                  style={{
-                    padding: '6px 10px',
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: '4px',
-                    color: 'var(--text-muted)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', margin: 0 }}>
-                  {investigationCase.title}
-                </h1>
-                <button
-                  onClick={() => setIsEditingTitle(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--accent-cyan)',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    fontWeight: 600,
-                  }}
-                >
-                  Edit Title
-                </button>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-              <span className="font-mono text-cyan-400">{investigationCase.id}</span>
-              <span>·</span>
-              <span>Created {new Date(investigationCase.createdAt).toLocaleDateString()}</span>
-              <span>·</span>
-              <span>Updated {new Date(investigationCase.updatedAt).toLocaleTimeString()}</span>
-              <span>·</span>
-              <span style={{ color: '#f8fafc', fontWeight: 700 }}>
-                {investigationCase.targets.length} target{investigationCase.targets.length !== 1 ? 's' : ''} attached
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Status & Priority Selectors */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <div>
-            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>
-              Status Workflow
-            </span>
+            {/* Status Selector Dropdown */}
             <select
               value={investigationCase.status}
               onChange={(e) => handleStatusChange(e.target.value as CaseStatus)}
               style={{
-                backgroundColor: '#030712',
-                border: '1px solid var(--border-light)',
-                borderRadius: '6px',
-                color: investigationCase.status === 'OPEN' ? '#34d399' : investigationCase.status === 'REVIEW' ? '#fbbf24' : '#94a3b8',
-                padding: '6px 12px',
-                fontSize: '12px',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-subtle)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                fontSize: '11px',
                 fontWeight: 700,
-                outline: 'none',
                 cursor: 'pointer',
+                outline: 'none',
               }}
             >
-              <option value="OPEN">● OPEN</option>
-              <option value="REVIEW">◐ UNDER REVIEW</option>
-              <option value="CLOSED">○ CLOSED</option>
+              <option value="OPEN">STATUS: OPEN</option>
+              <option value="REVIEW">STATUS: IN REVIEW</option>
+              <option value="CLOSED">STATUS: CLOSED</option>
             </select>
-          </div>
 
-          <div>
-            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>
-              Priority Level
-            </span>
+            {/* Priority Selector Dropdown */}
             <select
               value={investigationCase.priority}
               onChange={(e) => handlePriorityChange(e.target.value as CasePriority)}
               style={{
-                backgroundColor: '#030712',
-                border: '1px solid var(--border-light)',
-                borderRadius: '6px',
-                color: investigationCase.priority === 'HIGH' ? '#f87171' : investigationCase.priority === 'MEDIUM' ? '#fbbf24' : '#60a5fa',
-                padding: '6px 12px',
-                fontSize: '12px',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-subtle)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                fontSize: '11px',
                 fontWeight: 700,
-                outline: 'none',
                 cursor: 'pointer',
+                outline: 'none',
               }}
             >
-              <option value="HIGH">HIGH PRIORITY</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="LOW">LOW</option>
+              <option value="HIGH">PRIORITY: HIGH</option>
+              <option value="MEDIUM">PRIORITY: MEDIUM</option>
+              <option value="LOW">PRIORITY: LOW</option>
             </select>
           </div>
-        </div>
-      </div>
+        }
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Button
+              variant="secondary"
+              size="md"
+              icon={Printer}
+              onClick={() => setIsDossierModalOpen(true)}
+            >
+              Export Dossier / Print
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
+              icon={FileText}
+              onClick={() => setIsSarModalOpen(true)}
+            >
+              Generate SAR
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              icon={Trash2}
+              onClick={handleDeleteThisCase}
+              title="Delete case file"
+            />
+          </div>
+        }
+      />
 
       {/* ------------------------------------------------------------------ */}
-      {/* 3. Executive Threat & Observable Evidence Scope Summary            */}
+      {/* 2. CASE CONTEXT METRICS                                            */}
       {/* ------------------------------------------------------------------ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px' }}>
-        {/* Attached Targets Breakdown */}
-        <div className="dash-card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-            Attached Scope
-          </span>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span className="font-mono font-bold text-2xl text-slate-100">{investigationCase.targets.length}</span>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>targets</span>
-          </div>
-          <span style={{ fontSize: '11px', color: 'var(--accent-cyan)' }}>
-            {communityTargets.length} communities · {accountTargets.length} accounts · {transactionTargets.length} txs
-          </span>
+      <Panel padding="md">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+          <Metric
+            label="Case Lifecycle Status"
+            value={investigationCase.status}
+            subtext={`Updated ${new Date(investigationCase.updatedAt).toLocaleTimeString()}`}
+            variant={investigationCase.status === 'OPEN' ? 'accent' : 'default'}
+          />
+          <Metric
+            label="Investigation Priority"
+            value={investigationCase.priority}
+            subtext="Triage severity classification"
+            variant={investigationCase.priority === 'HIGH' ? 'high' : 'med'}
+          />
+          <Metric
+            label="Attached Entities"
+            value={`${investigationCase.targets.length} Targets`}
+            subtext={`${communityTargets.length} comm, ${accountTargets.length} acc, ${transactionTargets.length} tx`}
+          />
+          <Metric
+            label="Peak Cluster Prioritization"
+            value={maxObservedRiskScore !== null ? `${maxObservedRiskScore}/100` : '—'}
+            subtext="Highest target ML risk score"
+            variant={maxObservedRiskScore !== null && maxObservedRiskScore >= 75 ? 'high' : 'default'}
+          />
+          <Metric
+            label="Observable Evidence Rules"
+            value={`${aggregatedEvidence.length} Active`}
+            subtext={`${highEvidenceCount} High, ${medEvidenceCount} Med triggers`}
+            variant={highEvidenceCount > 0 ? 'high' : 'default'}
+          />
         </div>
-
-        {/* Max Observed Risk Score */}
-        <div className="dash-card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-            Max Cluster ML Risk
-          </span>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span className="font-mono font-bold text-2xl" style={{ color: maxObservedRiskScore && maxObservedRiskScore >= 60 ? '#f87171' : maxObservedRiskScore && maxObservedRiskScore >= 35 ? '#fbbf24' : '#34d399' }}>
-              {maxObservedRiskScore !== null ? `${maxObservedRiskScore}/100` : '—'}
-            </span>
-          </div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Model triage priority for attached clusters
-          </span>
-        </div>
-
-        {/* Aggregated Evidence Indicators */}
-        <div className="dash-card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-            Observable Evidence Items
-          </span>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span className="font-mono font-bold text-2xl text-amber-400">{aggregatedEvidence.length}</span>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>signals</span>
-          </div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            <strong style={{ color: '#f87171' }}>{highEvidenceCount} High</strong> · <strong style={{ color: '#fbbf24' }}>{medEvidenceCount} Med</strong> · <strong style={{ color: '#60a5fa' }}>{lowEvidenceCount} Low</strong>
-          </span>
-        </div>
-
-        {/* Case Status Summary */}
-        <div className="dash-card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-            Dossier Workflow Status
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '14px', fontWeight: 800, color: investigationCase.status === 'OPEN' ? '#34d399' : investigationCase.status === 'REVIEW' ? '#fbbf24' : '#94a3b8' }}>
-              {investigationCase.status === 'OPEN' ? 'Active Forensic Triage' : investigationCase.status === 'REVIEW' ? 'Compliance Review In Progress' : 'Case Closed & Archived'}
-            </span>
-          </div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            {investigationCase.priority} Priority Queue
-          </span>
-        </div>
-      </div>
+      </Panel>
 
       {/* ------------------------------------------------------------------ */}
-      {/* 4. Observable Evidence Summary (Aggregated across targets)         */}
+      {/* 3. ATTACHED TARGETS TABLE                                          */}
       {/* ------------------------------------------------------------------ */}
-      <div className="dash-card" style={{ padding: '22px 26px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-cyan)' }}>
-                Observable Evidence Intelligence Summary
-              </span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontStyle: 'italic' }}>
-                Aggregated rule-based signals · Zero label leakage
-              </span>
-            </div>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Deterministic evidence extracted across {investigationCase.targets.length} attached targets.
-            </span>
-          </div>
-
-          {/* Severity Filter Pills */}
-          {aggregatedEvidence.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {(['ALL', 'HIGH', 'MEDIUM', 'LOW'] as const).map((sev) => {
-                const count = sev === 'ALL' ? aggregatedEvidence.length : sev === 'HIGH' ? highEvidenceCount : sev === 'MEDIUM' ? medEvidenceCount : lowEvidenceCount;
-                const active = evidenceFilter === sev;
-                const color = sev === 'HIGH' ? '#f87171' : sev === 'MEDIUM' ? '#fbbf24' : sev === 'LOW' ? '#60a5fa' : 'rgba(255,255,255,0.6)';
-
-                return (
-                  <button
-                    key={sev}
-                    onClick={() => setEvidenceFilter(sev)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 16,
-                      border: active ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.08)',
-                      background: active ? `${color}12` : 'rgba(255,255,255,0.03)',
-                      color: active ? color : 'var(--text-dim)',
-                      fontSize: 11,
-                      fontWeight: active ? 700 : 400,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    {sev}
-                    <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 8, background: active ? `${color}25` : 'rgba(255,255,255,0.06)' }}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Evidence List */}
-        {loadingDetails ? (
-          <LoadingSkeleton type="table" count={3} />
-        ) : aggregatedEvidence.length === 0 ? (
-          <div style={{ padding: '32px 20px', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: '6px' }}>
-            <Shield size={28} style={{ margin: '0 auto 8px', opacity: 0.25, color: 'var(--accent-cyan)' }} />
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
-              No automated evidence signals detected on current targets. Attach communities or accounts to aggregate relationship signals.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filteredEvidence.slice(0, 10).map((item) => {
-              const sev = item.severity;
-              const isHigh = sev === 'HIGH';
-              const isMed = sev === 'MEDIUM';
-              const color = isHigh ? '#f87171' : isMed ? '#fbbf24' : '#60a5fa';
-
-              return (
-                <div
-                  key={item.evidence_id}
-                  style={{
-                    padding: '14px 16px',
-                    borderRadius: '8px',
-                    backgroundColor: '#070d1e',
-                    border: `1px solid ${isHigh ? 'rgba(239,68,68,0.25)' : isMed ? 'rgba(245,158,11,0.22)' : 'var(--border)'}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          padding: '2px 7px',
-                          borderRadius: 4,
-                          fontWeight: 800,
-                          backgroundColor: `${color}15`,
-                          color,
-                          border: `1px solid ${color}35`,
-                        }}
-                      >
-                        {item.severity}
-                      </span>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>
-                        {item.title}
-                      </span>
-                    </div>
-
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>
-                      {item.type}
-                    </span>
-                  </div>
-
-                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.55 }}>
-                    {item.description}
-                  </p>
-
-                  {/* Supporting entities and metrics */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Entities:</span>
-                      {item.supporting_entities.slice(0, 6).map((entity) => (
-                        <span
-                          key={entity}
-                          style={{
-                            fontSize: '10px',
-                            padding: '1px 6px',
-                            borderRadius: 3,
-                            backgroundColor: `${color}10`,
-                            border: `1px solid ${color}20`,
-                            color,
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {entity}
-                        </span>
-                      ))}
-                      {item.supporting_entities.length > 6 && (
-                        <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
-                          +{item.supporting_entities.length - 6} more
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Explore in graph action */}
-                    {availableCommunities.length > 0 && (
-                      <button
-                        onClick={handleOpenInvestigationGraph}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          padding: '3px 8px',
-                          borderRadius: 4,
-                          background: 'rgba(0,240,255,0.08)',
-                          border: '1px solid rgba(0,240,255,0.2)',
-                          color: 'var(--accent-cyan)',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <ScanSearch size={11} />
-                        Explore in Graph
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {filteredEvidence.length > 10 && (
-              <span style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-dim)', paddingTop: 4 }}>
-                Showing top 10 of {filteredEvidence.length} observable signals. Full list included in Dossier Export.
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 5. Attached Targets & Quick-Attach                                 */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="dash-card" style={{ padding: '22px 26px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h3 style={{ fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent-cyan)', margin: 0 }}>
-              Attached Target Inventory ({investigationCase.targets.length})
-            </h3>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-              Tracked Communities, Accounts, and Transactions linked to this case.
-            </span>
-          </div>
-
-          {/* Quick Add Bar */}
-          <form onSubmit={handleQuickAddTarget} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <Panel
+        title={`Attached Target Entities (${investigationCase.targets.length})`}
+        subtitle="Network communities, individual accounts, and transaction operations attached to this case file."
+        padding="none"
+      >
+        {/* Quick Add Target Bar */}
+        <div
+          style={{
+            padding: '12px 18px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            backgroundColor: 'var(--bg-sidebar)',
+          }}
+        >
+          <form onSubmit={handleQuickAddTarget} style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1', maxWidth: '480px' }}>
             <input
               type="text"
               value={addTargetInput}
               onChange={(e) => setAddTargetInput(e.target.value)}
-              placeholder="Attach target ID (e.g. 3, acc_..., tx_...)..."
+              placeholder="Add target ID (e.g. acc_123, tx_456, or community #)..."
               style={{
-                width: '280px',
+                flex: 1,
                 padding: '6px 12px',
-                backgroundColor: '#030712',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-input)',
                 border: '1px solid var(--border)',
-                borderRadius: '6px',
-                color: 'var(--text-main)',
+                color: 'var(--text-primary)',
                 fontSize: '12px',
-                fontFamily: 'var(--font-mono)',
                 outline: 'none',
               }}
             />
-            <button
-              type="submit"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px 12px',
-                backgroundColor: '#1e293b',
-                border: '1px solid var(--border-light)',
-                borderRadius: '6px',
-                color: 'var(--text-main)',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              <Plus size={13} />
-              Attach
-            </button>
+            <Button variant="secondary" size="sm" icon={Plus} type="submit">
+              Attach Target
+            </Button>
           </form>
+
+          <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+            Entities can also be attached directly from the Risk Queue or Detail workspaces.
+          </span>
         </div>
 
         {investigationCase.targets.length === 0 ? (
-          <div style={{ padding: '30px 20px', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: '6px' }}>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
-              No targets attached yet. Attach entities via the quick input above or browse Communities/Accounts.
-            </p>
-          </div>
+          <EmptyState
+            title="No target entities attached"
+            message="Attach suspicious communities, accounts, or transactions to begin building this forensic case dossier."
+          />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Communities */}
-            {communityTargets.length > 0 && (
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--accent-cyan)', display: 'block', marginBottom: '8px' }}>
-                  Communities ({communityTargets.length})
-                </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '10px' }}>
-                  {communityTargets.map((t) => {
-                    const detail = communityDetails.get(t.id);
-                    return (
-                      <div
-                        key={t.id}
-                        style={{
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          backgroundColor: '#070d1e',
-                          border: '1px solid var(--border)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ padding: 6, borderRadius: 4, background: 'rgba(0,240,255,0.1)', color: 'var(--accent-cyan)' }}>
-                            <Layers size={16} />
-                          </div>
-                          <div>
-                            <Link
-                              to={`/communities/${t.id}`}
-                              style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textDecoration: 'none' }}
-                            >
-                              {t.label}
-                            </Link>
-                            {detail && (
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                {detail.member_count} accounts · ${detail.transaction_statistics.total_transaction_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} vol
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {detail && <RiskBadge level={detail.risk_level} size="sm" />}
-                          <Link
-                            to={`/communities/${t.id}`}
-                            style={{ color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', padding: 4 }}
-                            title="Open Community Detail"
-                          >
-                            <ExternalLink size={14} />
-                          </Link>
-                          <button
-                            onClick={() => handleRemoveTarget(t)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4 }}
-                            title="Remove from case"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Accounts */}
-            {accountTargets.length > 0 && (
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#38bdf8', display: 'block', marginBottom: '8px' }}>
-                  Accounts ({accountTargets.length})
-                </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '10px' }}>
-                  {accountTargets.map((t) => {
-                    const detail = accountDetails.get(t.id);
-                    return (
-                      <div
-                        key={t.id}
-                        style={{
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          backgroundColor: '#070d1e',
-                          border: '1px solid var(--border)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ padding: 6, borderRadius: 4, background: 'rgba(56,189,248,0.1)', color: '#38bdf8' }}>
-                            <User size={16} />
-                          </div>
-                          <div>
-                            <Link
-                              to={`/accounts/${t.id}`}
-                              className="font-mono"
-                              style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textDecoration: 'none' }}
-                            >
-                              {t.label}
-                            </Link>
-                            {detail && (
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                Bal: ${detail.balance.toLocaleString()} · {detail.connected_account_count} connections
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {detail?.community_risk_level && <RiskBadge level={detail.community_risk_level} size="sm" />}
-                          <Link
-                            to={`/accounts/${t.id}`}
-                            style={{ color: '#38bdf8', display: 'flex', alignItems: 'center', padding: 4 }}
-                            title="Open Account Profile"
-                          >
-                            <ExternalLink size={14} />
-                          </Link>
-                          <button
-                            onClick={() => handleRemoveTarget(t)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4 }}
-                            title="Remove from case"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Transactions */}
-            {transactionTargets.length > 0 && (
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#fbbf24', display: 'block', marginBottom: '8px' }}>
-                  Transactions ({transactionTargets.length})
-                </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '10px' }}>
-                  {transactionTargets.map((t) => {
-                    const detail = transactionDetails.get(t.id);
-                    return (
-                      <div
-                        key={t.id}
-                        style={{
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          backgroundColor: '#070d1e',
-                          border: '1px solid var(--border)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ padding: 6, borderRadius: 4, background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}>
-                            <Activity size={16} />
-                          </div>
-                          <div>
-                            <Link
-                              to={`/transactions/${t.id}`}
-                              className="font-mono"
-                              style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textDecoration: 'none' }}
-                            >
-                              {t.label}
-                            </Link>
-                            {detail && (
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                ${detail.amount.toLocaleString()} · {detail.src_account_id} → {detail.dst_account_id}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {detail && (
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                padding: '2px 6px',
-                                borderRadius: 3,
-                                fontWeight: 700,
-                                backgroundColor: detail.transaction_status === 'COMPLETED' ? 'rgba(16,185,129,0.12)' : 'rgba(244,63,94,0.12)',
-                                color: detail.transaction_status === 'COMPLETED' ? '#34d399' : '#f87171',
-                              }}
-                            >
-                              {detail.transaction_status}
-                            </span>
-                          )}
-                          <Link
-                            to={`/transactions/${t.id}`}
-                            style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', padding: 4 }}
-                            title="Open Transaction Detail"
-                          >
-                            <ExternalLink size={14} />
-                          </Link>
-                          <button
-                            onClick={() => handleRemoveTarget(t)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4 }}
-                            title="Remove from case"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <DataTable
+            columns={targetColumns}
+            data={investigationCase.targets}
+            keyExtractor={(t) => `${t.type}_${t.id}`}
+          />
         )}
-      </div>
+      </Panel>
 
       {/* ------------------------------------------------------------------ */}
-      {/* 6. Chronological Investigation Timeline                            */}
+      {/* 4. AGGREGATED OBSERVABLE EVIDENCE TABLE                            */}
       {/* ------------------------------------------------------------------ */}
-      <div className="dash-card" style={{ padding: '22px 26px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-cyan)' }}>
-            Investigation Activity Timeline
-          </span>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontStyle: 'italic' }}>
-            Chronological forensic events ({timelineItems.length})
-          </span>
+      <Panel
+        title={`Aggregated Observable Evidence (${aggregatedEvidence.length})`}
+        subtitle="Deterministic evidence rule triggers collected across all attached case targets."
+        padding="none"
+      >
+        {/* Filter Bar Header */}
+        <div
+          style={{
+            padding: '10px 18px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'var(--bg-sidebar)',
+          }}
+        >
+          <FilterBar
+            options={evidenceFilterOptions}
+            selected={evidenceFilter}
+            onChange={setEvidenceFilter}
+            size="sm"
+          />
+          {loadingDetails && (
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Enriching evidence telemetry...
+            </span>
+          )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative', paddingLeft: 12 }}>
-          {/* Timeline line */}
-          <div style={{ position: 'absolute', top: 12, bottom: 12, left: 23, width: 2, backgroundColor: 'rgba(56,189,248,0.15)' }} />
-
-          {timelineItems.map((item, idx) => {
-            const dotColor = item.type === 'CASE' ? '#00F0FF' : item.type === 'COMMUNITY' ? '#38bdf8' : item.type === 'ACCOUNT' ? '#a78bfa' : '#fbbf24';
-
-            return (
-              <div
-                key={item.id || idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 16,
-                  padding: '12px 0',
-                  position: 'relative',
-                }}
-              >
-                {/* Dot */}
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    backgroundColor: '#030712',
-                    border: `2px solid ${dotColor}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    zIndex: 2,
-                    marginTop: 1,
-                  }}
-                >
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: dotColor }} />
-                </div>
-
-                {/* Event Content */}
-                <div style={{ flex: 1, backgroundColor: '#070d1e', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {item.link ? (
-                        <Link to={item.link} style={{ fontSize: '12.5px', fontWeight: 700, color: '#f8fafc', textDecoration: 'none' }}>
-                          {item.title}
-                        </Link>
-                      ) : (
-                        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#f8fafc' }}>
-                          {item.title}
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>
-                      {new Date(item.timestamp).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <p style={{ margin: '4px 0 0 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                    {item.subtitle}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+        {filteredEvidence.length === 0 ? (
+          <EmptyState
+            title="No observable evidence rule triggers"
+            message="No deterministic evidence rules have triggered for the currently attached target entities."
+          />
+        ) : (
+          <DataTable
+            columns={evidenceColumns}
+            data={filteredEvidence}
+            keyExtractor={(item) => item.evidence_id}
+          />
+        )}
+      </Panel>
 
       {/* ------------------------------------------------------------------ */}
-      {/* 7. Investigator Notes Workspace with Auto-Save                      */}
+      {/* 5. PERSISTENT INVESTIGATOR NOTES & AUDIT TRAIL                     */}
       {/* ------------------------------------------------------------------ */}
-      <div className="dash-card" style={{ padding: '22px 26px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: 10 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-cyan)' }}>
-                Investigator Forensic Notes & Dossier Record
-              </span>
+      <Panel
+        title="Investigator Notes & Forensic Hypotheses"
+        subtitle="Persistent case notes, timeline findings, and SAR corroboration log."
+        padding="md"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <textarea
+            value={notes}
+            onChange={(e) => handleNotesChange(e.target.value)}
+            placeholder="Record ongoing investigation observations, cross-account connections, merchant anomalies, or regulatory submission notes..."
+            rows={6}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: '4px',
+              backgroundColor: 'var(--bg-input)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+              lineHeight: 1.5,
+              outline: 'none',
+              resize: 'vertical',
+            }}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-dim)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {isSavingNotes ? (
-                <span style={{ fontSize: '11px', color: '#fbbf24', fontWeight: 600 }}>
-                  Saving changes...
-                </span>
+                <span style={{ color: 'var(--accent)' }}>Saving notes...</span>
               ) : (
-                lastSavedTimestamp && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '11px', color: '#86efac', fontWeight: 600 }}>
-                    <CheckCircle2 size={12} />
-                    Auto-saved at {lastSavedTimestamp}
-                  </span>
-                )
+                <>
+                  <CheckCircle2 size={12} style={{ color: 'var(--risk-low)' }} />
+                  <span>Autosaved locally{lastSavedTimestamp ? ` at ${lastSavedTimestamp}` : ''}</span>
+                </>
               )}
             </div>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-              Record forensic hypotheses, observable evidence synthesis, and compliance actions. Persists in local storage.
-            </span>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Save}
               onClick={handleManualSaveNotes}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                backgroundColor: '#0284c7',
-                border: 'none',
-                borderRadius: '4px',
-                color: '#fff',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
             >
-              <Save size={13} />
-              Save Now
-            </button>
+              Save Notes
+            </Button>
           </div>
         </div>
+      </Panel>
 
-        <textarea
-          value={notes}
-          onChange={(e) => handleNotesChange(e.target.value)}
-          placeholder="Document investigator hypotheses, multi-account relationship findings, merchant temporal overlap observations, or recommended remediation steps..."
-          rows={7}
-          style={{
-            width: '100%',
-            padding: '14px 16px',
-            backgroundColor: '#030712',
-            border: '1px solid var(--border)',
-            borderRadius: '6px',
-            color: 'var(--text-main)',
-            fontSize: '13px',
-            fontFamily: 'var(--font-sans)',
-            lineHeight: 1.6,
-            outline: 'none',
-            resize: 'vertical',
-          }}
-        />
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 8. Modal: Full Printable / Exportable Case Dossier                */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Case Dossier Modal */}
       <CaseDossierModal
         isOpen={isDossierModalOpen}
         onClose={() => setIsDossierModalOpen(false)}
@@ -1383,6 +888,12 @@ export const CaseDetailPage: React.FC = () => {
         accountDetails={accountDetails}
         transactionDetails={transactionDetails}
         aggregatedEvidence={aggregatedEvidence}
+      />
+
+      {/* SAR Export Modal */}
+      <SarExportModal
+        isOpen={isSarModalOpen}
+        onClose={() => setIsSarModalOpen(false)}
       />
     </div>
   );
