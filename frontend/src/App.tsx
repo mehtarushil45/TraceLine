@@ -16,17 +16,28 @@ export const App: React.FC = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
+          {/* Primary Product Entrypoint: Risk Queue */}
+          <Route index element={<DashboardPage />} />
+          <Route path="dashboard" element={<Navigate to="/" replace />} />
+
+          {/* Communities Registry & Deep Investigation */}
           <Route path="communities" element={<CommunitiesPage />} />
           <Route path="communities/:communityId" element={<CommunityDetailPage />} />
+
+          {/* Accounts Registry & Deep Investigation */}
           <Route path="accounts" element={<AccountsListPage />} />
           <Route path="accounts/:accountId" element={<AccountDetailPage />} />
+
+          {/* Transactions Registry & Deep Investigation */}
           <Route path="transactions" element={<TransactionsListPage />} />
           <Route path="transactions/:transactionId" element={<TransactionDetailPage />} />
+
+          {/* Forensic Case Management & Dossiers */}
           <Route path="investigations" element={<InvestigationsPage />} />
           <Route path="investigations/:caseId" element={<CaseDetailPage />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

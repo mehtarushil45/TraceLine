@@ -6,7 +6,7 @@ import {
   Briefcase,
   Layers,
   Search,
-  User,
+  Users,
   X,
 } from 'lucide-react';
 import { getCases } from '../../utils/caseManager';
@@ -41,14 +41,14 @@ export const OmnisearchModal: React.FC<OmnisearchModalProps> = ({ isOpen, onClos
   const raw = query.trim().toLowerCase();
   const cases = getCases();
 
-  // Search matches
-  const matchedCases = cases.filter(
-    (c) => c.title.toLowerCase().includes(raw) || c.id.toLowerCase().includes(raw)
-  );
+  // Matched cases from real LocalStorage cases
+  const matchedCases = raw
+    ? cases.filter((c) => c.title.toLowerCase().includes(raw) || c.id.toLowerCase().includes(raw))
+    : cases.slice(0, 3);
 
   const isNumeric = /^\d+$/.test(raw.replace(/^#/, ''));
-  const isAccount = raw.startsWith('acc_') || raw.includes('account');
-  const isTransaction = raw.startsWith('tx_') || raw.includes('transaction');
+  const isAccount = raw.startsWith('acc_') || (raw.startsWith('acc') && raw.length > 3);
+  const isTransaction = raw.startsWith('tx_') || (raw.startsWith('tx') && raw.length > 2);
 
   const handleSelect = (path: string) => {
     navigate(path);
@@ -66,6 +66,8 @@ export const OmnisearchModal: React.FC<OmnisearchModalProps> = ({ isOpen, onClos
       handleSelect(`/accounts/${raw}`);
     } else if (raw.startsWith('tx_')) {
       handleSelect(`/transactions/${raw}`);
+    } else if (matchedCases.length > 0) {
+      handleSelect(`/investigations/${matchedCases[0].id}`);
     } else {
       handleSelect(`/communities`);
     }
@@ -76,13 +78,12 @@ export const OmnisearchModal: React.FC<OmnisearchModalProps> = ({ isOpen, onClos
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(3, 7, 18, 0.85)',
-        backdropFilter: 'blur(12px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
         zIndex: 100,
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        paddingTop: '12vh',
+        paddingTop: '14vh',
         paddingLeft: '16px',
         paddingRight: '16px',
       }}
@@ -92,10 +93,10 @@ export const OmnisearchModal: React.FC<OmnisearchModalProps> = ({ isOpen, onClos
         className="dash-card"
         style={{
           width: '100%',
-          maxWidth: '620px',
-          backgroundColor: '#0a1024',
-          border: '1px solid rgba(0, 240, 255, 0.3)',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.1)',
+          maxWidth: '580px',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-light)',
+          boxShadow: '0 20px 48px rgba(0, 0, 0, 0.6)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -103,20 +104,20 @@ export const OmnisearchModal: React.FC<OmnisearchModalProps> = ({ isOpen, onClos
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input Box */}
-        <form onSubmit={handleEnter} style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <Search size={18} style={{ color: 'var(--accent-cyan)', marginRight: '12px', flexShrink: 0 }} />
+        <form onSubmit={handleEnter} style={{ display: 'flex', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+          <Search size={16} style={{ color: 'var(--text-dim)', marginRight: '10px', flexShrink: 0 }} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search communities (#3), accounts (acc_100), transactions (tx_7517), or cases..."
+            placeholder="Search investigations, communities, accounts and transactions..."
             autoFocus
             style={{
               width: '100%',
               backgroundColor: 'transparent',
               border: 'none',
-              color: '#f8fafc',
-              fontSize: '15px',
+              color: 'var(--text-primary)',
+              fontSize: '14px',
               fontFamily: 'var(--font-sans)',
               outline: 'none',
             }}
@@ -124,170 +125,107 @@ export const OmnisearchModal: React.FC<OmnisearchModalProps> = ({ isOpen, onClos
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </form>
 
-        {/* Search Results & Quick Actions */}
-        <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Quick Suggestions */}
-          {!raw && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', padding: '4px 8px' }}>
-                Quick Triage Targets
-              </span>
-              <div
-                onClick={() => handleSelect('/communities/3')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                  cursor: 'pointer',
-                  border: '1px solid var(--border)',
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
-                onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ padding: '6px', borderRadius: '4px', backgroundColor: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e' }}>
-                    <Layers size={15} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
-                      Community #3 (Flagship Cluster)
-                    </span>
-                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Risk Score: 92/100 · High Hardware & Instrument Reuse
-                    </span>
-                  </div>
-                </div>
-                <span className="font-mono text-xs text-rose-400 font-bold">92 HIGH</span>
-              </div>
-
-              <div
-                onClick={() => handleSelect('/investigations')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                  cursor: 'pointer',
-                  border: '1px solid var(--border)',
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
-                onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
-              >
-                <div style={{ padding: '6px', borderRadius: '4px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-cyan)' }}>
-                  <Briefcase size={15} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
-                    Investigation Queue & Watchlist
-                  </span>
-                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Review tracked targets, cases, and forensic notes
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Direct Matches */}
+        {/* Results / Navigation Suggestions */}
+        <div style={{ maxHeight: '360px', overflowY: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {/* Direct Entity Pattern Match */}
           {raw && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', padding: '4px 8px' }}>
-                Matching Entities
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', padding: '2px 6px' }}>
+                Direct Target Navigation
               </span>
 
-              {/* Community Jump */}
-              {(isNumeric || raw.includes('comm')) && (
+              {isNumeric && (
                 <div
-                  onClick={() => handleSelect(`/communities/${raw.replace(/\D/g, '') || '3'}`)}
+                  onClick={() => handleSelect(`/communities/${raw.replace(/^#/, '')}`)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    backgroundColor: 'var(--bg-subtle)',
                     cursor: 'pointer',
                     border: '1px solid var(--border)',
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Layers size={16} style={{ color: 'var(--accent-cyan)' }} />
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
-                      Jump to Community #{raw.replace(/\D/g, '') || '0'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Layers size={14} style={{ color: 'var(--accent)' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Open Community #{raw.replace(/^#/, '')}
                     </span>
                   </div>
-                  <ArrowRight size={14} style={{ color: 'var(--text-dim)' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                    Enter <ArrowRight size={11} />
+                  </span>
                 </div>
               )}
 
-              {/* Account Jump */}
-              {(isAccount || raw.startsWith('acc_')) && (
+              {isAccount && (
                 <div
                   onClick={() => handleSelect(`/accounts/${raw}`)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    backgroundColor: 'var(--bg-subtle)',
                     cursor: 'pointer',
                     border: '1px solid var(--border)',
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <User size={16} style={{ color: '#38bdf8' }} />
-                    <span className="font-mono text-sm text-slate-100 font-semibold">
-                      Inspect Account '{raw}'
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={14} style={{ color: 'var(--accent)' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      Inspect Account {raw}
                     </span>
                   </div>
-                  <ArrowRight size={14} style={{ color: 'var(--text-dim)' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                    Enter <ArrowRight size={11} />
+                  </span>
                 </div>
               )}
 
-              {/* Transaction Jump */}
-              {(isTransaction || raw.startsWith('tx_')) && (
+              {isTransaction && (
                 <div
                   onClick={() => handleSelect(`/transactions/${raw}`)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    backgroundColor: 'var(--bg-subtle)',
                     cursor: 'pointer',
                     border: '1px solid var(--border)',
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Activity size={16} style={{ color: '#fbbf24' }} />
-                    <span className="font-mono text-sm text-slate-100 font-semibold">
-                      Inspect Transaction '{raw}'
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Activity size={14} style={{ color: 'var(--accent)' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      Inspect Transaction {raw}
                     </span>
                   </div>
-                  <ArrowRight size={14} style={{ color: 'var(--text-dim)' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                    Enter <ArrowRight size={11} />
+                  </span>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Matched Investigation Cases */}
+          {/* Matched Investigation Cases */}
+          {matchedCases.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', padding: '2px 6px' }}>
+                Active Cases ({matchedCases.length})
+              </span>
               {matchedCases.map((c) => (
                 <div
                   key={c.id}
@@ -296,51 +234,83 @@ export const OmnisearchModal: React.FC<OmnisearchModalProps> = ({ isOpen, onClos
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    backgroundColor: 'var(--bg-subtle)',
                     cursor: 'pointer',
                     border: '1px solid var(--border)',
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Briefcase size={16} style={{ color: '#c084fc' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Briefcase size={14} style={{ color: 'var(--text-muted)' }} />
                     <div>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
                         {c.title}
                       </span>
-                      <span className="font-mono text-[11px]" style={{ display: 'block', color: 'var(--text-dim)' }}>
-                        {c.id} · {c.status} · {c.targets.length} targets
+                      <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                        {c.id} · {c.targets.length} targets · {c.status}
                       </span>
                     </div>
                   </div>
-                  <ArrowRight size={14} style={{ color: 'var(--text-dim)' }} />
+                  <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                    {c.priority}
+                  </span>
                 </div>
               ))}
             </div>
           )}
+
+          {/* Registry Jump Shortcuts */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', padding: '2px 6px' }}>
+              Registries
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+              <div
+                onClick={() => handleSelect('/communities')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  borderRadius: '5px',
+                  backgroundColor: 'var(--bg-subtle)',
+                  cursor: 'pointer',
+                  border: '1px solid var(--border)',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <Layers size={13} style={{ color: 'var(--accent)' }} />
+                <span>Communities Registry</span>
+              </div>
+
+              <div
+                onClick={() => handleSelect('/accounts')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  borderRadius: '5px',
+                  backgroundColor: 'var(--bg-subtle)',
+                  cursor: 'pointer',
+                  border: '1px solid var(--border)',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <Users size={13} style={{ color: 'var(--accent)' }} />
+                <span>Accounts Registry</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Modal Footer Key Hints */}
-        <div
-          style={{
-            padding: '10px 16px',
-            backgroundColor: '#050a18',
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '11px',
-            color: 'var(--text-dim)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span><kbd style={{ padding: '2px 4px', backgroundColor: '#1e293b', borderRadius: '3px', color: 'var(--text-muted)' }}>↵ Enter</kbd> to Select</span>
-            <span><kbd style={{ padding: '2px 4px', backgroundColor: '#1e293b', borderRadius: '3px', color: 'var(--text-muted)' }}>Esc</kbd> to Close</span>
-          </div>
-          <span className="gradient-text-razorpay font-semibold">Razorpay Neural Graph Search</span>
+        {/* Footer info */}
+        <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-dim)' }}>
+          <span>Type ID to navigate directly (e.g. 3, acc_..., tx_...)</span>
+          <span>Esc to close</span>
         </div>
       </div>
     </div>

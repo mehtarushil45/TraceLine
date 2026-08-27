@@ -86,27 +86,27 @@ export const AddToInvestigationButton: React.FC<AddToInvestigationButtonProps> =
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '6px',
-          padding: isSmall ? '4px 10px' : '7px 14px',
-          borderRadius: '6px',
-          backgroundColor: 'rgba(16, 185, 129, 0.12)',
-          border: '1px solid rgba(16, 185, 129, 0.35)',
+          gap: '5px',
+          padding: isSmall ? '3px 8px' : '6px 12px',
+          borderRadius: '4px',
+          backgroundColor: 'var(--risk-low-bg)',
+          border: '1px solid var(--risk-low-border)',
           color: '#86efac',
           fontSize: isSmall ? '11px' : '12px',
           fontWeight: 600,
           cursor: 'pointer',
-          transition: 'all 0.15s ease',
+          transition: 'all 0.12s ease',
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
         }}
         onMouseOut={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.12)';
+          e.currentTarget.style.backgroundColor = 'var(--risk-low-bg)';
         }}
       >
-        <Check size={isSmall ? 12 : 14} />
-        <span>In Investigation</span>
-        <ExternalLink size={11} style={{ opacity: 0.7 }} />
+        <Check size={isSmall ? 11 : 13} />
+        <span>In Case</span>
+        <ExternalLink size={10} style={{ opacity: 0.7 }} />
       </button>
     );
   }
@@ -118,42 +118,42 @@ export const AddToInvestigationButton: React.FC<AddToInvestigationButtonProps> =
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '6px',
-          padding: isSmall ? '4px 10px' : '7px 14px',
-          borderRadius: '6px',
-          backgroundColor: '#1e293b',
-          border: '1px solid var(--border-light)',
-          color: 'var(--text-main)',
+          gap: '5px',
+          padding: isSmall ? '3px 8px' : '6px 12px',
+          borderRadius: '4px',
+          backgroundColor: 'var(--bg-subtle)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-primary)',
           fontSize: isSmall ? '11px' : '12px',
           fontWeight: 600,
           cursor: 'pointer',
-          transition: 'all 0.15s ease',
+          transition: 'all 0.12s ease',
         }}
         onMouseOver={(e) => {
-          e.currentTarget.style.backgroundColor = '#334155';
-          e.currentTarget.style.borderColor = 'var(--accent-cyan)';
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.backgroundColor = '#1e293b';
+          e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
           e.currentTarget.style.borderColor = 'var(--border-light)';
         }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--bg-subtle)';
+          e.currentTarget.style.borderColor = 'var(--border)';
+        }}
       >
-        <Plus size={isSmall ? 12 : 14} style={{ color: 'var(--accent-cyan)' }} />
-        <span>Add to Investigation</span>
+        <Plus size={isSmall ? 11 : 13} style={{ color: 'var(--accent)' }} />
+        <span>Add to Case</span>
       </button>
 
       {feedback && (
         <span
           style={{
             position: 'absolute',
-            bottom: '-24px',
+            bottom: '-22px',
             left: '50%',
             transform: 'translateX(-50%)',
-            backgroundColor: '#0f172a',
+            backgroundColor: 'var(--bg-card)',
             border: '1px solid var(--border-light)',
             color: '#86efac',
-            padding: '2px 8px',
-            borderRadius: '4px',
+            padding: '1px 6px',
+            borderRadius: '3px',
             fontSize: '10px',
             fontFamily: 'var(--font-mono)',
             whiteSpace: 'nowrap',

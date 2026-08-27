@@ -4,8 +4,7 @@ import {
   Activity,
   Briefcase,
   Layers,
-  LayoutDashboard,
-  Network,
+  Shield,
   ShieldAlert,
   Users,
 } from 'lucide-react';
@@ -17,13 +16,7 @@ interface NavItem {
   path: string;
   icon: React.ComponentType<{ size?: number | string; style?: React.CSSProperties }>;
   match: string[];
-  tag?: string;
   badge?: string;
-}
-
-interface NavSection {
-  title: string;
-  items: NavItem[];
 }
 
 export const Sidebar: React.FC = () => {
@@ -65,74 +58,51 @@ export const Sidebar: React.FC = () => {
     };
   }, []);
 
-  const navSections: NavSection[] = [
+  const navItems: NavItem[] = [
     {
-      title: 'Graph Intelligence',
-      items: [
-        {
-          label: 'Overview SOC',
-          path: '/dashboard',
-          icon: LayoutDashboard,
-          match: ['/dashboard', '/'],
-        },
-        {
-          label: 'Community Explorer',
-          path: '/communities',
-          icon: Layers,
-          match: ['/communities'],
-        },
-        {
-          label: 'Flagship Topology',
-          path: '/communities/3',
-          icon: Network,
-          match: ['/communities/3'],
-          tag: 'HOT',
-        },
-      ],
+      label: 'Risk Queue',
+      path: '/',
+      icon: ShieldAlert,
+      match: ['/'],
     },
     {
-      title: 'Entity Forensics',
-      items: [
-        {
-          label: 'Accounts Registry',
-          path: '/accounts',
-          icon: Users,
-          match: ['/accounts'],
-        },
-        {
-          label: 'Transaction Stream',
-          path: '/transactions',
-          icon: Activity,
-          match: ['/transactions'],
-        },
-      ],
+      label: 'Communities',
+      path: '/communities',
+      icon: Layers,
+      match: ['/communities'],
     },
     {
-      title: 'Case Management',
-      items: [
-        {
-          label: 'Investigations',
-          path: '/investigations',
-          icon: Briefcase,
-          match: ['/investigations'],
-          badge: openCasesCount > 0 ? openCasesCount.toString() : undefined,
-        },
-      ],
+      label: 'Accounts',
+      path: '/accounts',
+      icon: Users,
+      match: ['/accounts'],
+    },
+    {
+      label: 'Transactions',
+      path: '/transactions',
+      icon: Activity,
+      match: ['/transactions'],
+    },
+    {
+      label: 'Cases',
+      path: '/investigations',
+      icon: Briefcase,
+      match: ['/investigations'],
+      badge: openCasesCount > 0 ? openCasesCount.toString() : undefined,
     },
   ];
 
-  const isActive = (matches: string[]) => {
-    return matches.some((m) => {
-      if (m === '/' && location.pathname === '/') return true;
-      if (m !== '/' && location.pathname.startsWith(m)) return true;
-      return false;
-    });
+  const isItemActive = (item: NavItem) => {
+    if (item.path === '/') {
+      return location.pathname === '/' || location.pathname === '/dashboard';
+    }
+    return location.pathname.startsWith(item.path);
   };
 
   return (
     <aside
       style={{
-        width: '260px',
+        width: '230px',
         backgroundColor: 'var(--bg-sidebar)',
         borderRight: '1px solid var(--border)',
         display: 'flex',
@@ -147,173 +117,130 @@ export const Sidebar: React.FC = () => {
       {/* Brand Header */}
       <div
         style={{
-          padding: '20px 20px 16px 20px',
+          padding: '18px 16px 14px 16px',
           borderBottom: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
+          gap: '10px',
         }}
       >
         <div
           style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(0, 240, 255, 0.1)',
-            border: '1px solid rgba(0, 240, 255, 0.3)',
-            boxShadow: '0 0 16px rgba(0, 240, 255, 0.2)',
+            width: '30px',
+            height: '30px',
+            borderRadius: '5px',
+            backgroundColor: 'var(--bg-subtle)',
+            border: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'var(--accent-cyan)',
+            color: 'var(--accent)',
           }}
         >
-          <ShieldAlert size={20} />
+          <Shield size={16} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f8fafc' }}>
-              TraceLine <span className="gradient-text-razorpay">AI</span>
-            </span>
-          </div>
+          <span style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+            TraceLine
+          </span>
           <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Razorpay Risk Platform
+            Risk Investigation
           </span>
         </div>
       </div>
 
-      {/* Navigation Sections */}
-      <nav style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '18px', flex: 1, overflowY: 'auto' }}>
-        {navSections.map((sec, sIdx) => (
-          <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ padding: '0 10px 4px 10px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-dim)' }}>
-              {sec.title}
-            </div>
-            {sec.items.map((item) => {
-              const active = isActive(item.match);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: active ? 600 : 500,
-                    color: active ? '#f8fafc' : 'var(--text-muted)',
-                    backgroundColor: active ? 'rgba(2, 132, 199, 0.15)' : 'transparent',
-                    border: active ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid transparent',
-                    boxShadow: active ? '0 0 12px rgba(0, 240, 255, 0.1)' : 'none',
-                    textDecoration: 'none',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseOver={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.backgroundColor = 'rgba(22, 36, 71, 0.5)';
-                      e.currentTarget.style.color = '#f8fafc';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-muted)';
-                    }
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Icon size={16} style={{ color: active ? 'var(--accent-cyan)' : 'inherit' }} />
-                    <span>{item.label}</span>
-                  </div>
-
-                  {item.tag && (
-                    <span
-                      style={{
-                        padding: '1px 5px',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(244, 63, 94, 0.2)',
-                        border: '1px solid rgba(244, 63, 94, 0.4)',
-                        color: '#fca5a5',
-                        fontSize: '9px',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      {item.tag}
-                    </span>
-                  )}
-
-                  {item.badge && (
-                    <span
-                      style={{
-                        padding: '1px 6px',
-                        borderRadius: '10px',
-                        backgroundColor: 'rgba(0, 240, 255, 0.2)',
-                        border: '1px solid rgba(0, 240, 255, 0.4)',
-                        color: '#00F0FF',
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      {/* Razorpay Engine Status Footer */}
-      <div
-        style={{
-          padding: '14px 16px',
-          borderTop: '1px solid var(--border)',
-          backgroundColor: '#030712',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: isOnline === true ? '#10b981' : isOnline === false ? '#ef4444' : '#f59e0b',
-                boxShadow: isOnline === true ? '0 0 10px #10b981' : 'none',
-              }}
-              className={isOnline === true ? 'animate-pulse-dot' : ''}
-            />
-            <span style={{ color: 'var(--text-main)', fontSize: '11px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-              {isOnline === true ? 'NEURAL API ONLINE' : isOnline === false ? 'API OFFLINE' : 'CONNECTING...'}
-            </span>
-          </div>
-
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '10px',
-              color: 'var(--accent-cyan)',
-              backgroundColor: 'rgba(0, 240, 255, 0.1)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-            }}
-          >
-            v2.4-PRO
-          </span>
+      {/* Primary Navigation */}
+      <nav style={{ padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '4px 8px 8px 8px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)' }}>
+          Workspace
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-          <span>Louvain + LR/RF Engine</span>
-          <span>&lt; 5ms inference</span>
+        {navItems.map((item) => {
+          const active = isItemActive(item);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '7px 10px',
+                borderRadius: '5px',
+                fontSize: '13px',
+                fontWeight: active ? 600 : 500,
+                color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                backgroundColor: active ? 'var(--bg-subtle)' : 'transparent',
+                border: active ? '1px solid var(--border-light)' : '1px solid transparent',
+                textDecoration: 'none',
+                transition: 'all 0.12s ease',
+              }}
+              onMouseOver={(e) => {
+                if (!active) {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-subtle)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!active) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                <Icon size={15} style={{ color: active ? 'var(--accent)' : 'inherit' }} />
+                <span>{item.label}</span>
+              </div>
+
+              {item.badge && (
+                <span
+                  style={{
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: active ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    color: active ? 'var(--accent)' : 'var(--text-muted)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  {item.badge}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* System Status Footer */}
+      <div
+        style={{
+          padding: '12px 14px',
+          borderTop: '1px solid var(--border)',
+          backgroundColor: 'var(--bg-sidebar)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
+          <span style={{ color: 'var(--text-dim)' }}>Engine API</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: isOnline ? '#10b981' : isOnline === false ? '#ef4444' : '#f59e0b',
+              }}
+            />
+            <span style={{ color: isOnline ? '#10b981' : 'var(--text-muted)', fontWeight: 600, fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+              {isOnline ? 'CONNECTED' : isOnline === false ? 'OFFLINE' : 'CONNECTING'}
+            </span>
+          </div>
         </div>
       </div>
     </aside>

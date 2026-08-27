@@ -962,7 +962,7 @@ export const CaseDetailPage: React.FC = () => {
               type="text"
               value={addTargetInput}
               onChange={(e) => setAddTargetInput(e.target.value)}
-              placeholder="Quick attach (e.g. 3, acc_100, tx_7517)..."
+              placeholder="Attach target ID (e.g. 3, acc_..., tx_...)..."
               style={{
                 width: '280px',
                 padding: '6px 12px',

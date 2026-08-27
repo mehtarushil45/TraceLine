@@ -16,14 +16,13 @@ export const Header: React.FC = () => {
     <>
       <header
         style={{
-          height: '60px',
+          height: '52px',
           backgroundColor: 'var(--bg-header)',
-          backdropFilter: 'blur(16px)',
           borderBottom: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: '0 20px',
           position: 'sticky',
           top: 0,
           zIndex: 30,
@@ -36,78 +35,66 @@ export const Header: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            width: '420px',
-            padding: '8px 14px',
-            backgroundColor: '#070d1e',
+            width: '440px',
+            padding: '6px 12px',
+            backgroundColor: 'var(--bg-input)',
             border: '1px solid var(--border)',
-            borderRadius: '8px',
+            borderRadius: '5px',
             cursor: 'pointer',
-            transition: 'all 0.15s ease',
+            transition: 'border-color 0.15s ease',
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = 'var(--accent-cyan)';
-            e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 240, 255, 0.15)';
+            e.currentTarget.style.borderColor = 'var(--border-light)';
           }}
           onMouseOut={(e) => {
             e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.boxShadow = 'none';
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Search size={15} style={{ color: 'var(--accent-cyan)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Search size={14} style={{ color: 'var(--text-dim)' }} />
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Search Communities, Accounts, or Txs...
+              Search investigations, communities, accounts and transactions...
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <kbd
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '2px',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                backgroundColor: '#162447',
-                border: '1px solid var(--border-light)',
-                color: 'var(--text-dim)',
-                fontSize: '10px',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              <Command size={10} /> K
-            </kbd>
-          </div>
+          <kbd
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+              padding: '1px 5px',
+              borderRadius: '3px',
+              backgroundColor: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-dim)',
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            <Command size={9} /> K
+          </kbd>
         </div>
 
-        {/* Global Telemetry & Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Live Engine Telemetry Pill */}
+        {/* Global Header Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Strict Leakage-Free Mode Badge */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(2, 132, 199, 0.1)',
-              border: '1px solid rgba(56, 189, 248, 0.2)',
+              gap: '5px',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              backgroundColor: 'var(--risk-low-bg)',
+              border: '1px solid var(--risk-low-border)',
               fontSize: '11px',
+              color: '#86efac',
               fontFamily: 'var(--font-mono)',
-              color: 'var(--accent-cyan)',
+              fontWeight: 600,
             }}
           >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                backgroundColor: '#00F0FF',
-                boxShadow: '0 0 8px #00F0FF',
-              }}
-              className="animate-pulse-dot"
-            />
-            <span className="font-semibold">GRAPH ENGINE: 50K NODES // 2.6M EDGES</span>
+            <Shield size={12} />
+            <span>OBSERVABLE ZERO-LEAKAGE</span>
           </div>
 
           {/* SAR Forensic Export Trigger */}
@@ -117,10 +104,10 @@ export const Header: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '6px 12px',
-              backgroundColor: '#162447',
-              border: '1px solid var(--border-light)',
-              borderRadius: '6px',
+              padding: '5px 12px',
+              backgroundColor: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              borderRadius: '5px',
               color: 'var(--text-main)',
               fontSize: '12px',
               fontWeight: 600,
@@ -128,37 +115,17 @@ export const Header: React.FC = () => {
               transition: 'all 0.15s ease',
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#1e293b';
-              e.currentTarget.style.borderColor = 'var(--accent-cyan)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#162447';
+              e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
               e.currentTarget.style.borderColor = 'var(--border-light)';
             }}
-          >
-            <FileText size={14} style={{ color: 'var(--accent-cyan)' }} />
-            <span>Generate SAR</span>
-          </button>
-
-          {/* Strict Leakage-Free Mode Badge */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              fontSize: '11px',
-              color: '#86efac',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 600,
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--bg-subtle)';
+              e.currentTarget.style.borderColor = 'var(--border)';
             }}
           >
-            <Shield size={13} />
-            <span>OBSERVABLE ZERO-LEAKAGE</span>
-          </div>
+            <FileText size={13} style={{ color: 'var(--accent)' }} />
+            <span>SAR Export</span>
+          </button>
         </div>
       </header>
 
