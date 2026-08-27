@@ -132,7 +132,7 @@ export const CommunityTable: React.FC<CommunityTableProps> = ({ communities }) =
                         ? '#fde68a'
                         : lvl === 'LOW'
                         ? '#86efac'
-                        : '#00F0FF'
+                        : 'var(--accent)'
                       : 'var(--text-muted)',
                 }}
               >

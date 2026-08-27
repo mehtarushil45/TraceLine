@@ -44,17 +44,6 @@ FORBIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-#: Observable transaction columns consumed by the feature engine.
-#: tx_df must contain at minimum ``src_account_id`` and ``amount``.
-_OBSERVABLE_TX_COLUMNS: list[str] = [
-    "src_account_id",
-    "dst_account_id",
-    "amount",
-    "transaction_status",
-    "payment_method",
-    "merchant_id",
-]
-
 # ---------------------------------------------------------------------------
 # Feature name registry
 # ---------------------------------------------------------------------------
@@ -305,7 +294,7 @@ def _shannon_entropy_bits(categories: pd.Series) -> float:
     """
     if categories.empty:
         return _NAN
-    counts = categories.value_counts().values.astype(np.float64)
+    counts = np.asarray(categories.value_counts().to_numpy(), dtype=np.float64)
     total = counts.sum()
     if total == 0.0:
         return _NAN
@@ -485,9 +474,13 @@ def compute_community_features(
     }
 
     if not tx_df.empty and "src_account_id" in tx_df.columns:
-        src_col = tx_df["src_account_id"].astype(str).values
+        src_col = [str(value) for value in tx_df["src_account_id"]]
         has_dst = "dst_account_id" in tx_df.columns
-        dst_col = tx_df["dst_account_id"].astype(str).values if has_dst else None
+        dst_col = (
+            [str(value) for value in tx_df["dst_account_id"]]
+            if has_dst
+            else None
+        )
 
         for row_idx, src in enumerate(src_col):
             seen_cid: set[int] = set()

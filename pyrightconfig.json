@@ -1,0 +1,24 @@
+{
+  "include": [
+    "src",
+    "tests",
+    "scripts",
+    "gen-fraud-graph/src",
+    "gen-fraud-graph/tests"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    ".venv",
+    "data"
+  ],
+  "extraPaths": [
+    "src",
+    "gen-fraud-graph/src"
+  ],
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": false,
+  "reportAttributeAccessIssue": "none"
+}

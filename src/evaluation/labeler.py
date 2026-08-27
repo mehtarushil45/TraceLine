@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -103,7 +104,7 @@ def load_fraud_rings(
     for _, row in df.iterrows():
         pid = str(row["pattern_id"])
         inv = row["involved_accounts"]
-        if pd.isna(inv):
+        if bool(pd.isna(inv)):
             rings[pid] = set()
             continue
         if isinstance(inv, (list, tuple, set)):
@@ -122,76 +123,89 @@ def create_community_labels(
     fraud_cases: pd.DataFrame | str | Path | dict[str, set[str]],
     theta: float = DEFAULT_THETA,
 ) -> pd.DataFrame:
-    """Compute ground-truth binary labels and ring attribution for communities.
+    """Evaluate detected communities against ground-truth fraud rings.
+
+    Computes for every community:
+    - ``is_positive``: 1 if max_ring_coverage >= theta, else 0.
+    - ``max_ring_coverage``: max_{r} |C ∩ r| / |r| across all known fraud rings r.
+    - ``primary_ring_id``: ID of the ring that yields max_ring_coverage (or None).
+    - ``num_rings_intersected``: Number of distinct rings with |C ∩ r| > 0.
+    - ``fraud_account_count``: Total number of member accounts belonging to any ring.
+    - ``fraud_purity``: |C ∩ all_fraud_accounts| / |C|.
 
     Args:
-        communities: Detected communities from Louvain community detection.
-        fraud_cases: Ground-truth fraud rings DataFrame, CSV path, or pre-parsed dict.
-        theta: Minimum ring coverage threshold for positive label (default 0.5).
-            Must satisfy 0.0 < theta <= 1.0.
+        communities: Detected communities from Louvain.
+        fraud_cases: Ground-truth fraud rings as DataFrame, file path, or pre-loaded dict.
+        theta: Threshold on max_ring_coverage for assigning is_positive=1 (default: 0.5).
 
     Returns:
-        DataFrame indexed by ``community_id`` with columns:
-        - ``is_positive`` (int: 0 or 1)
-        - ``max_ring_coverage`` (float: [0.0, 1.0])
-        - ``primary_ring_id`` (str or None: ring with highest coverage in this community)
-        - ``num_rings_intersected`` (int: count of rings with >= 1 account in C)
-        - ``fraud_account_count`` (int: count of distinct fraud accounts in C)
-        - ``fraud_purity`` (float: fraud_account_count / member_count)
-
-    Raises:
-        ValueError: If theta is not in (0.0, 1.0].
+        DataFrame with index ``community_id`` and columns :data:`LABEL_COLUMNS`.
     """
     if not (0.0 < theta <= 1.0):
         raise ValueError(f"theta must be in range (0.0, 1.0], got {theta}")
 
-    if not communities:
-        empty = pd.DataFrame(columns=LABEL_COLUMNS)
-        empty.index.name = "community_id"
-        return empty
-
-    if isinstance(fraud_cases, dict):
-        rings = fraud_cases
-    else:
+    if isinstance(fraud_cases, (str, Path)):
         rings = load_fraud_rings(fraud_cases)
+    elif isinstance(fraud_cases, dict):
+        rings = {k: set(v) for k, v in fraud_cases.items()}
+    elif isinstance(fraud_cases, pd.DataFrame):
+        rings = load_fraud_rings(fraud_cases)
+    else:
+        raise TypeError(
+            f"fraud_cases must be DataFrame, Path, str, or dict; got {type(fraud_cases).__name__}"
+        )
 
-    # Pre-collect all fraud accounts across all rings for rapid purity checks.
     all_fraud_accounts: set[str] = set()
-    for accs in rings.values():
-        all_fraud_accounts.update(accs)
+    for ring_members in rings.values():
+        all_fraud_accounts |= ring_members
 
-    records: list[dict[str, int | float | str | None]] = []
+    records: list[dict[str, Any]] = []
     community_ids: list[int] = []
 
     for c in communities:
-        members_set = set(c.member_account_ids)
-        c_fraud_accounts = members_set & all_fraud_accounts
-        fraud_count = len(c_fraud_accounts)
-        purity = fraud_count / c.member_count if c.member_count > 0 else 0.0
+        members = set(c.member_account_ids)
+        size = len(members)
 
-        max_cov = 0.0
-        primary_ring: str | None = None
-        rings_touched = 0
+        if size == 0:
+            records.append(
+                {
+                    "is_positive": 0,
+                    "max_ring_coverage": 0.0,
+                    "primary_ring_id": None,
+                    "num_rings_intersected": 0,
+                    "fraud_account_count": 0,
+                    "fraud_purity": 0.0,
+                }
+            )
+            community_ids.append(c.community_id)
+            continue
 
-        for pid, ring_accs in rings.items():
-            if not ring_accs:
+        best_ring_id: str | None = None
+        best_coverage: float = 0.0
+        rings_intersected: int = 0
+
+        for ring_id, ring_members in rings.items():
+            if not ring_members:
                 continue
-            overlap = len(members_set & ring_accs)
-            if overlap > 0:
-                rings_touched += 1
-                cov = overlap / len(ring_accs)
-                if cov > max_cov:
-                    max_cov = cov
-                    primary_ring = pid
+            intersection_size = len(members & ring_members)
+            if intersection_size > 0:
+                rings_intersected += 1
+                coverage = intersection_size / len(ring_members)
+                if coverage > best_coverage:
+                    best_coverage = coverage
+                    best_ring_id = ring_id
 
-        is_pos = 1 if max_cov >= theta else 0
+        fraud_members = members & all_fraud_accounts
+        fraud_count = len(fraud_members)
+        purity = fraud_count / size if size > 0 else 0.0
+        is_pos = 1 if best_coverage >= theta else 0
 
         records.append(
             {
                 "is_positive": int(is_pos),
-                "max_ring_coverage": round(max_cov, 6),
-                "primary_ring_id": primary_ring,
-                "num_rings_intersected": int(rings_touched),
+                "max_ring_coverage": round(best_coverage, 6),
+                "primary_ring_id": best_ring_id,
+                "num_rings_intersected": int(rings_intersected),
                 "fraud_account_count": int(fraud_count),
                 "fraud_purity": round(purity, 6),
             }
@@ -200,7 +214,7 @@ def create_community_labels(
 
     df = pd.DataFrame(records, index=community_ids)
     df.index.name = "community_id"
-    return df[LABEL_COLUMNS]
+    return pd.DataFrame(df.reindex(columns=LABEL_COLUMNS))
 
 
 def get_binary_labels(
@@ -223,6 +237,4 @@ def get_binary_labels(
         s = pd.Series(dtype=np.int64, name="label")
         s.index.name = "community_id"
         return s
-    s = labels_df["is_positive"].astype(np.int64)
-    s.name = "label"
-    return s
+    return pd.Series(labels_df["is_positive"].astype(np.int64).values, index=labels_df.index, name="label")

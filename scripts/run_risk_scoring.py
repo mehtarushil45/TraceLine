@@ -18,6 +18,7 @@ from src.ml.risk_scorer import (
 
 PROCESSED_DIR = Path("data/processed/payment_network")
 
+
 def main():
     print("=" * 70)
     print("TRACELINE: ML RISK SCORING ON 59 COMMUNITIES (50k Dataset)")
@@ -25,11 +26,11 @@ def main():
 
     # --- Load pre-computed features and labels ---
     feat_path = PROCESSED_DIR / "community_features.csv"
-    lab_path  = PROCESSED_DIR / "community_labels.csv"
+    lab_path = PROCESSED_DIR / "community_labels.csv"
 
     print(f"\nLoading feature matrix from {feat_path}...")
     X = load_feature_matrix(feat_path)
-    print(f"  X shape: {X.shape} (communities × features)")
+    print(f"  X shape: {X.shape} (communities x features)")
 
     print(f"Loading labels from {lab_path}...")
     y = load_labels(lab_path)
@@ -47,7 +48,7 @@ def main():
     # --- Cross-validation evaluation ---
     print("\n" + "=" * 70)
     print("CROSS-VALIDATION EVALUATION")
-    print("(RepeatedStratifiedKFold: 10 folds × 10 repeats = 100 mini-experiments)")
+    print("(RepeatedStratifiedKFold: 10 folds x 10 repeats = 100 mini-experiments)")
     print("=" * 70)
 
     t0 = time.perf_counter()
@@ -60,11 +61,11 @@ def main():
     for name, res in results.items():
         warn = " [!] UNSTABLE (std>0.15)" if res.stability_warning else ""
         print(f"\n  Model: {name}{warn}")
-        print(f"    ROC-AUC:           {res.mean_roc_auc:.4f} ± {res.std_roc_auc:.4f}")
-        print(f"    Average Precision: {res.mean_average_precision:.4f} ± {res.std_average_precision:.4f}")
-        print(f"    F1 (macro):        {res.mean_f1:.4f} ± {res.std_f1:.4f}")
-        print(f"    Precision:         {res.mean_precision:.4f} ± {res.std_precision:.4f}")
-        print(f"    Recall:            {res.mean_recall:.4f} ± {res.std_recall:.4f}")
+        print(f"    ROC-AUC:           {res.mean_roc_auc:.4f} +- {res.std_roc_auc:.4f}")
+        print(f"    Average Precision: {res.mean_average_precision:.4f} +- {res.std_average_precision:.4f}")
+        print(f"    F1 (macro):        {res.mean_f1:.4f} +- {res.std_f1:.4f}")
+        print(f"    Precision:         {res.mean_precision:.4f} +- {res.std_precision:.4f}")
+        print(f"    Recall:            {res.mean_recall:.4f} +- {res.std_recall:.4f}")
         print(f"    N folds:           {res.n_folds}  (N={res.n_samples}, pos={res.n_positive})")
 
     # --- Feature importance ---
@@ -105,13 +106,14 @@ def main():
     tier_counts = scores["risk_level"].value_counts()
     print("\nRisk tier distribution:")
     for tier in ["HIGH", "MEDIUM", "LOW"]:
-        n = tier_counts.get(tier, 0)
-        pct = n / len(scores) * 100
+        n = int(tier_counts.get(tier, 0) or 0)
+        pct = (float(n) / len(scores)) * 100
         print(f"  {tier:<8}: {n:>2} communities ({pct:.1f}%)")
 
     print("\n" + "=" * 70)
     print("COMPLETE")
     print("=" * 70)
+
 
 if __name__ == "__main__":
     main()

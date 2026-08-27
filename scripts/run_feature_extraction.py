@@ -37,11 +37,11 @@ def main():
     # 1. Load Data
     t0 = time.perf_counter()
     print("\n[1/5] Loading processed observable transactions and merchant catalog...", flush=True)
-    
+
     # Load observable columns only
     tx_df = pd.read_csv(processed_dir / "enriched_transactions.csv", usecols=OBSERVABLE_COLUMNS)
     print(f"Loaded {len(tx_df):,} observable transactions in {time.perf_counter()-t0:.2f}s", flush=True)
-    
+
     # Check forbidden columns guard
     forbidden_present = FORBIDDEN_COLUMNS & set(tx_df.columns)
     assert not forbidden_present, f"FATAL: Forbidden columns in tx_df: {forbidden_present}"
@@ -120,8 +120,8 @@ def main():
     if nan_counts.sum() == 0:
         print("   0 NaNs across all 21 features!")
     else:
-        for col, cnt in nan_counts[nan_counts > 0].items():
-            pct = (cnt / len(features_df)) * 100
+        for col, cnt in dict(nan_counts[nan_counts > 0]).items():
+            pct = (float(cnt) / len(features_df)) * 100
             print(f"   - {col}: {cnt} NaNs ({pct:.1f}%)")
 
     print("\n3. LABEL DISTRIBUTION (theta=0.5):")
@@ -162,6 +162,7 @@ def main():
     print("\n" + "=" * 70, flush=True)
     print("COMPLETE: Feature extraction and labeling pipeline validated successfully.", flush=True)
     print("=" * 70, flush=True)
+
 
 if __name__ == "__main__":
     main()

@@ -1037,7 +1037,7 @@ class TestAPIIntegration:
 
         if service.total_communities > 0 and service.community_risk_scores_df is not None:
             # Get first valid community ID
-            valid_id = int(service.community_risk_scores_df.index[0])
+            valid_id = int(service.community_risk_scores_df.index.tolist()[0])
             r = client.get(f"/api/communities/{valid_id}/evidence")
             if r.status_code == 200:
                 data = r.json()

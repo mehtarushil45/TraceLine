@@ -413,7 +413,7 @@ def test_t19_nan_imputation(y: pd.Series, cfg: RiskScorerConfig) -> None:
     scores = score_communities(X_with_nan, y, cfg)
     # Should complete without error and produce valid scores
     assert len(scores) == _N_COMMUNITIES
-    assert not scores["risk_probability"].isna().any(), (
+    assert not bool(scores["risk_probability"].isna().any()), (
         "NaN should be imputed; risk_probability must be fully defined"
     )
 

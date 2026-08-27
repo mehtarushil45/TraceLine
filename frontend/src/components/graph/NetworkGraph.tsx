@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cytoscape from 'cytoscape';
 import type { Core, EventObject } from 'cytoscape';
@@ -60,10 +60,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const [layoutName, setLayoutName] = useState<'cose' | 'concentric' | 'circle'>('cose');
 
   // Build a set of node IDs that exist in the graph — used to validate supporting entities
-  const nodeIdSet = useRef<Set<string>>(new Set(graphData.nodes.map((n) => n.id)));
-  useEffect(() => {
-    nodeIdSet.current = new Set(graphData.nodes.map((n) => n.id));
-  }, [graphData]);
+  const availableNodeIds = useMemo(() => new Set(graphData.nodes.map((n) => n.id)), [graphData.nodes]);
 
   // ---------------------------------------------------------------------------
   // Initialize Cytoscape
@@ -113,9 +110,9 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'node',
           style: {
-            'background-color': '#0284c7',
+            'background-color': '#1e293b',
             'border-width': 2,
-            'border-color': '#00F0FF',
+            'border-color': '#38bdf8',
             'label': 'data(label)',
             'color': '#94a3b8',
             'font-size': '9px',
@@ -132,10 +129,10 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'node:selected',
           style: {
-            'background-color': '#fbbf24',
-            'border-color': '#fef08a',
+            'background-color': '#f59e0b',
+            'border-color': '#fde68a',
             'border-width': 3,
-            'color': '#fef08a',
+            'color': '#fde68a',
             'font-size': '10px',
             'font-weight': 'bold',
           },
@@ -144,7 +141,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'node.ev-focus',
           style: {
-            'background-color': '#1d4ed8',  // overridden per-evidence via custom style
+            'background-color': '#1d4ed8', // overridden per-evidence via custom style
             'border-width': 3.5,
             'border-color': '#93c5fd',
             'color': '#e2e8f0',
@@ -165,7 +162,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           selector: 'edge',
           style: {
             'width': 'mapData(weight, 1, 15, 1.2, 6)',
-            'line-color': '#1e3a5f',
+            'line-color': '#282b30',
             'curve-style': 'bezier',
             'opacity': 0.65,
             'transition-property': 'line-color, opacity, width',
@@ -192,7 +189,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'edge:selected',
           style: {
-            'line-color': '#00F0FF',
+            'line-color': '#38bdf8',
             'opacity': 1,
             'width': 3.5,
           },
@@ -242,14 +239,13 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
     if (!evidenceFocus) return;
 
-    const focusColor = EVIDENCE_COLORS[evidenceFocus.type] || '#00F0FF';
+    const focusColor = EVIDENCE_COLORS[evidenceFocus.type] || '#3b82f6';
 
     // Resolve which node IDs to highlight.
     // For account-based evidence, supporting_entities contains account IDs.
     // For burst/interaction/density, we highlight ALL nodes (community-wide signal).
-    const graphNodeIds = nodeIdSet.current;
     const rawSupport = (evidenceFocus.supporting_entities || []).filter((id) =>
-      graphNodeIds.has(id)
+      availableNodeIds.has(id)
     );
 
     const isAllNodes = rawSupport.length === 0;
@@ -288,9 +284,9 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       try {
         const focusNodes = cy.nodes().filter((n: any) => focusedIds.has(n.id()));
         if (focusNodes.length > 0) cy.fit(focusNodes, 60);
-      } catch (_) {}
+      } catch {}
     } else {
-      try { cy.fit(undefined, 40); } catch (_) {}
+      try { cy.fit(undefined, 40); } catch {}
     }
   }, [evidenceFocus, graphData]);
 
@@ -299,20 +295,20 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   // ---------------------------------------------------------------------------
   const handleZoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.25);
   const handleZoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() * 0.8);
-  const handleFit = () => { try { cyRef.current?.fit(undefined, 40); } catch (_) {} };
+  const handleFit = () => { try { cyRef.current?.fit(undefined, 40); } catch {} };
   const handleReset = useCallback(() => {
     if (!cyRef.current) return;
     cyRef.current.elements().removeClass('ev-focus ev-dim');
     cyRef.current.elements().removeStyle();
-    try { cyRef.current.fit(undefined, 40); } catch (_) {}
+    try { cyRef.current.fit(undefined, 40); } catch {}
     onClearFocus?.();
   }, [onClearFocus]);
 
   const hasFocus = !!evidenceFocus;
   const focusLabel = evidenceFocus ? (EVIDENCE_DISPLAY_LABELS[evidenceFocus.type] || evidenceFocus.type.replace(/_/g, ' ')) : '';
-  const focusColor = evidenceFocus ? (EVIDENCE_COLORS[evidenceFocus.type] || '#00F0FF') : '#00F0FF';
+  const focusColor = evidenceFocus ? (EVIDENCE_COLORS[evidenceFocus.type] || '#3b82f6') : '#3b82f6';
   const focusedNodeCount = evidenceFocus
-    ? (evidenceFocus.supporting_entities || []).filter((id) => nodeIdSet.current.has(id)).length
+    ? (evidenceFocus.supporting_entities || []).filter((id) => availableNodeIds.has(id)).length
     : 0;
 
   return (
@@ -498,7 +494,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#00F0FF', boxShadow: '0 0 5px #00F0FF', flexShrink: 0 }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#38bdf8', border: '1px solid #38bdf8', flexShrink: 0 }} />
             <span>Node size = connection degree</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -507,7 +503,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           </div>
           {hasFocus && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 4, marginTop: 2 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: focusColor, boxShadow: `0 0 5px ${focusColor}`, flexShrink: 0 }} />
+              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: focusColor, flexShrink: 0 }} />
               <span style={{ color: focusColor }}>Evidence: {focusLabel}</span>
             </div>
           )}
@@ -519,36 +515,35 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             style={{
               position: 'absolute', top: 14, right: 14,
               width: 290,
-              backgroundColor: 'rgba(5,10,24,0.95)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(0,240,255,0.4)',
-              borderRadius: 8,
+              backgroundColor: 'var(--bg-panel)',
+              border: '1px solid var(--border-light)',
+              borderRadius: 6,
               padding: 16,
               display: 'flex', flexDirection: 'column', gap: 12,
-              boxShadow: '0 12px 36px rgba(0,0,0,0.7), 0 0 16px rgba(0,240,255,0.15)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
               zIndex: 10,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Account Node
               </span>
               <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14 }}>✕</button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: '#f8fafc', fontFamily: 'monospace' }}>{selectedNode.id}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{selectedNode.id}</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedNode.customer_name}</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
               <div>
                 <span style={{ color: 'var(--text-dim)', display: 'block' }}>Degree:</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace' }}>{selectedNode.degree} edges</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>{selectedNode.degree} edges</span>
               </div>
               <div>
                 <span style={{ color: 'var(--text-dim)', display: 'block' }}>Balance:</span>
-                <span style={{ fontWeight: 700, color: '#34d399', fontFamily: 'monospace' }}>${selectedNode.balance?.toLocaleString() || '0.00'}</span>
+                <span style={{ fontWeight: 700, color: '#34d399', fontFamily: 'var(--font-mono)' }}>${selectedNode.balance?.toLocaleString() || '0.00'}</span>
               </div>
             </div>
 
@@ -556,10 +551,11 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               onClick={() => navigate(`/accounts/${selectedNode.id}`)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '8px 12px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #00F0FF 100%)',
-                border: 'none', borderRadius: 6,
-                color: '#030712', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                padding: '7px 12px',
+                backgroundColor: 'var(--accent)',
+                border: '1px solid var(--accent-border)',
+                borderRadius: 5,
+                color: '#ffffff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               }}
             >
               Open Account Profile

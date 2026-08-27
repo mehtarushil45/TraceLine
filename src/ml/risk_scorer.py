@@ -44,9 +44,16 @@ certainty ("elevated" rather than "fraudulent").
 
 from __future__ import annotations
 
+import sys
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Literal
+
+# Ensure repository root is on sys.path if invoked directly
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import numpy as np
 import pandas as pd
@@ -163,7 +170,7 @@ class RiskScorerConfig:
     lr_max_iter: int = 2000
     rf_n_estimators: int = 200
     rf_max_depth: int | None = 6
-    class_weight: str = "balanced"
+    class_weight: Literal["balanced", "balanced_subsample"] | dict[Any, Any] | None = "balanced"
     risk_tier_thresholds: dict[str, float] = field(
         default_factory=lambda: dict(RISK_TIER_THRESHOLDS)
     )
@@ -291,6 +298,15 @@ def load_labels(path: Path | str) -> pd.Series:
 # ---------------------------------------------------------------------------
 
 
+def _resolve_lr_class_weight(
+    class_weight: Literal["balanced", "balanced_subsample"] | dict[Any, Any] | None,
+) -> Literal["balanced"] | dict[Any, Any] | None:
+    """Ensure class_weight is valid for LogisticRegression (which doesn't support 'balanced_subsample')."""
+    if class_weight == "balanced_subsample":
+        return "balanced"
+    return class_weight
+
+
 def _build_lr_pipeline(cfg: RiskScorerConfig) -> Pipeline:
     """Build a StandardScaler + LogisticRegression pipeline."""
     return Pipeline(
@@ -301,7 +317,7 @@ def _build_lr_pipeline(cfg: RiskScorerConfig) -> Pipeline:
                 LogisticRegression(
                     C=cfg.lr_C,
                     max_iter=cfg.lr_max_iter,
-                    class_weight=cfg.class_weight,
+                    class_weight=_resolve_lr_class_weight(cfg.class_weight),
                     random_state=cfg.seed,
                     solver="lbfgs",
                 ),
@@ -358,11 +374,15 @@ def _run_cv(
     # Impute NaN with column medians before CV (some features may be NaN for
     # edge-case communities; median imputation is done inside CV to prevent
     # test-fold contamination of imputation statistics).
-    X_arr = X.values.copy()
-    col_medians = np.nanmedian(X_arr, axis=0)
+    X_arr = X.values.copy().astype(np.float64)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        col_medians = np.nanmedian(X_arr, axis=0)
+    col_medians = np.nan_to_num(col_medians, nan=0.0)
     nan_mask = np.isnan(X_arr)
     for j in range(X_arr.shape[1]):
         X_arr[nan_mask[:, j], j] = col_medians[j]
+    X_arr = np.nan_to_num(X_arr, nan=0.0)
 
     X_imputed = pd.DataFrame(X_arr, columns=X.columns, index=X.index)
 
@@ -380,20 +400,22 @@ def _run_cv(
 
     n_folds = cfg.n_splits * cfg.n_repeats
     n_pos = int(y.sum())
-    std_roc = float(np.std(cv_results["test_roc_auc"], ddof=1))
+    n_scores = len(cv_results["test_roc_auc"])
+    ddof = 1 if n_scores > 1 else 0
+    std_roc = float(np.std(cv_results["test_roc_auc"], ddof=ddof)) if n_scores > 0 else 0.0
 
     return EvaluationResult(
         model_name=model_name,
         mean_roc_auc=float(np.mean(cv_results["test_roc_auc"])),
         std_roc_auc=std_roc,
         mean_average_precision=float(np.mean(cv_results["test_average_precision"])),
-        std_average_precision=float(np.std(cv_results["test_average_precision"], ddof=1)),
+        std_average_precision=float(np.std(cv_results["test_average_precision"], ddof=ddof)),
         mean_f1=float(np.mean(cv_results["test_f1"])),
-        std_f1=float(np.std(cv_results["test_f1"], ddof=1)),
+        std_f1=float(np.std(cv_results["test_f1"], ddof=ddof)),
         mean_precision=float(np.mean(cv_results["test_precision"])),
-        std_precision=float(np.std(cv_results["test_precision"], ddof=1)),
+        std_precision=float(np.std(cv_results["test_precision"], ddof=ddof)),
         mean_recall=float(np.mean(cv_results["test_recall"])),
-        std_recall=float(np.std(cv_results["test_recall"], ddof=1)),
+        std_recall=float(np.std(cv_results["test_recall"], ddof=ddof)),
         n_folds=n_folds,
         n_samples=len(y),
         n_positive=n_pos,
@@ -555,30 +577,38 @@ def score_communities(
 
     # --- NaN imputation (median, fitted on labelled split to be conservative) ---
     X_arr = X[FEATURE_NAMES].values.copy().astype(np.float64)
-    col_medians = np.nanmedian(X_arr, axis=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        col_medians = np.nanmedian(X_arr, axis=0)
+    col_medians = np.nan_to_num(col_medians, nan=0.0)
     nan_mask = np.isnan(X_arr)
     for j in range(X_arr.shape[1]):
         X_arr[nan_mask[:, j], j] = col_medians[j]
+    X_arr = np.nan_to_num(X_arr, nan=0.0)
 
     # --- Fit final LR model on all labelled data ---
-    common_idx = X.index.intersection(y.index)
-    X_train_arr = X_arr[[i for i, idx in enumerate(X.index) if idx in set(common_idx)]]
-    y_train = y.loc[common_idx].values
+    common_idx = [idx for idx in X.index if idx in y.index]
+    if len(common_idx) == 0:
+        raise ValueError("X and y have no overlapping community_id indices.")
+    X_train_arr: np.ndarray = np.asarray(
+        X_arr[[i for i, idx in enumerate(X.index) if idx in y.index]], dtype=np.float64
+    )
+    y_train: np.ndarray = np.asarray(y.loc[common_idx].to_numpy(), dtype=np.int64)
 
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train_arr)
+    X_train_scaled: np.ndarray = np.asarray(scaler.fit_transform(X_train_arr), dtype=np.float64)
 
     lr = LogisticRegression(
         C=cfg.lr_C,
         max_iter=cfg.lr_max_iter,
-        class_weight=cfg.class_weight,
+        class_weight=_resolve_lr_class_weight(cfg.class_weight),
         random_state=cfg.seed,
         solver="lbfgs",
     )
-    lr.fit(X_train_scaled, y_train)
+    lr.fit(X_train_scaled, y_train)  # type: ignore[arg-type]
 
     # --- Score ALL communities in X ---
-    X_all_scaled = scaler.transform(X_arr)
+    X_all_scaled: np.ndarray = np.asarray(scaler.transform(X_arr), dtype=np.float64)
     probabilities = lr.predict_proba(X_all_scaled)[:, 1]
 
     # Extract LR coefficients for explanation generation
@@ -642,28 +672,36 @@ def get_feature_importance(
 
     # Impute NaN
     X_arr = X[FEATURE_NAMES].values.copy().astype(np.float64)
-    col_medians = np.nanmedian(X_arr, axis=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        col_medians = np.nanmedian(X_arr, axis=0)
+    col_medians = np.nan_to_num(col_medians, nan=0.0)
     nan_mask = np.isnan(X_arr)
     for j in range(X_arr.shape[1]):
         X_arr[nan_mask[:, j], j] = col_medians[j]
+    X_arr = np.nan_to_num(X_arr, nan=0.0)
 
-    common_idx = X.index.intersection(y.index)
-    X_train = X_arr[[i for i, idx in enumerate(X.index) if idx in set(common_idx)]]
-    y_train = y.loc[common_idx].values
+    common_idx = [idx for idx in X.index if idx in y.index]
+    if len(common_idx) == 0:
+        raise ValueError("X and y have no overlapping community_id indices.")
+    X_train: np.ndarray = np.asarray(
+        X_arr[[i for i, idx in enumerate(X.index) if idx in y.index]], dtype=np.float64
+    )
+    y_train: np.ndarray = np.asarray(y.loc[common_idx].to_numpy(), dtype=np.int64)
 
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_train)
+    X_scaled: np.ndarray = np.asarray(scaler.fit_transform(X_train), dtype=np.float64)
 
     lr = LogisticRegression(
         C=cfg.lr_C,
         max_iter=cfg.lr_max_iter,
-        class_weight=cfg.class_weight,
+        class_weight=_resolve_lr_class_weight(cfg.class_weight),
         random_state=cfg.seed,
         solver="lbfgs",
     )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        lr.fit(X_scaled, y_train)
+        lr.fit(X_scaled, y_train)  # type: ignore[arg-type]
     lr_importances = np.abs(lr.coef_[0])
 
     rf = RandomForestClassifier(
@@ -673,7 +711,7 @@ def get_feature_importance(
         random_state=cfg.seed,
         n_jobs=1,
     )
-    rf.fit(X_train, y_train)
+    rf.fit(X_train, y_train)  # type: ignore[arg-type]
     rf_importances = rf.feature_importances_
 
     imp_df = pd.DataFrame(
@@ -686,3 +724,26 @@ def get_feature_importance(
     imp_df["lr_rank"] = imp_df["lr_importance"].rank(ascending=False).astype(int)
     imp_df["rf_rank"] = imp_df["rf_importance"].rank(ascending=False).astype(int)
     return imp_df.sort_values("lr_importance", ascending=False).reset_index(drop=True)
+
+
+def main() -> None:
+    """CLI entrypoint for running risk scoring on the default dataset."""
+    default_feat = Path("data/processed/payment_network/community_features.csv")
+    default_lab = Path("data/processed/payment_network/community_labels.csv")
+
+    if not default_feat.exists() or not default_lab.exists():
+        print("Default dataset not found at data/processed/payment_network/. Exiting.")
+        return
+
+    print("Loading features and labels...")
+    X = load_feature_matrix(default_feat)
+    y = load_labels(default_lab)
+    print(f"Loaded {len(X)} communities. Scoring...")
+    cfg = RiskScorerConfig()
+    scores = score_communities(X, y, cfg)
+    print(f"Successfully scored {len(scores)} communities.")
+    print(scores.head(10))
+
+
+if __name__ == "__main__":
+    main()

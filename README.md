@@ -12,7 +12,7 @@
    - [How It Works (High-Level Architecture)](#how-it-works-high-level-architecture)
    - [Observable-Only & Zero-Leakage Guarantee](#observable-only--zero-leakage-guarantee)
 2. [Key Capabilities & Forensic Features](#-key-capabilities--forensic-features)
-   - [7-Step Guided Investigation Playbook](#7-step-guided-investigation-playbook)
+   - [5-Stage Unified Investigation Workflow](#5-stage-unified-investigation-workflow)
    - [9 Deterministic Evidence Detectors](#9-deterministic-evidence-detectors)
    - [21 Observable Topological Features](#21-observable-topological-features)
    - [Interactive Cytoscape.js Topology Graph](#interactive-cytoscapejs-topology-graph)
@@ -31,7 +31,7 @@
 ## 🎯 Executive Summary & Motivation
 
 ### What is TraceLine?
-**TraceLine** is an enterprise-grade financial crime investigation console and anti-money laundering (AML) graph analytics engine. It transforms raw, fragmented payment transactions into multi-layered entity graphs, partitions account networks into structural communities using Louvain community detection, computes 21 observable graph features, scores communities via an explainable machine learning risk model, and provides a dark-mode Security Operations Center (SOC) dashboard with guided investigation playbooks.
+**TraceLine** is an enterprise-grade financial crime investigation workstation and anti-money laundering (AML) graph analytics platform. It transforms raw, fragmented payment transactions into multi-layered entity graphs, partitions account networks into structural communities using Louvain community detection, computes 21 observable graph features, scores communities via an explainable machine learning risk model, and provides a professional, high-density Dark Graphite investigation workstation.
 
 ### Why was it Built? (The Problem Space)
 Traditional fraud engines analyze transactions in isolation (e.g., checking if a single transaction amount exceeds a threshold or happens at an odd hour). However, organized financial crime syndicates, synthetic identity rings, and money mule networks operate through **coordinated, distributed graphs**:
@@ -79,7 +79,7 @@ Point-in-time transaction monitoring fails against these topologies. **TraceLine
                                               │ HTTP / JSON
                                  ┌────────────▼────────────┐
                                  │ React 19 + Cytoscape.js │
-                                 │ Forensic SOC Console    │
+                                 │ Financial Crime Console │
                                  └─────────────────────────┘
 ```
 
@@ -96,15 +96,13 @@ In synthetic and historical data environments, datasets often contain ground-tru
 
 ## ⚡ Key Capabilities & Forensic Features
 
-### 1. 7-Step Guided Investigation Playbook
-TraceLine features an interactive linear workflow designed to onboard investigators and guide complex cases from initial network triage to finished intelligence reports:
-1. **Triage (`/`)**: Discover top-risk communities ranked by ML risk score and observable anomaly flags.
-2. **Evidence (`/communities/:id`)**: Inspect deterministic rule detector firings with severity metrics and supporting entities.
-3. **Graph (`/communities/:id`)**: Launch interactive Cytoscape network topology with dynamic evidence focus and neighborhood dimming.
-4. **Account (`/accounts/:id`)**: Drill down into individual account profiles, hardware footprints, IP telemetry, and money flows.
-5. **Transaction (`/transactions/:id`)**: Audit transaction velocities, merchant risk tiers, and gateway decline codes.
-6. **Case (`/investigations/:caseId`)**: Aggregate multiple targets, maintain forensic notes, and filter risk indicators.
-7. **Dossier (`/investigations/:caseId` Modal)**: Export print-ready investigation dossiers with formal regulatory attestations.
+### 1. 5-Stage Unified Investigation Workflow
+TraceLine is designed as an open, high-density financial-crime workstation where investigators can seamlessly navigate across all relationship dimensions:
+1. **Risk Queue (`/`)**: Triage high-priority communities ranked by ML risk score, observable signals, and cluster member density.
+2. **Community Investigation (`/communities/:id`)**: Audit deterministic rule firings, feature radar breakdowns, member account rosters, and interactive network graphs.
+3. **Account Investigation (`/accounts/:id`)**: Drill into account ledger balances, directional transaction streams, and multi-entity connection rings (devices, payment cards, IP addresses).
+4. **Transaction Investigation (`/transactions/:id`)**: Inspect payment gateway routing flows ($src \rightarrow dst$), digital hardware footprints, authorization status, and merchant risk tiers.
+5. **Investigation Cases & Dossier (`/investigations/:caseId`)**: Assemble multi-entity targets across communities, accounts, and transactions into a formal case dossier with persistent investigator notes and ISO-20022/FinCEN SAR export.
 
 ### 2. 9 Deterministic Evidence Detectors
 The **Evidence Intelligence Engine** (`src/intelligence/evidence_engine.py`) runs 9 deterministic rule detectors:
@@ -126,7 +124,7 @@ The **Community Feature Engine** (`src/features/community_features.py`) extracts
 - **F4: Transaction Behavior** (4 features): `total_transaction_amount`, `mean_tx_amount`, `amount_cv` (coefficient of variation), `declined_rate`.
 
 ### 4. Interactive Cytoscape.js Topology Graph
-- **Cyberpunk Dark-Mode SOC Theme**: Custom Cytoscape rendering engine with glowing neon accents and responsive canvas zooming.
+- **Dark Graphite Investigation Canvas**: Custom Cytoscape rendering engine with clear node hierarchies and responsive canvas zooming.
 - **Evidence-to-Graph Focus**: Clicking an evidence card instantly focuses on supporting entities in the network graph while dimming unlinked background nodes.
 - **Cluster & Partition Highlighting**: Visualizes Louvain community partitions, high-degree hubs, and weighted transaction flows.
 
@@ -236,38 +234,44 @@ TraceLine/
 │       │   └── transactions.ts                # Transaction detail endpoint client
 │       │
 │       ├── components/                        # Modular React UI components
-│       │   ├── account/                       # Account-specific UI components
-│       │   │   ├── AccountTable.tsx           # Paginated table of accounts with risk badges
-│       │   │   └── ConnectionsTable.tsx       # Table of shared entity connections for an account
-│       │   ├── common/                        # Shared, reusable UI components
+│       │   ├── common/                        # Shared, reusable UI components (Phase 1 Design System)
 │       │   │   ├── AddToInvestigationButton.tsx # Quick-action button to attach target to a case
+│       │   │   ├── Badge.tsx                  # Standard semantic text badge
+│       │   │   ├── Button.tsx                 # Standardized button with variants
+│       │   │   ├── DataTable.tsx              # High-density sortable, paginated data table
+│       │   │   ├── Divider.tsx                # Visual separator line
 │       │   │   ├── EmptyState.tsx             # Empty state placeholder with iconography
+│       │   │   ├── EntityLink.tsx             # Standard clickable entity link with badges
 │       │   │   ├── ErrorState.tsx             # Error state fallback component with retry triggers
-│       │   │   ├── KpiCard.tsx                # Metric HUD card with trend badges and glow effects
+│       │   │   ├── FilterBar.tsx              # Filter bar with multi-selection pills
+│       │   │   ├── IconButton.tsx             # Icon-only interactive button
 │       │   │   ├── LoadingSkeleton.tsx        # Shimmer loading skeleton placeholder
+│       │   │   ├── LoadingState.tsx           # Compact loading spinner placeholder
+│       │   │   ├── Metric.tsx                 # High-density metric display unit
+│       │   │   ├── PageHeader.tsx             # Standardized page title header with actions
 │       │   │   ├── Pagination.tsx             # Paginated navigation bar control
+│       │   │   ├── Panel.tsx                  # Standard surface container panel
 │       │   │   ├── RiskBadge.tsx              # HIGH/MEDIUM/LOW risk level pill badge
 │       │   │   ├── RiskScore.tsx              # Numerical risk score dial with color progression
-│       │   │   └── SignalBadge.tsx            # Top contributing risk signal badge
+│       │   │   ├── SearchInput.tsx            # Debounced search input field
+│       │   │   ├── SectionHeader.tsx          # Consistent section title header
+│       │   │   ├── SignalBadge.tsx            # Top contributing risk signal badge
+│       │   │   ├── StatusBadge.tsx            # Case and ledger lifecycle status pill
+│       │   │   └── index.ts                   # Unified common component exports
 │       │   ├── community/                     # Community investigation UI components
 │       │   │   ├── CommunityTable.tsx         # Sortable table of detected risk communities
-│       │   │   ├── EvidenceIntelligencePanel.tsx # Comprehensive Evidence Intelligence panel with filters
-│       │   │   ├── EvidencePanel.tsx          # Lightweight summary evidence drawer
 │       │   │   └── FeatureBreakdown.tsx       # 21-feature radar and breakdown comparison chart
 │       │   ├── graph/                         # Topology graph components
 │       │   │   └── NetworkGraph.tsx           # Cytoscape.js interactive graph canvas with evidence focus
 │       │   ├── layout/                        # Layout, navigation, and modal components
 │       │   │   ├── CaseDossierModal.tsx       # Printable Case Dossier modal with Markdown export
 │       │   │   ├── Header.tsx                 # Top navigation header with status indicators and search
-│       │   │   ├── InvestigationPlaybookBanner.tsx # 7-Step guided investigation workflow stepper
 │       │   │   ├── Layout.tsx                 # Main layout wrapper with sidebar and header
 │       │   │   ├── OmnisearchModal.tsx        # Global search modal (Ctrl+K) for accounts and communities
 │       │   │   ├── SarExportModal.tsx         # FinCEN SAR XML/JSON compliance export modal
 │       │   │   └── Sidebar.tsx                # Left navigation sidebar with live case counters
-│       │   ├── timeline/                      # Temporal activity components
-│       │   │   └── TimelineView.tsx           # Chronological transaction timeline stream
-│       │   └── transaction/                   # Transaction UI components
-│       │       └── TransactionTable.tsx       # Paginated table of transaction records
+│       │   └── timeline/                      # Temporal activity components
+│       │       └── TimelineView.tsx           # Chronological transaction timeline stream
 │       │
 │       ├── pages/                             # Full-page route views
 │       │   ├── AccountDetailPage.tsx          # Account 360 profile, hardware footprint, and connections
@@ -275,7 +279,7 @@ TraceLine/
 │       │   ├── CaseDetailPage.tsx             # Comprehensive Case Dossier investigation workspace
 │       │   ├── CommunitiesPage.tsx            # Directory of detected Louvain communities
 │       │   ├── CommunityDetailPage.tsx        # Deep-dive community console (Graph, Evidence, Accounts)
-│       │   ├── DashboardPage.tsx              # Executive SOC Dashboard with KPI HUD and Playbook launcher
+│       │   ├── DashboardPage.tsx              # Risk Queue & Triage entry point
 │       │   ├── InvestigationsPage.tsx         # Investigation cases management and triage dashboard
 │       │   ├── TransactionDetailPage.tsx      # Deep transaction audit, gateway telemetry, and risk flags
 │       │   └── TransactionsListPage.tsx       # Searchable ledger of payment transactions
@@ -285,15 +289,13 @@ TraceLine/
 │       │   └── cases.ts                       # Investigation case, target, and status types
 │       │
 │       └── utils/                             # Client-side utility functions and state managers
-│           ├── caseManager.ts                 # LocalStorage investigation case manager and event dispatcher
-│           └── playbookManager.ts             # 7-Step Guided Playbook state machine and synchronizer
+│           └── caseManager.ts                 # LocalStorage investigation case manager and event dispatcher
 │
 ├── gen-fraud-graph/                           # Submodule for Santander synthetic fraud graph generator
 │
-├── scratch/                                   # Developer utility scripts and standalone validation runners
+├── scripts/                                   # Developer utility scripts and standalone validation runners
 │   ├── run_feature_extraction.py              # Script to extract 21 features across Louvain communities
-│   ├── run_risk_scoring.py                    # Script to train logistic regression & score communities
-│   └── test_api_endpoints.py                  # Quick HTTPX smoke test script for API endpoints
+│   └── run_risk_scoring.py                    # Script to train logistic regression & score communities
 │
 ├── src/                                       # Core Backend Python Package
 │   ├── __init__.py                            # Package initialization
@@ -370,10 +372,10 @@ To generate or reproduce the processed payment network dataset from raw transact
 python -m src.data.enrichment --raw-dir data/raw --out-dir data/processed/payment_network
 
 # 2. Extract the 21 observable community graph features
-python scratch/run_feature_extraction.py
+python scripts/run_feature_extraction.py
 
 # 3. Score communities with the explainable ML model
-python scratch/run_risk_scoring.py
+python scripts/run_risk_scoring.py
 ```
 
 ---
@@ -521,13 +523,13 @@ All endpoints are served under `/api` and adhere to strict zero-leakage observab
 
 ```bash
 # 1. Run Python compilation check (0 syntax errors)
-python -m compileall src tests scratch
+python -m compileall src tests scripts
 
 # 2. Run Ruff static linter (0 errors)
-ruff check src tests scratch
+ruff check src tests scripts
 
 # 3. Run Mypy static type checker across all source modules (0 errors)
-mypy src tests scratch
+mypy src tests
 
 # 4. Run Pytest backend test suite (207 tests passing)
 python -m pytest tests/ -q

@@ -33,7 +33,6 @@ import {
 } from '../components/common';
 import type { Column, FilterOption } from '../components/common';
 import { getCases, subscribeToCaseUpdates } from '../utils/caseManager';
-import { startPlaybook } from '../utils/playbookManager';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -100,10 +99,6 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   const handleReviewCommunity = (commId: number) => {
-    startPlaybook({
-      communityId: commId,
-      currentStep: 1,
-    });
     navigate(`/communities/${commId}`);
   };
 

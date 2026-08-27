@@ -204,15 +204,14 @@ def test_ring_members_correlated_but_not_identical(runs: dict[str, Path]) -> Non
     # Correlation: the pattern-shared device/IP is used far more often inside
     # the ring than any single device/IP is used across legitimate traffic.
     ring_dev_rate = float((pat0["device_id"] == "dev_ring_pat_0").mean())
-    ring_ip_rate = float(pat0["ip_address"].str.startswith("10.66.").mean())
+    ip_series = pd.Series(pat0["ip_address"].tolist(), dtype=str)
+    ring_ip_rate = float(ip_series.str.startswith("10.66.").mean())
 
     legit_df = txs[legit_mask]
-    top_legit_device_rate = float(legit_df.groupby("device_id").size().max()) / max(
-        len(legit_df), 1
-    )
-    top_legit_ip_rate = float(legit_df.groupby("ip_address").size().max()) / max(
-        len(legit_df), 1
-    )
+    dev_counts_list: list[int] = [int(v) for v in legit_df.groupby("device_id").size().tolist()]
+    ip_counts_list: list[int] = [int(v) for v in legit_df.groupby("ip_address").size().tolist()]
+    top_legit_device_rate = float(max(dev_counts_list, default=0)) / max(len(legit_df), 1)
+    top_legit_ip_rate = float(max(ip_counts_list, default=0)) / max(len(legit_df), 1)
 
     assert ring_dev_rate > top_legit_device_rate * 3, (
         "Ring members should correlate on the pattern device"
@@ -223,12 +222,13 @@ def test_ring_members_correlated_but_not_identical(runs: dict[str, Path]) -> Non
 
     # Non-identical: no single feature separates rings perfectly.
     assert ring_dev_rate < 1.0, "Not every ring transaction may use the ring device"
+    m_mode = pd.Series(pat0["merchant_id"].tolist()).mode().iloc[0]
     mixed_signals = (
         (pat0["device_id"] != "dev_ring_pat_0")
-        | (~pat0["ip_address"].str.startswith("10.66."))
-        | (pat0["merchant_id"] != pat0["merchant_id"].mode().iloc[0])
+        | (~ip_series.str.startswith("10.66."))
+        | (pat0["merchant_id"] != m_mode)
     )
-    assert mixed_signals.any(), (
+    assert bool(mixed_signals.any()), (
         "Ring signals must be probabilistic, never uniform across all members"
     )
 
@@ -255,7 +255,7 @@ def test_ring_members_correlated_but_not_identical(runs: dict[str, Path]) -> Non
     def _pairs(counts: pd.Series) -> int:
         return int(((counts * (counts - 1)) // 2).sum())
 
-    assert _pairs(ip_counts) > _pairs(dev_counts), (
+    assert _pairs(pd.Series(ip_counts)) > _pairs(pd.Series(dev_counts)), (
         "Accounts should co-occur through shared IPs more than shared devices"
     )
 
@@ -299,7 +299,7 @@ def test_labels_kept_separate_from_features(
 
     # attach_evaluation_columns changes nothing in the observable block.
     labelled = attach_evaluation_columns(
-        observable_only, chunk["src_id"], chunk["dst_id"], {"acc_60": "pat_x"}
+        observable_only, pd.Series(chunk["src_id"]), pd.Series(chunk["dst_id"]), {"acc_60": "pat_x"}
     )
     pd.testing.assert_frame_equal(
         labelled[list(OBSERVABLE_COLUMNS)], observable_only[list(OBSERVABLE_COLUMNS)]

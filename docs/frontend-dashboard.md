@@ -1,6 +1,6 @@
-# TraceLine AI | Razorpay Risk & Fraud Intelligence Hub
+# TraceLine — Financial Crime Investigation Workstation
 
-TraceLine is a next-generation graph-based payment fraud intelligence and investigation platform tailored for the **Razorpay Buildathon**. It combines unsupervised Louvain community detection and explainable ensemble ML over 50,000 payment accounts with an elite cyber-SOC investigator workspace.
+TraceLine is a graph-based payment fraud investigation platform and anti-money laundering (AML) intelligence system. It combines unsupervised Louvain community detection and explainable risk scoring over 50,000 payment accounts with a high-density, professional Dark Graphite investigation workstation.
 
 ---
 
@@ -8,12 +8,12 @@ TraceLine is a next-generation graph-based payment fraud intelligence and invest
 
 ```
                           ┌────────────────────────────────────────────────────────┐
-                          │   TraceLine AI | Razorpay Cyber Risk Hub (React 19)    │
+                          │   TraceLine — Financial Crime Console (React 19)       │
                           │   - Plus Jakarta Sans & JetBrains Mono Fonts           │
-                          │   - Glassmorphism & Cyber Grid Design System           │
+                          │   - High-Density Dark Graphite Design System           │
                           │   - Omnisearch Modal [⌘K / Ctrl+K]                     │
                           │   - ISO-20022 Aligned SAR Forensic Dossier Generator   │
-                          │   - Persistent Case Management & Target Watchlist      │
+                          │   - Persistent Multi-Entity Case Management            │
                           └──────────────┬───────────────────────────┬─────────────┘
                                          │                           │
                                          │ Local Storage             │ HTTP / JSON API (Proxy)
@@ -33,48 +33,54 @@ TraceLine is a next-generation graph-based payment fraud intelligence and invest
 
 ---
 
-## 2. Elite Design Tokens & Visual Aesthetics
+## 2. Design Tokens & Visual Language (Phase 1 Foundation)
 
-- **Color System**:
-  - **Background**: Deep Obsidian `#030712` and `#050a18` with subtle cyber grid texture and ambient radial glow gradients.
-  - **Razorpay Brand & Accents**: Electric Razorpay Blue (`#0C2340`, `#0284c7`, `#3395FF`), Neon Cyan (`#00F0FF`), Cyber Purple (`#8b5cf6`), Signal Crimson (`#f43f5e`), Signal Amber (`#fbbf24`), Signal Emerald (`#10b981`).
-  - **Surface Treatment**: Glassmorphism cards (`backdrop-filter: blur(16px); background: rgba(11, 19, 41, 0.75); border: 1px solid rgba(56, 189, 248, 0.12);`).
-  - **Typography**: Google Fonts **Plus Jakarta Sans** (clean, futuristic fintech headlines) + **JetBrains Mono** (hashes, transaction IDs, currencies, graph telemetry).
+- **Canvas & Surfaces**:
+  - Background Canvas: `#111214`
+  - Sidebar & Headers: `#151719`
+  - Surface Panels / Cards: `#1a1c1f`
+  - Subtle Surface: `#22252a`
+  - Borders: `#282b30` / `#33373e`
+- **Typography**:
+  - Text Main: `#e6e7e9`
+  - Text Secondary: `#9a9da3`
+  - Text Dim: `#666a72`
+  - Fonts: **Plus Jakarta Sans** (UI and headings) + **JetBrains Mono** (financial amounts, hashes, IDs)
+- **Accents & Risk Semantics**:
+  - Cold Blue Accent: `#3b82f6`
+  - High Risk: `#ef4444`
+  - Medium Risk: `#f59e0b`
+  - Low Risk: `#10b981`
 
 ---
 
 ## 3. Workspaces & Key Capabilities
 
-### A. Executive Security Operations Command (`/dashboard`)
-- **Live Threat Radar HUD**: Highlights network threat concentration (17 High-Risk clusters identified across 50,000 accounts).
-- **Flagship Quick Triage Shortcut**: Direct access to prioritize cluster **Community #3** (Risk Score 92/100, 1,231 members, heavy device & instrument reuse).
-- **4 Glowing Glassmorphic KPI Cards**: Accounts (50k), Transactions (450.5k), Graph Evidence Edges (2.61M), Louvain Clusters (59).
-- **Observable Fraud Typology Matrix**: 4 visual cards breaking down *Hardware & Device Clustering*, *Payment Instrument Collusion*, *Temporal Micro-Bursting*, and *Decline Velocity Spikes*.
-- **Risk Spectrum Distribution Bar**: Multi-segmented progress bar for High (28.8%), Medium (22.0%), and Low (49.2%) clusters.
-- **Top Flagged Communities Leaderboard**: Table with risk gauges, density metrics, mean edge weights, observable signal tags, and instant `Add to Investigation` buttons.
+### A. Risk Queue & Triage (`/`)
+- **Network Scope Metrics**: Summary cards displaying total network accounts (50k), verified transactions (450.5k), graph evidence edges (2.61M), and Louvain clusters (59).
+- **Cluster Triage Queue**: Sortable, filterable `DataTable` displaying risk scores, cluster sizes, top observable signals, and quick-action buttons (`Add to Case`, `Investigate →`).
+- **Real-Time Search & Tier Filters**: Filter by `HIGH`, `MEDIUM`, `LOW` risk tiers with instant text search across cluster IDs.
 
 ### B. Universal Omnisearch (`[⌘K]` / `[Ctrl+K]`) & SAR Export
-- **Omnisearch Modal**: Instant fuzzy searching across Community IDs (`#0`–`#58`), Accounts (`acc_...`), Transactions (`tx_...`), and Cases.
-- **Forensic SAR Dossier Generator**: One-click generation of formal **Suspicious Activity Reports** (ISO-20022 aligned) ready to copy or download as Markdown (`.md`).
+- **Omnisearch Modal**: Instant search across Communities (`#0`–`#58`), Accounts (`acc_...`), Transactions (`tx_...`), and Investigation Cases.
+- **Forensic SAR Dossier Generator**: One-click generation of formal **Suspicious Activity Reports** (ISO-20022 aligned) ready to copy or download as Markdown.
 
 ### C. Community Investigation Workspace (`/communities/:communityId`)
-- **Flagship Hero Banner**: Community ID, Louvain Cluster Index, ML Risk Score meter, Total Network Volume, Member Accounts.
-- **Razorpay Explainable AI Evidence Panel**: Natural language forensic summary, top 3 observable signal cards with feature delta intensity bars.
-- **4 Feature Dimension Cards (21 Observable Features)**: Graph Topology (4), Entity Sharing (6), Temporal Velocity (5), Transaction Analytics (6).
-- **Interactive Network Topology Graph (Cytoscape)**:
-  - Deep space cyber canvas with glowing cyan nodes and bezier evidence edges.
-  - Layout engine selector: Force-Directed (Cose), Concentric (Degree), Circular.
-  - Interactive side-drawers on node and edge click detailing degrees, balances, shared cards, devices, IPs, and temporal overlap.
+- **Cluster Overview**: Community ID, member count, ML risk score priority, and risk level.
+- **Model vs. Observable Evidence Analysis**: Feature group comparisons against network baselines.
+- **Deterministic Evidence Rules Table**: Severity-ranked observable evidence items with supporting entity links.
+- **Interactive Cytoscape.js Network Graph**: Evidence-driven node focus, degree layouts (cose/concentric/circle), and node selection inspector.
 - **Member Accounts Directory & Activity Timeline Stream**.
 
 ### D. Account Profile & Transaction Inspector (`/accounts/:id`, `/transactions/:id`)
-- Customer KYC profile, outgoing vs incoming flow metrics, decline rates, connected peer matrix.
-- Interactive **Payment Gateway Transfer Flow** diagram and observable digital footprint breakdown (hardware fingerprint, card token, IP address).
+- Customer profile, directional transaction flows (sent vs received), decline rates, and peer connections table.
+- Interactive **Payment Gateway Transfer Flow** diagram ($src \rightarrow dst$) and digital footprint hardware matrix (device fingerprint, payment instrument token, IP address).
 
-### E. Investigation Queue & Case Workspace (`/investigations`, `/investigations/:caseId`)
-- Persistent case management across `OPEN` → `UNDER REVIEW` → `CLOSED` status workflows.
-- Auto-saving **Investigator Notes** editor.
-- Multi-entity target watchlist categorized by Communities, Accounts, and Transactions with one-click navigation and quick ID attach.
+### E. Investigation Queue & Case Dossier (`/investigations`, `/investigations/:caseId`)
+- Persistent case management across `OPEN` → `REVIEW` → `CLOSED` lifecycle states.
+- Debounced auto-saving **Investigator Notes** editor.
+- Multi-entity target attachments (Communities, Accounts, Transactions) with duplicate prevention and quick ID attachment.
+- Aggregated observable evidence matrix and printable Case Dossier modal with clean `@media print` formatting.
 
 ---
 

@@ -65,6 +65,29 @@ def _sanitize_float(val: Any) -> float | None:
         return None
 
 
+def _to_float(val: Any, default: float = 0.0) -> float:
+    """Convert float value with a guaranteed non-None fallback."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return default
+        return f
+    except (ValueError, TypeError):
+        return default
+
+
+def _to_int(val: Any, default: int = 0) -> int:
+    """Convert int value with a guaranteed non-None fallback."""
+    if val is None:
+        return default
+    try:
+        return int(float(val))
+    except (ValueError, TypeError):
+        return default
+
+
 class TraceLineService:
     """Singleton service providing fast in-memory query capabilities."""
 
@@ -133,8 +156,8 @@ class TraceLineService:
         if mem_path.exists():
             mem_df = pd.read_csv(mem_path)
             for _, row in mem_df.iterrows():
-                acc = str(row["account_id"])
-                cid = int(row["community_id"])
+                acc = str(row.get("account_id") or "")
+                cid = _to_int(row.get("community_id"), 0)
                 self.account_to_community[acc] = cid
                 self.community_to_accounts.setdefault(cid, []).append(acc)
         else:
@@ -261,21 +284,21 @@ class TraceLineService:
 
         items: list[CommunitySummary] = []
         for cid, row in merged.iterrows():
-            cid_int = int(cid)
+            cid_int = _to_int(cid, 0)
             items.append(
                 CommunitySummary(
                     community_id=cid_int,
-                    member_count=int(row.get("member_count", len(self.community_to_accounts.get(cid_int, [])))),
-                    risk_score=int(row.get("risk_score", 0)),
-                    risk_probability=round(float(row.get("risk_probability", 0.0)), 4),
-                    risk_level=str(row.get("risk_level", "LOW")),
-                    top_signal_1=str(row.get("top_signal_1", "")),
-                    top_signal_2=str(row.get("top_signal_2", "")),
-                    top_signal_3=str(row.get("top_signal_3", "")),
-                    density=round(float(row.get("density", 0.0)), 6),
+                    member_count=_to_int(row.get("member_count"), len(self.community_to_accounts.get(cid_int, []))),
+                    risk_score=_to_int(row.get("risk_score"), 0),
+                    risk_probability=round(_to_float(row.get("risk_probability"), 0.0), 4),
+                    risk_level=str(row.get("risk_level") or "LOW"),
+                    top_signal_1=str(row.get("top_signal_1") or ""),
+                    top_signal_2=str(row.get("top_signal_2") or ""),
+                    top_signal_3=str(row.get("top_signal_3") or ""),
+                    density=round(_to_float(row.get("density"), 0.0), 6),
                     mean_edge_weight=_sanitize_float(row.get("mean_edge_weight")),
-                    tx_per_member=round(float(row.get("tx_per_member", 0.0)), 2),
-                    total_transaction_amount=round(float(row.get("total_transaction_amount", 0.0)), 2),
+                    tx_per_member=round(_to_float(row.get("tx_per_member"), 0.0), 2),
+                    total_transaction_amount=round(_to_float(row.get("total_transaction_amount"), 0.0), 2),
                 )
             )
 
@@ -303,10 +326,10 @@ class TraceLineService:
         for feat in FEATURE_NAMES:
             features[feat] = _sanitize_float(feat_row.get(feat))
 
-        member_count = int(feat_row.get("member_count", len(self.community_to_accounts.get(community_id, []))))
-        density = float(feat_row.get("density", 0.0))
+        member_count = _to_int(feat_row.get("member_count"), len(self.community_to_accounts.get(community_id, [])))
+        density = _to_float(feat_row.get("density"), 0.0)
         mean_edge_weight = _sanitize_float(feat_row.get("mean_edge_weight"))
-        weight_per_member = float(feat_row.get("weight_per_member", 0.0))
+        weight_per_member = _to_float(feat_row.get("weight_per_member"), 0.0)
         total_internal_weight = weight_per_member * member_count
 
         possible_pairs = member_count * (member_count - 1) / 2.0 if member_count > 1 else 0
@@ -314,18 +337,18 @@ class TraceLineService:
 
         # Build detailed responses
         tx_stats = TransactionStats(
-            total_transaction_amount=float(feat_row.get("total_transaction_amount", 0.0)),
+            total_transaction_amount=_to_float(feat_row.get("total_transaction_amount"), 0.0),
             mean_tx_amount=_sanitize_float(feat_row.get("mean_tx_amount")),
             amount_cv=_sanitize_float(feat_row.get("amount_cv")),
             declined_rate=_sanitize_float(feat_row.get("declined_rate")),
-            tx_per_member=float(feat_row.get("tx_per_member", 0.0)),
+            tx_per_member=_to_float(feat_row.get("tx_per_member"), 0.0),
             unique_payment_methods=_sanitize_float(feat_row.get("unique_payment_methods")),
             merchant_category_entropy=_sanitize_float(feat_row.get("merchant_category_entropy")),
         )
 
         temp_stats = TemporalStats(
-            temporal_compression_score=float(feat_row.get("temporal_compression_score", 0.0)),
-            unique_active_hours=float(feat_row.get("unique_active_hours", 0.0)),
+            temporal_compression_score=_to_float(feat_row.get("temporal_compression_score"), 0.0),
+            unique_active_hours=_to_float(feat_row.get("unique_active_hours"), 0.0),
             median_inter_transaction_gap_hours=_sanitize_float(feat_row.get("median_inter_transaction_gap_hours")),
             timestamp_span_hours=None,
             min_timestamp=None,
@@ -333,12 +356,12 @@ class TraceLineService:
         )
 
         entity_sharing = EntitySharingStats(
-            unique_shared_instruments=float(feat_row.get("unique_shared_instruments", 0.0)),
-            unique_shared_devices=float(feat_row.get("unique_shared_devices", 0.0)),
-            unique_shared_ips=float(feat_row.get("unique_shared_ips", 0.0)),
-            unique_shared_merchants=float(feat_row.get("unique_shared_merchants", 0.0)),
-            instrument_sharing_ratio=float(feat_row.get("instrument_sharing_ratio", 0.0)),
-            device_sharing_ratio=float(feat_row.get("device_sharing_ratio", 0.0)),
+            unique_shared_instruments=_to_float(feat_row.get("unique_shared_instruments"), 0.0),
+            unique_shared_devices=_to_float(feat_row.get("unique_shared_devices"), 0.0),
+            unique_shared_ips=_to_float(feat_row.get("unique_shared_ips"), 0.0),
+            unique_shared_merchants=_to_float(feat_row.get("unique_shared_merchants"), 0.0),
+            instrument_sharing_ratio=_to_float(feat_row.get("instrument_sharing_ratio"), 0.0),
+            device_sharing_ratio=_to_float(feat_row.get("device_sharing_ratio"), 0.0),
         )
 
         return CommunityDetailResponse(

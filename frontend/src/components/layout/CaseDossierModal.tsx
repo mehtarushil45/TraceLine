@@ -316,13 +316,12 @@ Attestation: ZERO_LABEL_LEAKAGE_STRICT_COMPLIANCE
                 alignItems: 'center',
                 gap: '5px',
                 padding: '6px 14px',
-                backgroundColor: '#0284c7',
-                background: 'linear-gradient(135deg, #0284c7 0%, #00F0FF 100%)',
-                border: 'none',
-                borderRadius: '6px',
-                color: '#030712',
+                backgroundColor: 'var(--accent)',
+                border: '1px solid var(--accent-border)',
+                borderRadius: '5px',
+                color: '#ffffff',
                 fontSize: '12px',
-                fontWeight: 800,
+                fontWeight: 600,
                 cursor: 'pointer',
               }}
               title="Print or Save as PDF"
