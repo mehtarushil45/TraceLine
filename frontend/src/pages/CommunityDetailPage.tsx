@@ -2,39 +2,49 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRight,
   Clock,
+  Cpu,
   FileText,
-  Layers,
   Network,
   Users,
 } from 'lucide-react';
 import {
   getCommunity,
   getCommunityAccounts,
+  getCommunityEvidence,
   getCommunityGraph,
   getCommunityTimeline,
 } from '../api';
 import type {
   AccountSummary,
   CommunityDetailResponse,
+  CommunityEvidenceResponse,
   CommunityGraphResponse,
   EvidenceItem,
   TimelineEvent,
 } from '../types/api';
-import { RiskBadge } from '../components/common/RiskBadge';
-import { RiskScore } from '../components/common/RiskScore';
-import { AddToInvestigationButton } from '../components/common/AddToInvestigationButton';
-import { EvidenceIntelligencePanel } from '../components/community/EvidenceIntelligencePanel';
-import { FeatureBreakdown } from '../components/community/FeatureBreakdown';
+import {
+  AddToInvestigationButton,
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  EntityLink,
+  ErrorState,
+  LoadingState,
+  Metric,
+  PageHeader,
+  Pagination,
+  Panel,
+  RiskBadge,
+  RiskScore,
+} from '../components/common';
+import type { Column } from '../components/common';
 import { NetworkGraph } from '../components/graph/NetworkGraph';
-import { AccountTable } from '../components/account/AccountTable';
+import { FeatureBreakdown } from '../components/community/FeatureBreakdown';
 import { TimelineView } from '../components/timeline/TimelineView';
-import { Pagination } from '../components/common/Pagination';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { ErrorState } from '../components/common/ErrorState';
 import { SarExportModal } from '../components/layout/SarExportModal';
-
-import { updatePlaybookContext, updatePlaybookStep, getPlaybookContext } from '../utils/playbookManager';
 
 export const CommunityDetailPage: React.FC = () => {
   const { communityId } = useParams<{ communityId: string }>();
@@ -42,24 +52,34 @@ export const CommunityDetailPage: React.FC = () => {
   const location = useLocation();
 
   const [community, setCommunity] = useState<CommunityDetailResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<'accounts' | 'graph' | 'timeline'>('accounts');
+  const [evidence, setEvidence] = useState<CommunityEvidenceResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<'accounts' | 'graph' | 'timeline' | 'features'>('accounts');
   const [isSarModalOpen, setIsSarModalOpen] = useState(false);
 
-  // Evidence focus — drives NetworkGraph highlighting and context banner
+  // Evidence focus — drives NetworkGraph node highlighting
   const [evidenceFocus, setEvidenceFocus] = useState<EvidenceItem | null>(null);
 
-  // Sync with playbook on load
-  useEffect(() => {
-    if (!communityId) return;
-    const ctx = getPlaybookContext();
-    if (ctx.isActive) {
-      updatePlaybookContext({ communityId });
-    }
-  }, [communityId]);
+  // Member Accounts
+  const [accounts, setAccounts] = useState<AccountSummary[]>([]);
+  const [accountsTotal, setAccountsTotal] = useState(0);
+  const [accountsPage, setAccountsPage] = useState(1);
+  const [accountsTotalPages, setAccountsTotalPages] = useState(1);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  // Graph data
+  const [graphData, setGraphData] = useState<CommunityGraphResponse | null>(null);
+  const [loadingGraph, setLoadingGraph] = useState(false);
+
+  // Timeline events
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Handle incoming navigation state (e.g. from AccountDetailPage "Explore in Graph")
   useEffect(() => {
-    const state = location.state as { tab?: 'accounts' | 'graph' | 'timeline'; evidenceFocus?: EvidenceItem } | null;
+    const state = location.state as { tab?: 'accounts' | 'graph' | 'timeline' | 'features'; evidenceFocus?: EvidenceItem } | null;
     if (state?.tab) {
       setActiveTab(state.tab);
     }
@@ -67,49 +87,44 @@ export const CommunityDetailPage: React.FC = () => {
       setEvidenceFocus(state.evidenceFocus);
       setActiveTab('graph');
       setTimeout(() => {
-        document.getElementById('community-graph-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('community-workspace-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 120);
     }
   }, [location.state]);
 
-  // Tab 1: Accounts
-  const [accounts, setAccounts] = useState<AccountSummary[]>([]);
-  const [accountsTotal, setAccountsTotal] = useState(0);
-  const [accountsPage, setAccountsPage] = useState(1);
-  const [accountsTotalPages, setAccountsTotalPages] = useState(1);
-  const [loadingAccounts, setLoadingAccounts] = useState(false);
-
-  // Tab 2: Graph — pre-loaded so the evidence panel can validate nodes
-  const [graphData, setGraphData] = useState<CommunityGraphResponse | null>(null);
-  const [loadingGraph, setLoadingGraph] = useState(false);
-
-  // Tab 3: Timeline
-  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
-  const [loadingTimeline, setLoadingTimeline] = useState(false);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Load community detail
+  // Load core community and observable evidence
   useEffect(() => {
     if (!communityId) return;
     setLoading(true);
     setError(null);
-    getCommunity(communityId)
-      .then(setCommunity)
-      .catch((err) => setError(err instanceof Error ? err.message : `Community ${communityId} not found`))
-      .finally(() => setLoading(false));
+
+    Promise.all([
+      getCommunity(communityId),
+      getCommunityEvidence(communityId).catch(() => null),
+    ])
+      .then(([commRes, evRes]) => {
+        setCommunity(commRes);
+        setEvidence(evRes);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : `Community #${communityId} not found`);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [communityId]);
 
-  // Pre-load graph data in background (needed for explorable-check in evidence panel)
+  // Pre-load graph data in background
   useEffect(() => {
     if (!communityId || graphData) return;
     getCommunityGraph(communityId, 200, 500)
       .then(setGraphData)
-      .catch(() => { /* silent — graph optional for evidence panel */ });
+      .catch(() => {
+        /* Graph preloading optional */
+      });
   }, [communityId, graphData]);
 
-  // Load accounts when tab active
+  // Load accounts when on accounts tab or page changes
   useEffect(() => {
     if (!communityId || activeTab !== 'accounts') return;
     setLoadingAccounts(true);
@@ -123,7 +138,7 @@ export const CommunityDetailPage: React.FC = () => {
       .finally(() => setLoadingAccounts(false));
   }, [communityId, activeTab, accountsPage]);
 
-  // Load graph on demand (if not already loaded)
+  // Load graph on demand
   useEffect(() => {
     if (!communityId || activeTab !== 'graph' || graphData || loadingGraph) return;
     setLoadingGraph(true);
@@ -143,241 +158,507 @@ export const CommunityDetailPage: React.FC = () => {
       .finally(() => setLoadingTimeline(false));
   }, [communityId, activeTab, timelineEvents.length]);
 
-  // -------------------------------------------------------------------------
-  // Handlers
-  // -------------------------------------------------------------------------
-
   /**
-   * Called when investigator clicks "Explore in Graph" on an evidence item.
-   * Switches to the graph tab and sets the evidence focus.
+   * Explores an evidence item in the Cytoscape graph view.
    */
   const handleExploreInGraph = (item: EvidenceItem) => {
     setEvidenceFocus(item);
     setActiveTab('graph');
-    const ctx = getPlaybookContext();
-    if (ctx.isActive) {
-      updatePlaybookStep(3, { evidenceId: item.evidence_id });
-    }
-    // Scroll graph section into view after a short tick
     setTimeout(() => {
-      document.getElementById('community-graph-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('community-workspace-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
   };
 
   const handleClearFocus = () => setEvidenceFocus(null);
 
-  // -------------------------------------------------------------------------
-  // Render guards
-  // -------------------------------------------------------------------------
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <LoadingState type="card" count={1} />
+        <LoadingState type="table" count={6} />
+      </div>
+    );
+  }
 
-  if (loading) return <LoadingSkeleton type="detail" />;
-  if (error || !community) return <ErrorState message={error || undefined} onRetry={() => navigate('/communities')} />;
+  if (error || !community) {
+    return (
+      <ErrorState
+        title="Community Investigation Unavailable"
+        message={error || 'The requested community cluster could not be loaded.'}
+        onRetry={() => navigate('/')}
+      />
+    );
+  }
 
-  const isHigh = community.risk_level === 'HIGH';
+  // Observable Evidence Table Columns
+  const evidenceColumns: Column<EvidenceItem>[] = [
+    {
+      key: 'severity',
+      header: 'Severity',
+      width: '100px',
+      render: (item) => <RiskBadge level={item.severity} size="sm" />,
+    },
+    {
+      key: 'title',
+      header: 'Observable Rule / Indicator',
+      render: (item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            {item.title}
+          </span>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+            {item.description}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'score_contribution',
+      header: 'Rule Weight',
+      width: '110px',
+      align: 'right',
+      render: (item) => (
+        <span className="font-mono" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>
+          +{item.score_contribution.toFixed(1)} pts
+        </span>
+      ),
+    },
+    {
+      key: 'supporting_entities',
+      header: 'Affected Entities',
+      width: '160px',
+      render: (item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+            {item.supporting_entities.length} entit{item.supporting_entities.length === 1 ? 'y' : 'ies'}
+          </span>
+          {item.supporting_entities.length > 0 && (
+            <span className="font-mono truncate" style={{ fontSize: '10px', color: 'var(--text-dim)', maxWidth: '140px' }}>
+              {item.supporting_entities.slice(0, 2).join(', ')}
+              {item.supporting_entities.length > 2 ? '...' : ''}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      width: '150px',
+      align: 'right',
+      render: (item) => (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={Network}
+          onClick={() => handleExploreInGraph(item)}
+          title="Highlight affected entities in network topology"
+        >
+          Explore in Graph
+        </Button>
+      ),
+    },
+  ];
 
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
+  // Member Accounts Table Columns
+  const accountColumns: Column<AccountSummary>[] = [
+    {
+      key: 'account_id',
+      header: 'Account ID',
+      width: '160px',
+      render: (acc) => <EntityLink type="account" id={acc.account_id} />,
+    },
+    {
+      key: 'customer_name',
+      header: 'Customer Name',
+      render: (acc) => (
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+          {acc.customer_name}
+        </span>
+      ),
+    },
+    {
+      key: 'balance',
+      header: 'Balance',
+      width: '130px',
+      align: 'right',
+      render: (acc) => (
+        <span className="font-mono" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+          ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      ),
+    },
+    {
+      key: 'account_risk_score',
+      header: 'Risk Score',
+      width: '110px',
+      render: (acc) => (
+        acc.account_risk_score !== null ? (
+          <RiskScore score={Math.round(acc.account_risk_score * 100)} size="sm" />
+        ) : (
+          <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>—</span>
+        )
+      ),
+    },
+    {
+      key: 'creation_date',
+      header: 'Created',
+      width: '130px',
+      render: (acc) => (
+        <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          {acc.creation_date || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      width: '140px',
+      align: 'right',
+      render: (acc) => (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={ArrowRight}
+          iconPosition="right"
+          onClick={() => navigate(`/accounts/${acc.account_id}`)}
+        >
+          Inspect Profile
+        </Button>
+      ),
+    },
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-
-      {/* 1. Breadcrumb + Action Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1600px', margin: '0 auto' }}>
+      {/* ------------------------------------------------------------------ */}
+      {/* 1. PAGE HEADER                                                     */}
+      {/* ------------------------------------------------------------------ */}
+      <PageHeader
+        title="Community Investigation"
+        description={`Investigate network structure and observable evidence associated with community #${community.community_id}.`}
+        breadcrumbs={
           <button
-            onClick={() => navigate('/communities')}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
-          >
-            <ArrowLeft size={14} />
-            Communities
-          </button>
-          <span>/</span>
-          <span className="font-mono text-slate-200">Community #{community.community_id}</span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            onClick={() => setIsSarModalOpen(true)}
+            onClick={() => navigate('/')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px',
-              backgroundColor: '#162447', border: '1px solid var(--border-light)',
-              borderRadius: '6px', color: 'var(--text-main)',
-              fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              padding: 0,
+              marginBottom: '6px',
             }}
+            onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
-            <FileText size={13} style={{ color: 'var(--accent-cyan)' }} />
-            <span>Generate SAR</span>
+            <ArrowLeft size={13} />
+            <span>Back to Risk Queue</span>
           </button>
+        }
+        badge={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Badge variant="neutral">COMMUNITY comm_{community.community_id}</Badge>
+            <RiskBadge level={community.risk_level} size="md" />
+          </div>
+        }
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AddToInvestigationButton
+              targetType="COMMUNITY"
+              targetId={community.community_id.toString()}
+              targetLabel={`Community #${community.community_id}`}
+              riskScore={community.risk_score}
+              riskLevel={community.risk_level}
+              size="md"
+            />
+            <Button
+              variant="secondary"
+              size="md"
+              icon={FileText}
+              onClick={() => setIsSarModalOpen(true)}
+            >
+              Generate SAR
+            </Button>
+          </div>
+        }
+      />
 
-          <AddToInvestigationButton
-            targetType="COMMUNITY"
-            targetId={community.community_id.toString()}
-            targetLabel={`Community #${community.community_id}`}
-            riskScore={community.risk_score}
-            riskLevel={community.risk_level}
+      {/* ------------------------------------------------------------------ */}
+      {/* 2. INVESTIGATION CONTEXT METRICS                                  */}
+      {/* ------------------------------------------------------------------ */}
+      <Panel padding="md">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+          <Metric
+            label="ML Risk Score"
+            value={
+              <RiskScore
+                score={community.risk_score}
+                level={community.risk_level}
+                size="md"
+                showBar={true}
+              />
+            }
+            subtext="Prioritized risk tier"
+          />
+          <Metric
+            label="Evidence Strength"
+            value={`${evidence?.evidence_score ?? '—'}/100`}
+            subtext={`${evidence?.evidence_count ?? 0} active triggers (${evidence?.high_count ?? 0} High)`}
+            variant={evidence && evidence.evidence_score >= 70 ? 'high' : 'default'}
+          />
+          <Metric
+            label="Member Accounts"
+            value={community.member_count.toLocaleString()}
+            subtext="Partition node count"
+          />
+          <Metric
+            label="Transaction Volume"
+            value={`$${community.transaction_statistics.total_transaction_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            subtext={`${community.transaction_statistics.tx_per_member.toFixed(1)} tx / account`}
+          />
+          <Metric
+            label="Network Density"
+            value={community.density.toFixed(4)}
+            subtext={`${community.internal_edge_count.toLocaleString()} internal edges`}
           />
         </div>
-      </div>
+      </Panel>
 
-      {/* 2. Hero HUD */}
-      <div
-        className="dash-card"
-        style={{
-          padding: '24px 28px',
-          borderColor: isHigh ? 'rgba(244,63,94,0.4)' : 'var(--border)',
-          background: isHigh
-            ? 'linear-gradient(135deg, rgba(244,63,94,0.07) 0%, rgba(11,19,41,0.9) 100%)'
-            : 'var(--bg-card)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px',
-        }}
+      {/* ------------------------------------------------------------------ */}
+      {/* 3. "WHY THIS COMMUNITY IS PRIORITIZED" SECTION                    */}
+      {/* ------------------------------------------------------------------ */}
+      <Panel
+        title="Why this community is prioritized"
+        subtitle="Ensemble model prioritization corroborated by observable evidence engine rules."
+        padding="lg"
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '18px' }}>
-          <div style={{
-            padding: '13px', borderRadius: '10px',
-            backgroundColor: isHigh ? 'rgba(244,63,94,0.18)' : 'rgba(51,65,85,0.28)',
-            color: isHigh ? '#f43f5e' : 'var(--text-muted)',
-            boxShadow: isHigh ? '0 0 18px rgba(244,63,94,0.28)' : 'none',
-          }}>
-            <Layers size={28} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0 }}>
-                Community #{community.community_id}
-              </h1>
-              <RiskBadge level={community.risk_level} size="lg" />
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
-              Louvain Partition · {community.member_count.toLocaleString()} accounts · $
-              {community.transaction_statistics.total_transaction_amount.toLocaleString(undefined, {
-                minimumFractionDigits: 2, maximumFractionDigits: 2,
-              })} total volume
-            </p>
-          </div>
-        </div>
-
-        <div style={{
-          padding: '13px 20px', borderRadius: '8px',
-          backgroundColor: '#030712', border: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: '20px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        }}>
-          <div>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              ML Risk Score
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+          {/* Model Prioritization Analysis */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)' }}>
+              Model Prioritization
             </span>
-            <RiskScore score={community.risk_score} level={community.risk_level} size="lg" showSubtitle />
+            <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>
+              Assigned an ML risk score of <strong style={{ color: community.risk_level === 'HIGH' ? 'var(--risk-high)' : 'var(--text-primary)' }}>{community.risk_score}/100 ({community.risk_level})</strong> derived from 21 graph-topological and payment-velocity features.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Top Risk Signals:</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {[community.top_signal_1, community.top_signal_2, community.top_signal_3]
+                  .filter(Boolean)
+                  .map((sig, idx) => (
+                    <Badge key={idx} variant="neutral" size="sm">
+                      {sig}
+                    </Badge>
+                  ))}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '8px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
+              <div>
+                <span style={{ color: 'var(--text-dim)' }}>Declined Rate: </span>
+                <span className="font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                  {((community.transaction_statistics.declined_rate || 0) * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-dim)' }}>Mean Edge Weight: </span>
+                <span className="font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                  {community.mean_edge_weight?.toFixed(2) || '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Observable Evidence Engine Analysis */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: '1px solid var(--border)', paddingLeft: '24px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)' }}>
+              Observable Evidence Engine
+            </span>
+            <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>
+              Deterministic evidence analysis identified <strong style={{ color: 'var(--accent)' }}>{evidence?.evidence_count ?? 0} active rule triggers</strong> ({evidence?.high_count ?? 0} High, {evidence?.medium_count ?? 0} Medium, {evidence?.low_count ?? 0} Low).
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+              <div style={{ padding: '8px 10px', borderRadius: '4px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block' }}>Shared Devices</span>
+                <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {community.entity_sharing.unique_shared_devices}
+                </span>
+              </div>
+              <div style={{ padding: '8px 10px', borderRadius: '4px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block' }}>Shared Instruments</span>
+                <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {community.entity_sharing.unique_shared_instruments}
+                </span>
+              </div>
+              <div style={{ padding: '8px 10px', borderRadius: '4px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block' }}>Shared IPs</span>
+                <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {community.entity_sharing.unique_shared_ips}
+                </span>
+              </div>
+              <div style={{ padding: '8px 10px', borderRadius: '4px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block' }}>Temporal Score</span>
+                <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {community.temporal_statistics.temporal_compression_score.toFixed(2)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </Panel>
 
-      {/* 3. Evidence Intelligence Panel */}
-      <div className="dash-card" style={{ padding: '22px 26px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-cyan)' }}>
-            Evidence Intelligence
-          </span>
-          <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.18)', fontStyle: 'italic' }}>
-            Observable-rule analysis · Not ground-truth
-          </span>
-        </div>
-        <EvidenceIntelligencePanel
-          communityId={community.community_id}
-          onExploreInGraph={handleExploreInGraph}
-          graphData={graphData}
-        />
-      </div>
+      {/* ------------------------------------------------------------------ */}
+      {/* 4. OBSERVABLE EVIDENCE DETAIL TABLE                                */}
+      {/* ------------------------------------------------------------------ */}
+      <Panel
+        title={`Observable Evidence Rules (${evidence?.items.length ?? 0})`}
+        subtitle="Deterministic rule evaluations linking entities via shared hardware, payment instruments, or temporal concentration."
+        padding="none"
+      >
+        {!evidence || evidence.items.length === 0 ? (
+          <EmptyState
+            title="No observable evidence triggers"
+            message="No deterministic evidence rules triggered for this community partition."
+          />
+        ) : (
+          <DataTable
+            columns={evidenceColumns}
+            data={evidence.items}
+            keyExtractor={(item) => item.evidence_id}
+          />
+        )}
+      </Panel>
 
-      {/* 4. Feature Breakdown */}
-      <FeatureBreakdown community={community} />
-
-      {/* 5. Investigation Workspace Tabs */}
-      <div id="community-graph-section" style={{ scrollMarginTop: '20px' }}>
-        {/* Tab bar */}
-        <div style={{ borderBottom: '1px solid var(--border)', display: 'flex', gap: '4px', marginBottom: 0 }}>
+      {/* ------------------------------------------------------------------ */}
+      {/* 5. INVESTIGATION WORKSPACE TABS                                   */}
+      {/* ------------------------------------------------------------------ */}
+      <div id="community-workspace-section" style={{ scrollMarginTop: '20px' }}>
+        {/* Tab Controls Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            borderBottom: '1px solid var(--border)',
+            paddingBottom: '2px',
+            marginBottom: '16px',
+          }}
+        >
           {[
             { key: 'accounts', label: `Member Accounts (${community.member_count.toLocaleString()})`, icon: Users },
             { key: 'graph', label: 'Network Graph', icon: Network },
             { key: 'timeline', label: 'Activity Timeline', icon: Clock },
+            { key: 'features', label: 'Feature Breakdown (21)', icon: Cpu },
           ].map(({ key, label, icon: Icon }) => {
-            const isActive = activeTab === key;
-            const showFocusDot = key === 'graph' && !!evidenceFocus;
+            const isSelected = activeTab === key;
+            const isGraphWithFocus = key === 'graph' && Boolean(evidenceFocus);
             return (
               <button
                 key={key}
+                type="button"
                 onClick={() => setActiveTab(key as any)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '7px',
-                  padding: '11px 16px',
-                  background: 'none', border: 'none',
-                  borderBottom: isActive ? '2px solid var(--accent-cyan)' : '2px solid transparent',
-                  color: isActive ? '#f8fafc' : 'var(--text-muted)',
-                  fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
-                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  padding: '9px 16px',
+                  borderRadius: '5px 5px 0 0',
+                  border: 'none',
+                  borderBottom: isSelected ? '2px solid var(--accent)' : '2px solid transparent',
+                  backgroundColor: isSelected ? 'var(--bg-subtle)' : 'transparent',
+                  color: isSelected ? 'var(--text-primary)' : 'var(--text-muted)',
+                  fontSize: '13px',
+                  fontWeight: isSelected ? 700 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
                 }}
               >
-                <Icon size={14} style={{ color: isActive ? 'var(--accent-cyan)' : 'inherit' }} />
-                {label}
-                {showFocusDot && (
-                  <span style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: '#22d3ee',
-                    boxShadow: '0 0 4px #22d3ee',
-                    flexShrink: 0,
-                  }} title="Evidence focus active" />
+                <Icon size={14} style={{ color: isSelected ? 'var(--accent)' : 'inherit' }} />
+                <span>{label}</span>
+                {isGraphWithFocus && (
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--accent)',
+                    }}
+                    title="Evidence focus active"
+                  />
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Tab: Accounts */}
+        {/* Tab Content: Member Accounts */}
         {activeTab === 'accounts' && (
-          <div className="dash-card" style={{ marginTop: 0, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+          <Panel padding="none">
             {loadingAccounts ? (
-              <LoadingSkeleton type="table" count={6} />
+              <div style={{ padding: '24px' }}>
+                <LoadingState type="table" count={6} />
+              </div>
             ) : (
               <>
-                <AccountTable accounts={accounts} />
-                <Pagination
-                  currentPage={accountsPage}
-                  totalPages={accountsTotalPages}
-                  totalItems={accountsTotal}
-                  pageSize={50}
-                  onPageChange={(p) => setAccountsPage(p)}
+                <DataTable
+                  columns={accountColumns}
+                  data={accounts}
+                  keyExtractor={(acc) => acc.account_id}
+                  emptyMessage="No member accounts found in this partition."
                 />
+                <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
+                  <Pagination
+                    currentPage={accountsPage}
+                    totalPages={accountsTotalPages}
+                    totalItems={accountsTotal}
+                    pageSize={50}
+                    onPageChange={(p) => setAccountsPage(p)}
+                  />
+                </div>
               </>
             )}
-          </div>
+          </Panel>
         )}
 
-        {/* Tab: Network Graph */}
+        {/* Tab Content: Network Graph */}
         {activeTab === 'graph' && (
-          <div style={{ marginTop: 0 }}>
+          <Panel padding="none">
             {loadingGraph || !graphData ? (
-              <LoadingSkeleton type="graph" height="560px" />
+              <div style={{ padding: '24px' }}>
+                <LoadingState type="graph" />
+              </div>
             ) : (
               <NetworkGraph
                 graphData={graphData}
-                height="580px"
+                height="620px"
                 evidenceFocus={evidenceFocus}
                 onClearFocus={handleClearFocus}
               />
             )}
-          </div>
+          </Panel>
         )}
 
-        {/* Tab: Timeline */}
+        {/* Tab Content: Activity Timeline */}
         {activeTab === 'timeline' && (
-          <div>
+          <Panel padding="md">
             {loadingTimeline ? (
-              <LoadingSkeleton type="table" count={6} />
+              <LoadingState type="table" count={6} />
             ) : (
               <TimelineView events={timelineEvents} evidenceFocus={evidenceFocus} />
             )}
-          </div>
+          </Panel>
+        )}
+
+        {/* Tab Content: Feature Breakdown */}
+        {activeTab === 'features' && (
+          <FeatureBreakdown community={community} />
         )}
       </div>
 
