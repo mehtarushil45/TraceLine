@@ -5,7 +5,7 @@ import {
   Search,
   Shield,
 } from 'lucide-react';
-import { OmnisearchModal } from './OmnisearchModal';
+import { CommandPalette } from './CommandPalette';
 import { SarExportModal } from './SarExportModal';
 
 export const Header: React.FC = () => {
@@ -129,7 +129,7 @@ export const Header: React.FC = () => {
         </div>
       </header>
 
-      <OmnisearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <SarExportModal isOpen={isSarOpen} onClose={() => setIsSarOpen(false)} />
     </>
   );

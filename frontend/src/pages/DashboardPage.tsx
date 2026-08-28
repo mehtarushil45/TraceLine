@@ -42,6 +42,7 @@ export const DashboardPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [evidenceMap, setEvidenceMap] = useState<Record<number, CommunityEvidenceResponse>>({});
   const [loading, setLoading] = useState(true);
+  const [evidenceLoading, setEvidenceLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [triageSearchQuery, setTriageSearchQuery] = useState('');
   const [tableFilterRisk, setTableFilterRisk] = useState('ALL');
@@ -59,13 +60,17 @@ export const DashboardPage: React.FC = () => {
         setEvidenceMap((prev) => ({ ...prev, [communityId]: evidence }));
       }
     } catch {
-      // Non-blocking: fallback to summary signals if evidence endpoint unavailable
+      // Non-blocking: fallback gracefully
     }
   }, []);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    // Only trigger full page loading indicator if we don't have initial summary yet
+    if (!summary) {
+      setLoading(true);
+    }
     setError(null);
+
     try {
       const [summaryResponse, communitiesResponse] = await Promise.all([
         getSummary(),
@@ -76,35 +81,38 @@ export const DashboardPage: React.FC = () => {
       setCommunities(sorted);
       loadCases();
 
-      // Automatically select the highest-risk community as initial lead
+      // Automatically select the highest-risk community as initial lead if none selected
       if (sorted.length > 0) {
         setSelectedId((current) =>
           current !== null && sorted.some((c) => c.community_id === current) ? current : sorted[0].community_id
         );
       }
 
-      // Preload evidence for the top 15 priority leads
-      const topBatch = sorted.slice(0, 15);
-      const evidenceResults = await Promise.all(
-        topBatch.map(async (comm) => {
-          try {
-            return { id: comm.community_id, evidence: await getCommunityEvidence(comm.community_id) };
-          } catch {
-            return { id: comm.community_id, evidence: null };
-          }
+      setLoading(false);
+      setEvidenceLoading(true);
+
+      // Preload evidence for ALL communities in parallel batches so full queue displays instantly
+      const evidenceResults = await Promise.allSettled(
+        sorted.map(async (comm) => {
+          const ev = await getCommunityEvidence(comm.community_id);
+          return { id: comm.community_id, evidence: ev };
         })
       );
+
       const nextMap: Record<number, CommunityEvidenceResponse> = {};
-      evidenceResults.forEach(({ id, evidence }) => {
-        if (evidence) nextMap[id] = evidence;
+      evidenceResults.forEach((res) => {
+        if (res.status === 'fulfilled' && res.value.evidence) {
+          nextMap[res.value.id] = res.value.evidence;
+        }
       });
       setEvidenceMap(nextMap);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to TraceLine API');
     } finally {
       setLoading(false);
+      setEvidenceLoading(false);
     }
-  }, [loadCases]);
+  }, [loadCases, summary]);
 
   useEffect(() => {
     loadData();
@@ -226,15 +234,15 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  if (error || !summary) {
+  if (error && !summary) {
     return <ErrorState message={error || undefined} onRetry={loadData} />;
   }
 
   const filterOptions: FilterOption[] = [
     { label: 'All', value: 'ALL', count: communities.length },
-    { label: 'High', value: 'HIGH', count: summary.high_risk_count },
-    { label: 'Medium', value: 'MEDIUM', count: summary.medium_risk_count },
-    { label: 'Low', value: 'LOW', count: summary.low_risk_count },
+    { label: 'High', value: 'HIGH', count: summary?.high_risk_count ?? 0 },
+    { label: 'Medium', value: 'MEDIUM', count: summary?.medium_risk_count ?? 0 },
+    { label: 'Low', value: 'LOW', count: summary?.low_risk_count ?? 0 },
   ];
 
   const columns: Column<CommunitySummary>[] = [
@@ -305,16 +313,29 @@ export const DashboardPage: React.FC = () => {
       width: '140px',
       render: (community) => {
         const evidence = evidenceMap[community.community_id];
-        return evidence ? (
+        if (evidence) {
+          return (
+            <div className="rq-evidence-cell">
+              <strong>{evidence.evidence_score}/100</strong>
+              <span>
+                {evidence.evidence_count} signal{evidence.evidence_count === 1 ? '' : 's'} · {evidence.high_count} high
+              </span>
+            </div>
+          );
+        }
+
+        if (evidenceLoading) {
+          return (
+            <div className="rq-evidence-cell">
+              <span className="rq-subtext">Calculating…</span>
+            </div>
+          );
+        }
+
+        return (
           <div className="rq-evidence-cell">
-            <strong>{evidence.evidence_score}/100</strong>
-            <span>
-              {evidence.evidence_count} signal{evidence.evidence_count === 1 ? '' : 's'} · {evidence.high_count} high
-            </span>
-          </div>
-        ) : (
-          <div className="rq-evidence-cell">
-            <span className="rq-subtext">Calculating...</span>
+            <strong>—</strong>
+            <span className="rq-subtext" title="Evidence score unavailable for this community">Unavailable</span>
           </div>
         );
       },
