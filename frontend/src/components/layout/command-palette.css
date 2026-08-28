@@ -19,7 +19,7 @@
 
 .cmd-modal {
   width: 100%;
-  maxWidth: 640px;
+  max-width: 640px;
   background-color: var(--bg-panel);
   border: 1px solid var(--border-light);
   border-radius: 8px;

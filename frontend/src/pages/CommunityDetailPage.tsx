@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -7,6 +7,7 @@ import {
   Cpu,
   FileText,
   Network,
+  ScanSearch,
   Users,
 } from 'lucide-react';
 import {
@@ -56,8 +57,9 @@ export const CommunityDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'accounts' | 'graph' | 'timeline' | 'features'>('accounts');
   const [isSarModalOpen, setIsSarModalOpen] = useState(false);
 
-  // Evidence focus — drives NetworkGraph node highlighting
+  // Evidence focus & selected node — drives NetworkGraph node highlighting
   const [evidenceFocus, setEvidenceFocus] = useState<EvidenceItem | null>(null);
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
 
   // Member Accounts
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
@@ -79,7 +81,7 @@ export const CommunityDetailPage: React.FC = () => {
 
   // Handle incoming navigation state (e.g. from AccountDetailPage "Explore in Graph")
   useEffect(() => {
-    const state = location.state as { tab?: 'accounts' | 'graph' | 'timeline' | 'features'; evidenceFocus?: EvidenceItem } | null;
+    const state = location.state as { tab?: 'accounts' | 'graph' | 'timeline' | 'features'; evidenceFocus?: EvidenceItem; accountId?: string } | null;
     if (state?.tab) {
       setActiveTab(state.tab);
     }
@@ -88,7 +90,11 @@ export const CommunityDetailPage: React.FC = () => {
       setActiveTab('graph');
       setTimeout(() => {
         document.getElementById('community-workspace-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 120);
+      }, 100);
+    }
+    if (state?.accountId) {
+      setFocusedNodeId(state.accountId);
+      setActiveTab('graph');
     }
   }, [location.state]);
 
@@ -161,15 +167,29 @@ export const CommunityDetailPage: React.FC = () => {
   /**
    * Explores an evidence item in the Cytoscape graph view.
    */
-  const handleExploreInGraph = (item: EvidenceItem) => {
+  const handleExploreInGraph = useCallback((item: EvidenceItem) => {
     setEvidenceFocus(item);
     setActiveTab('graph');
     setTimeout(() => {
       document.getElementById('community-workspace-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
-  };
+  }, []);
 
-  const handleClearFocus = () => setEvidenceFocus(null);
+  /**
+   * Focuses on a specific member account inside the graph.
+   */
+  const handleFocusAccountInGraph = useCallback((accountId: string) => {
+    setFocusedNodeId(accountId);
+    setActiveTab('graph');
+    setTimeout(() => {
+      document.getElementById('community-workspace-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }, []);
+
+  const handleClearFocus = useCallback(() => {
+    setEvidenceFocus(null);
+    setFocusedNodeId(null);
+  }, []);
 
   if (loading) {
     return (
@@ -313,18 +333,29 @@ export const CommunityDetailPage: React.FC = () => {
     {
       key: 'action',
       header: 'Action',
-      width: '140px',
+      width: '240px',
       align: 'right',
       render: (acc) => (
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={ArrowRight}
-          iconPosition="right"
-          onClick={() => navigate(`/accounts/${acc.account_id}`)}
-        >
-          Inspect Profile
-        </Button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={ScanSearch}
+            onClick={() => handleFocusAccountInGraph(acc.account_id)}
+            title="Focus this account in the Network Graph"
+          >
+            Graph
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={ArrowRight}
+            iconPosition="right"
+            onClick={() => navigate(`/accounts/${acc.account_id}`)}
+          >
+            Inspect Profile
+          </Button>
+        </div>
       ),
     },
   ];
@@ -361,7 +392,7 @@ export const CommunityDetailPage: React.FC = () => {
         }
         badge={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Badge variant="neutral">COMMUNITY comm_{community.community_id}</Badge>
+            <Badge variant="neutral">COMMUNITY #{community.community_id}</Badge>
             <RiskBadge level={community.risk_level} size="md" />
           </div>
         }
@@ -558,7 +589,7 @@ export const CommunityDetailPage: React.FC = () => {
             { key: 'features', label: 'Feature Breakdown (21)', icon: Cpu },
           ].map(({ key, label, icon: Icon }) => {
             const isSelected = activeTab === key;
-            const isGraphWithFocus = key === 'graph' && Boolean(evidenceFocus);
+            const isGraphWithFocus = key === 'graph' && Boolean(evidenceFocus || focusedNodeId);
             return (
               <button
                 key={key}
@@ -590,7 +621,7 @@ export const CommunityDetailPage: React.FC = () => {
                       borderRadius: '50%',
                       backgroundColor: 'var(--accent)',
                     }}
-                    title="Evidence focus active"
+                    title="Graph focus active"
                   />
                 )}
               </button>
@@ -637,8 +668,11 @@ export const CommunityDetailPage: React.FC = () => {
             ) : (
               <NetworkGraph
                 graphData={graphData}
-                height="620px"
+                height="640px"
                 evidenceFocus={evidenceFocus}
+                allEvidenceItems={evidence?.items ?? []}
+                communityId={community.community_id}
+                initialSelectedNodeId={focusedNodeId}
                 onClearFocus={handleClearFocus}
               />
             )}
