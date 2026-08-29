@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Activity,
   ArrowLeft,
@@ -51,6 +51,11 @@ import { SarExportModal } from '../components/layout/SarExportModal';
 export const AccountDetailPage: React.FC = () => {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const navState = location.state as { fromForensics?: boolean; communityId?: string } | null;
+  const fromForensics = Boolean(navState?.fromForensics);
+  const forensicCommunityId = navState?.communityId;
 
   const [account, setAccount] = useState<AccountDetailResponse | null>(null);
   const [evidence, setEvidence] = useState<AccountEvidenceResponse | null>(null);
@@ -274,7 +279,7 @@ export const AccountDetailPage: React.FC = () => {
       header: 'Action',
       width: '150px',
       align: 'right',
-      render: (item) => {
+      render: () => {
         if (!hasCommunity) return null;
         return (
           <Button
@@ -282,9 +287,7 @@ export const AccountDetailPage: React.FC = () => {
             size="sm"
             icon={Network}
             onClick={() =>
-              navigate(`/communities/${account.community_id}`, {
-                state: { tab: 'graph', evidenceFocus: item },
-              })
+              navigate(`/forensics?community=${account.community_id}&view=network&focus=${account.account_id}`)
             }
             title="Explore affected nodes in community graph topology"
           >
@@ -514,7 +517,16 @@ export const AccountDetailPage: React.FC = () => {
         description="Investigate observable entity connections, payment velocity, and deterministic network evidence."
         breadcrumbs={
           <button
-            onClick={() => (hasCommunity ? navigate(`/communities/${account.community_id}`) : navigate('/accounts'))}
+            onClick={() => {
+              if (fromForensics && (forensicCommunityId || account.community_id)) {
+                const targetComm = forensicCommunityId || String(account.community_id);
+                navigate(`/forensics?community=${targetComm}&view=accounts`);
+              } else if (hasCommunity) {
+                navigate(`/communities/${account.community_id}`);
+              } else {
+                navigate('/accounts');
+              }
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -531,7 +543,13 @@ export const AccountDetailPage: React.FC = () => {
             onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
             <ArrowLeft size={13} />
-            <span>{hasCommunity ? `Back to Community #${account.community_id}` : 'Back to Accounts'}</span>
+            <span>
+              {fromForensics && (forensicCommunityId || account.community_id)
+                ? `Back to Community #${forensicCommunityId || account.community_id} Forensic Workspace`
+                : hasCommunity
+                ? `Back to Community #${account.community_id}`
+                : 'Back to Accounts'}
+            </span>
           </button>
         }
         badge={
@@ -695,7 +713,7 @@ export const AccountDetailPage: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   icon={Network}
-                  onClick={() => navigate(`/communities/${account.community_id}`, { state: { tab: 'graph' } })}
+                  onClick={() => navigate(`/forensics?community=${account.community_id}&view=network&focus=${account.account_id}`)}
                 >
                   Explore Cluster Topology in Graph
                 </Button>

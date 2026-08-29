@@ -8,6 +8,7 @@ interface EntityRoleMatrixProps {
   graphData: CommunityGraphResponse | null;
   timelineEvents: TimelineEvent[];
   onFocusAccountInGraph: (accountId: string) => void;
+  communityId?: number | string;
 }
 
 interface ClassifiedEntity {
@@ -23,6 +24,7 @@ export const EntityRoleMatrix: React.FC<EntityRoleMatrixProps> = ({
   graphData,
   timelineEvents,
   onFocusAccountInGraph,
+  communityId,
 }) => {
   const navigate = useNavigate();
 
@@ -124,7 +126,15 @@ export const EntityRoleMatrix: React.FC<EntityRoleMatrixProps> = ({
                 variant="secondary"
                 size="sm"
                 icon={ExternalLink}
-                onClick={() => navigate(`/accounts/${ent.id}`)}
+                onClick={() =>
+                  navigate(`/accounts/${ent.id}`, {
+                    state: {
+                      fromForensics: true,
+                      communityId: communityId ? String(communityId) : undefined,
+                      forensicView: 'accounts',
+                    },
+                  })
+                }
               >
                 Profile
               </Button>

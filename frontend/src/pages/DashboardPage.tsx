@@ -368,7 +368,7 @@ export const DashboardPage: React.FC = () => {
             size="sm"
             icon={ArrowRight}
             iconPosition="right"
-            onClick={() => navigate(`/communities/${community.community_id}?tab=overview`)}
+            onClick={() => navigate(`/communities/${community.community_id}`)}
           >
             Review
           </Button>
@@ -636,17 +636,17 @@ export const DashboardPage: React.FC = () => {
                 <div className="rq-decision-actions">
                   <div className="rq-decision-action-item">
                     <div className="rq-decision-desc">
-                      <strong>Inspect Community</strong>
-                      <span>Review full interactive network graph, transaction timeline, and member accounts.</span>
+                      <strong>Community Triage</strong>
+                      <span>Review prioritization signals and open the Forensic Workspace.</span>
                     </div>
                     <Button
                       variant="primary"
                       size="md"
                       icon={ArrowRight}
                       iconPosition="right"
-                      onClick={() => navigate(`/communities/${selectedCommunity.community_id}?tab=overview`)}
+                      onClick={() => navigate(`/communities/${selectedCommunity.community_id}`)}
                     >
-                      Inspect Community
+                      Open Triage
                     </Button>
                   </div>
 

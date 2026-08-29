@@ -28,7 +28,8 @@ import type { FilterOption } from '../components/common';
 // This is the investigation entry point, NOT a duplicate of the Risk Queue.
 // Risk Queue = triage/detection desk.
 // Communities = investigation target selection.
-// /communities/:id = deep investigation workspace.
+// /communities/:id = Community Triage brief.
+// /forensics?community=:id = deep investigation workspace.
 // ---------------------------------------------------------------------------
 
 export const CommunitiesPage: React.FC = () => {
@@ -182,7 +183,7 @@ export const CommunitiesPage: React.FC = () => {
         }}
       >
         <strong style={{ color: 'var(--text-secondary)' }}>Investigation Entry Point:</strong>{' '}
-        Select a community to open its full investigation workspace — Overview, Evidence, Network Graph, Members, Timeline, and Feature Breakdown.
+        Select a detected community partition to review its triage brief and enter the Forensic Workspace.
         Use the{' '}
         <a
           onClick={() => navigate('/')}
@@ -234,7 +235,7 @@ export const CommunitiesPage: React.FC = () => {
                   cursor: 'pointer',
                   transition: 'border-color 0.15s ease, background-color 0.15s ease',
                 }}
-                onClick={() => navigate(`/communities/${comm.community_id}?tab=overview`)}
+                onClick={() => navigate(`/communities/${comm.community_id}`)}
                 onMouseOver={(e) => {
                   e.currentTarget.style.borderColor = comm.risk_level === 'HIGH' ? 'rgba(244, 63, 94, 0.5)' : 'var(--border-light)';
                   e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
@@ -353,7 +354,7 @@ export const CommunitiesPage: React.FC = () => {
                     size="sm"
                     icon={ScanSearch}
                     iconPosition="right"
-                    onClick={() => navigate(`/communities/${comm.community_id}?tab=overview`)}
+                    onClick={() => navigate(`/communities/${comm.community_id}`)}
                   >
                     Investigate
                   </Button>

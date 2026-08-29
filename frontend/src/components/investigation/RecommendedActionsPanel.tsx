@@ -37,7 +37,16 @@ export const RecommendedActionsPanel: React.FC<RecommendedActionsPanelProps> = (
       reason: `Account exhibits the highest degree connectivity (${hubNode?.degree || 0} links) within this partition cluster.`,
       icon: UserCheck,
       actionLabel: 'Inspect Profile',
-      onClick: () => (hubNode ? navigate(`/accounts/${hubNode.id}`) : null),
+      onClick: () =>
+        hubNode
+          ? navigate(`/accounts/${hubNode.id}`, {
+              state: {
+                fromForensics: true,
+                communityId: String(community.community_id),
+                forensicView: 'evidence',
+              },
+            })
+          : null,
     },
     {
       id: 'trace_flow',

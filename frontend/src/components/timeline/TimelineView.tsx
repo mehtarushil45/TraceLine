@@ -6,9 +6,10 @@ import type { TimelineEvent, EvidenceItem } from '../../types/api';
 interface TimelineViewProps {
   events: TimelineEvent[];
   evidenceFocus?: EvidenceItem | null;
+  communityId?: number | string;
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ events, evidenceFocus = null }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({ events, evidenceFocus = null, communityId }) => {
   const navigate = useNavigate();
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DECLINED' | 'SETTLED'>('ALL');
@@ -141,7 +142,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ events, evidenceFocu
             return (
               <div
                 key={evt.transaction_id}
-                onClick={() => navigate(`/transactions/${evt.transaction_id}`)}
+                onClick={() =>
+                  navigate(`/transactions/${evt.transaction_id}`, {
+                    state: {
+                      fromForensics: true,
+                      communityId: communityId ? String(communityId) : undefined,
+                      forensicView: 'timeline',
+                    },
+                  })
+                }
                 style={{
                   display: 'flex',
                   alignItems: 'center',

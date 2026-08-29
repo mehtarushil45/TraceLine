@@ -180,7 +180,13 @@ export const ForensicWorkspacePage: React.FC = () => {
   const accountColumns: Column<AccountSummary>[] = [
     {
       key: 'account_id', header: 'Account', width: '160px',
-      render: (acc) => <EntityLink type="account" id={acc.account_id} />,
+      render: (acc) => (
+        <EntityLink
+          type="account"
+          id={acc.account_id}
+          state={{ fromForensics: true, communityId: communityParam, forensicView: 'accounts' }}
+        />
+      ),
     },
     {
       key: 'customer_name', header: 'Customer',
@@ -209,7 +215,17 @@ export const ForensicWorkspacePage: React.FC = () => {
       render: (acc) => (
         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
           <Button variant="secondary" size="sm" onClick={() => handleFocusInNetwork(acc.account_id)}>Graph</Button>
-          <Button variant="secondary" size="sm" onClick={() => navigate('/accounts/' + acc.account_id)}>Profile</Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              navigate('/accounts/' + acc.account_id, {
+                state: { fromForensics: true, communityId: communityParam },
+              })
+            }
+          >
+            Profile
+          </Button>
         </div>
       ),
     },
@@ -304,7 +320,7 @@ export const ForensicWorkspacePage: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)', gap: '16px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           <button
-            onClick={() => navigate('/communities/' + communityParam + '?tab=overview')}
+            onClick={() => navigate('/communities/' + communityParam)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
             onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
             onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
@@ -418,6 +434,7 @@ export const ForensicWorkspacePage: React.FC = () => {
               graphData={graphData}
               timelineEvents={timelineEvents}
               onFocusAccountInGraph={handleFocusInNetwork}
+              communityId={community.community_id}
             />
           )}
           <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -459,7 +476,7 @@ export const ForensicWorkspacePage: React.FC = () => {
             ? <LoadingState type="table" count={8} />
             : timelineEvents.length === 0
               ? <EmptyState title="No timeline events" message="No transaction events found for this community." />
-              : <TimelineView events={timelineEvents} evidenceFocus={evidenceFocus} />
+              : <TimelineView events={timelineEvents} evidenceFocus={evidenceFocus} communityId={community.community_id} />
           }
         </div>
       )}

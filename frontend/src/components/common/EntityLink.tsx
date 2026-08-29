@@ -7,6 +7,7 @@ interface EntityLinkProps {
   label?: string;
   className?: string;
   style?: React.CSSProperties;
+  state?: unknown;
 }
 
 export const EntityLink: React.FC<EntityLinkProps> = ({
@@ -15,6 +16,7 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
   label,
   className = '',
   style = {},
+  state,
 }) => {
   const getPath = () => {
     switch (type) {
@@ -37,6 +39,7 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
   return (
     <Link
       to={getPath()}
+      state={state}
       className={`font-mono ${className}`}
       style={{
         color: 'var(--text-primary)',

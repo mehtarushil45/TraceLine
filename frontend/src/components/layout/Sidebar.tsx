@@ -73,6 +73,12 @@ export const Sidebar: React.FC = () => {
       match: ['/communities'],
     },
     {
+      label: 'Forensic Workspace',
+      path: '/forensics',
+      icon: FlaskConical,
+      match: ['/forensics'],
+    },
+    {
       label: 'Accounts',
       path: '/accounts',
       icon: Users,
@@ -90,12 +96,6 @@ export const Sidebar: React.FC = () => {
       icon: Briefcase,
       match: ['/investigations'],
       badge: openCasesCount > 0 ? openCasesCount.toString() : undefined,
-    },
-    {
-      label: 'Forensic Workspace',
-      path: '/forensics',
-      icon: FlaskConical,
-      match: ['/forensics'],
     },
   ];
 

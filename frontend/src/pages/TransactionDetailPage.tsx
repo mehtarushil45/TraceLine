@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
@@ -46,6 +46,12 @@ import { SarExportModal } from '../components/layout/SarExportModal';
 export const TransactionDetailPage: React.FC = () => {
   const { transactionId } = useParams<{ transactionId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const navState = location.state as { fromForensics?: boolean; communityId?: string; forensicView?: string } | null;
+  const fromForensics = Boolean(navState?.fromForensics);
+  const forensicCommunityId = navState?.communityId;
+  const forensicView = navState?.forensicView || 'timeline';
 
   const [tx, setTx] = useState<TransactionDetailResponse | null>(null);
   const [srcAccount, setSrcAccount] = useState<AccountDetailResponse | null>(null);
@@ -236,7 +242,7 @@ export const TransactionDetailPage: React.FC = () => {
       header: 'Action',
       width: '160px',
       align: 'right',
-      render: (item) => {
+      render: () => {
         if (!srcAccount?.community_id) return null;
         return (
           <Button
@@ -244,9 +250,7 @@ export const TransactionDetailPage: React.FC = () => {
             size="sm"
             icon={Network}
             onClick={() =>
-              navigate(`/communities/${srcAccount.community_id}`, {
-                state: { tab: 'graph', evidenceFocus: item },
-              })
+              navigate(`/forensics?community=${srcAccount.community_id}&view=network`)
             }
             title="Explore affected nodes in community topology"
           >
@@ -345,7 +349,16 @@ export const TransactionDetailPage: React.FC = () => {
         description="Forensic investigation of payment flow, digital fingerprints, and counterparty relationships."
         breadcrumbs={
           <button
-            onClick={() => (srcAccount ? navigate(`/accounts/${tx.src_account_id}`) : navigate('/transactions'))}
+            onClick={() => {
+              if (fromForensics && (forensicCommunityId || srcAccount?.community_id)) {
+                const targetComm = forensicCommunityId || String(srcAccount?.community_id);
+                navigate(`/forensics?community=${targetComm}&view=${forensicView}`);
+              } else if (srcAccount) {
+                navigate(`/accounts/${tx.src_account_id}`);
+              } else {
+                navigate('/transactions');
+              }
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -362,7 +375,13 @@ export const TransactionDetailPage: React.FC = () => {
             onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
             <ArrowLeft size={13} />
-            <span>{srcAccount ? `Back to Account ${tx.src_account_id}` : 'Back to Transactions'}</span>
+            <span>
+              {fromForensics && (forensicCommunityId || srcAccount?.community_id)
+                ? `Back to Community #${forensicCommunityId || srcAccount?.community_id} Forensic Workspace`
+                : srcAccount
+                ? `Back to Account ${tx.src_account_id}`
+                : 'Back to Transactions'}
+            </span>
           </button>
         }
         badge={

@@ -39,11 +39,11 @@ export const InvestigationCommandBar: React.FC<InvestigationCommandBarProps> = (
         <button
           type="button"
           className="inv-command-back"
-          onClick={() => navigate('/')}
-          title="Return to Risk Queue"
+          onClick={() => navigate('/investigations')}
+          title="Return to Cases Directory"
         >
           <ArrowLeft size={13} />
-          <span>Risk Queue</span>
+          <span>Cases</span>
         </button>
 
         <span style={{ color: 'var(--border)' }}>|</span>

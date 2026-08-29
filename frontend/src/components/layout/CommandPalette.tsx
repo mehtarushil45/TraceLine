@@ -113,7 +113,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         type: 'COMMUNITY',
         title: `Community #${c.community_id}`,
         subtitle: `${c.member_count} member accounts · ML Risk ${c.risk_score.toFixed(0)}/100`,
-        path: `/communities/${c.community_id}?tab=overview`,
+        path: `/communities/${c.community_id}`,
         badge: c.risk_level,
         badgeVariant: c.risk_level === 'HIGH' ? 'high' : c.risk_level === 'MEDIUM' ? 'med' : 'low',
       }));
@@ -133,22 +133,22 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
           id: 'nav-risk-queue',
           type: 'NAVIGATION',
           title: 'Risk Queue (Triage Desk)',
-          subtitle: 'Prioritized graph clusters awaiting investigator review — full community directory',
+          subtitle: 'ML-prioritized community clusters awaiting investigator review',
           path: '/',
         },
         {
           id: 'nav-communities',
           type: 'NAVIGATION',
-          title: 'Community Intelligence',
-          subtitle: 'Browse all detected community partitions and select an investigation target',
+          title: 'Communities Directory',
+          subtitle: 'Browse detected community partitions and select an investigation target',
           path: '/communities',
         },
         {
-          id: 'nav-cases',
+          id: 'nav-forensics',
           type: 'NAVIGATION',
-          title: 'Investigation Cases',
-          subtitle: 'Forensic dossiers, active investigations, and SAR exports',
-          path: '/investigations',
+          title: 'Forensic Workspace',
+          subtitle: 'Deep evidence convergence, graph topology, timeline, and hypothesis testing cockpit',
+          path: '/forensics',
         },
         {
           id: 'nav-accounts',
@@ -160,9 +160,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         {
           id: 'nav-transactions',
           type: 'NAVIGATION',
-          title: 'Transaction Registry',
+          title: 'Transactions Registry',
           subtitle: 'Search individual money transfers and merchant flows',
           path: '/transactions',
+        },
+        {
+          id: 'nav-cases',
+          type: 'NAVIGATION',
+          title: 'Cases & Dossiers',
+          subtitle: 'Formal investigation dossiers, active case tracking, and SAR exports',
+          path: '/investigations',
         },
       ];
 
@@ -198,7 +205,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         type: 'COMMUNITY',
         title: `Community #${c.community_id}`,
         subtitle: `${c.member_count} member accounts · ML Risk ${c.risk_score.toFixed(0)}/100 · ${c.top_signal_1 || 'Graph anomaly'}`,
-        path: `/communities/${c.community_id}?tab=overview`,
+        path: `/communities/${c.community_id}`,
         badge: c.risk_level,
         badgeVariant: c.risk_level === 'HIGH' ? 'high' : c.risk_level === 'MEDIUM' ? 'med' : 'low',
       }));
