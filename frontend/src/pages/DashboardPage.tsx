@@ -688,6 +688,7 @@ export const DashboardPage: React.FC = () => {
       </section>
 
       {/* 2. Full Investigation Queue (Below Workspace: Complete Directory) */}
+      <div id="full-investigation-queue" style={{ scrollMarginTop: '60px' }}>
       <Panel padding="none" className="rq-table-panel">
         <div className="rq-queue-toolbar">
           <div>
@@ -721,6 +722,7 @@ export const DashboardPage: React.FC = () => {
           emptyMessage="No communities match the active search or filter controls."
         />
       </Panel>
+      </div>
     </main>
   );
 };

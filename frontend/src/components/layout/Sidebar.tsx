@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Activity,
   Briefcase,
+  FlaskConical,
   Layers,
   Shield,
   ShieldAlert,
@@ -90,6 +91,12 @@ export const Sidebar: React.FC = () => {
       match: ['/investigations'],
       badge: openCasesCount > 0 ? openCasesCount.toString() : undefined,
     },
+    {
+      label: 'Forensic Workspace',
+      path: '/forensics',
+      icon: FlaskConical,
+      match: ['/forensics'],
+    },
   ];
 
   const isItemActive = (item: NavItem) => {
@@ -158,6 +165,7 @@ export const Sidebar: React.FC = () => {
         {navItems.map((item) => {
           const active = isItemActive(item);
           const Icon = item.icon;
+
           return (
             <Link
               key={item.path}

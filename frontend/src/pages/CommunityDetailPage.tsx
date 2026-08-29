@@ -47,10 +47,7 @@ import { NetworkGraph } from '../components/graph/NetworkGraph';
 import { FeatureBreakdown } from '../components/community/FeatureBreakdown';
 import { TimelineView } from '../components/timeline/TimelineView';
 import { SarExportModal } from '../components/layout/SarExportModal';
-import { EvidenceConvergencePanel } from '../components/investigation/EvidenceConvergencePanel';
-import { FraudStoryTimeline } from '../components/investigation/FraudStoryTimeline';
-import { HypothesisEnginePanel } from '../components/investigation/HypothesisEnginePanel';
-import { RecommendedActionsPanel } from '../components/investigation/RecommendedActionsPanel';
+
 
 // ---------------------------------------------------------------------------
 // Tab key type & normalizer — avoids unsafe arbitrary string casting
@@ -593,123 +590,53 @@ export const CommunityDetailPage: React.FC = () => {
       {/* ------------------------------------------------------------------ */}
       {/* TAB CONTENT                                                         */}
       {/* ------------------------------------------------------------------ */}
-
-      {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Investigation Context Metrics */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* ZONE 1 — COMMUNITY SCORECARD */}
           <Panel padding="md">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-              <Metric
-                label="ML Risk Score"
-                value={
-                  <RiskScore
-                    score={community.risk_score}
-                    level={community.risk_level}
-                    size="md"
-                    showBar={true}
-                  />
-                }
-                subtext="Prioritized risk tier"
-              />
-              <Metric
-                label="Evidence Strength"
-                value={`${evidence?.evidence_score ?? '—'}/100`}
-                subtext={`${evidence?.evidence_count ?? 0} active triggers (${evidence?.high_count ?? 0} High)`}
-                variant={evidence && evidence.evidence_score >= 70 ? 'high' : 'default'}
-              />
-              <Metric
-                label="Member Accounts"
-                value={community.member_count.toLocaleString()}
-                subtext="Partition node count"
-              />
-              <Metric
-                label="Transaction Volume"
-                value={`$${community.transaction_statistics.total_transaction_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-                subtext={`${community.transaction_statistics.tx_per_member.toFixed(1)} tx / account`}
-              />
-              <Metric
-                label="Network Density"
-                value={community.density.toFixed(4)}
-                subtext={`${community.internal_edge_count.toLocaleString()} internal edges`}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
+              <Metric label="ML Risk Score" value={<RiskScore score={community.risk_score} level={community.risk_level} size="md" showBar />} subtext="Prioritized risk tier" />
+              <Metric label="Evidence Strength" value={`${evidence?.evidence_score ?? '—'}/100`} subtext={`${evidence?.evidence_count ?? 0} triggers · ${evidence?.high_count ?? 0} High`} variant={evidence && evidence.evidence_score >= 70 ? 'high' : 'default'} />
+              <Metric label="Member Accounts" value={community.member_count.toLocaleString()} subtext="Partition node count" />
+              <Metric label="Transaction Volume" value={`$${community.transaction_statistics.total_transaction_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} subtext={`${community.transaction_statistics.tx_per_member.toFixed(1)} tx / account`} />
+              <Metric label="Network Density" value={community.density.toFixed(4)} subtext={`${community.internal_edge_count.toLocaleString()} internal edges`} />
             </div>
           </Panel>
 
-          {/* Why This Community Is Prioritized */}
-          <Panel
-            title="Why this community is prioritized"
-            subtitle="Ensemble model prioritization corroborated by observable evidence engine rules."
-            padding="lg"
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-              {/* Model Prioritization */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)' }}>
-                  Model Prioritization
-                </span>
+          {/* ZONE 2 — WHY THIS COMMUNITY IS PRIORITIZED */}
+          <Panel title="Why this community is prioritized" subtitle="Ensemble model signal vs. deterministic evidence engine." padding="lg">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)' }}>Model Prioritization</span>
                 <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>
-                  Assigned an ML risk score of{' '}
-                  <strong style={{ color: community.risk_level === 'HIGH' ? 'var(--risk-high)' : 'var(--text-primary)' }}>
-                    {community.risk_score}/100 ({community.risk_level})
-                  </strong>{' '}
-                  derived from 21 graph-topological and payment-velocity features.
+                  ML risk score of <strong style={{ color: community.risk_level === 'HIGH' ? 'var(--risk-high)' : 'var(--text-primary)' }}>{community.risk_score}/100 ({community.risk_level})</strong> derived from 21 graph-topological and payment-velocity features.
                 </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Top Risk Signals:</span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {[community.top_signal_1, community.top_signal_2, community.top_signal_3]
-                      .filter(Boolean)
-                      .map((sig, idx) => (
-                        <Badge key={idx} variant="neutral" size="sm">
-                          {sig}
-                        </Badge>
-                      ))}
-                  </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                  {[community.top_signal_1, community.top_signal_2, community.top_signal_3].filter(Boolean).map((sig, i) => (
+                    <Badge key={i} variant="neutral" size="sm">{sig}</Badge>
+                  ))}
                 </div>
-
-                <div style={{ marginTop: '8px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-dim)' }}>Declined Rate: </span>
-                    <span className="font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                      {((community.transaction_statistics.declined_rate || 0) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-dim)' }}>Mean Edge Weight: </span>
-                    <span className="font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                      {community.mean_edge_weight?.toFixed(2) || '—'}
-                    </span>
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', marginTop: '6px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                  <div><span style={{ color: 'var(--text-dim)' }}>Declined Rate: </span><span className="font-mono" style={{ fontWeight: 600 }}>{((community.transaction_statistics.declined_rate || 0) * 100).toFixed(1)}%</span></div>
+                  <div><span style={{ color: 'var(--text-dim)' }}>Mean Edge Wt: </span><span className="font-mono" style={{ fontWeight: 600 }}>{community.mean_edge_weight?.toFixed(2) || '—'}</span></div>
                 </div>
               </div>
-
-              {/* Observable Evidence Engine */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: '1px solid var(--border)', paddingLeft: '24px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)' }}>
-                  Observable Evidence Engine
-                </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '1px solid var(--border)', paddingLeft: '24px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)' }}>Observable Evidence</span>
                 <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>
-                  Deterministic evidence analysis identified{' '}
-                  <strong style={{ color: 'var(--accent)' }}>
-                    {evidence?.evidence_count ?? 0} active rule triggers
-                  </strong>{' '}
-                  ({evidence?.high_count ?? 0} High, {evidence?.medium_count ?? 0} Medium, {evidence?.low_count ?? 0} Low).
+                  <strong style={{ color: 'var(--accent)' }}>{evidence?.evidence_count ?? 0} rule triggers</strong> ({evidence?.high_count ?? 0} High, {evidence?.medium_count ?? 0} Medium, {evidence?.low_count ?? 0} Low).
                 </p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
                   {[
-                    { label: 'Shared Devices',      value: community.entity_sharing.unique_shared_devices      },
-                    { label: 'Shared Instruments',  value: community.entity_sharing.unique_shared_instruments  },
-                    { label: 'Shared IPs',          value: community.entity_sharing.unique_shared_ips          },
-                    { label: 'Temporal Score',      value: community.temporal_statistics.temporal_compression_score.toFixed(2) },
+                    { label: 'Shared Devices', value: community.entity_sharing.unique_shared_devices },
+                    { label: 'Shared Instruments', value: community.entity_sharing.unique_shared_instruments },
+                    { label: 'Shared IPs', value: community.entity_sharing.unique_shared_ips },
+                    { label: 'Temporal Score', value: community.temporal_statistics.temporal_compression_score.toFixed(2) },
                   ].map(({ label, value }) => (
                     <div key={label} style={{ padding: '8px 10px', borderRadius: '4px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block' }}>{label}</span>
-                      <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {value}
-                      </span>
+                      <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -717,47 +644,93 @@ export const CommunityDetailPage: React.FC = () => {
             </div>
           </Panel>
 
-          {/* Quick action strip */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Button variant="secondary" size="md" icon={ScanSearch} onClick={() => setActiveTab('evidence')}>
-              Review Evidence ({evidence?.evidence_count ?? 0} signals)
-            </Button>
-            <Button variant="secondary" size="md" icon={Network} onClick={() => setActiveTab('graph')}>
-              Open Network Graph
-            </Button>
-          </div>
+          {/* ZONE 3 — INVESTIGATION SUMMARY (compact signal cards) */}
+          <Panel title="Investigation Summary" subtitle="Key signals driving this investigation. Click any card to investigate further." padding="md">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+              {/* Strongest evidence family */}
+              <div
+                onClick={() => navigate(`/forensics?community=${communityId}&view=evidence`)}
+                style={{ padding: '14px 16px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '8px', transition: 'border-color 0.12s ease' }}
+                onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--accent)' }}>EVIDENCE</span>
+                  {evidence?.high_count != null && evidence.high_count > 0 && <Badge variant="high" size="sm">{evidence.high_count} High</Badge>}
+                </div>
+                <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{evidence?.items[0]?.title ?? 'No triggers detected'}</strong>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {evidence?.evidence_count ?? 0} total rules triggered across {evidence?.items[0]?.supporting_entities?.length ?? 0} entities.
+                </p>
+                <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>Investigate Evidence →</span>
+              </div>
 
-          {/* ── EVIDENCE CONVERGENCE ─────────────────────────────────────── */}
-          <EvidenceConvergencePanel
-            evidence={evidence}
-            onSelectEvidence={handleExploreInGraph}
-          />
+              {/* Network / topology signal */}
+              <div
+                onClick={() => navigate(`/forensics?community=${communityId}&view=network`)}
+                style={{ padding: '14px 16px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '8px', transition: 'border-color 0.12s ease' }}
+                onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--accent)' }}>NETWORK</span>
+                </div>
+                <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Topology & Hub Connectivity</strong>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {community.internal_edge_count.toLocaleString()} internal edges · density {(community.density * 100).toFixed(2)}% · {community.member_count} members.
+                </p>
+                <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>Investigate Network →</span>
+              </div>
 
-          {/* ── FRAUD STORYLINE ──────────────────────────────────────────── */}
-          <FraudStoryTimeline
-            community={community}
-            evidence={evidence}
-            timelineEvents={timelineEvents}
-            accounts={accounts}
-            onSelectEvidence={handleExploreInGraph}
-          />
+              {/* Hypothesis / skepticism signal */}
+              <div
+                onClick={() => navigate(`/forensics?community=${communityId}&view=hypotheses`)}
+                style={{ padding: '14px 16px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-light)', borderLeft: '3px solid var(--risk-med)', borderRadius: '6px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '8px', transition: 'border-color 0.12s ease' }}
+                onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border-light)')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--risk-med)' }}>SKEPTICISM</span>
+                  <Badge variant="neutral" size="sm">Anti-Bias</Badge>
+                </div>
+                <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Competing Hypothesis: Shared Corporate Network</strong>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  Shared IP subnet ({community.entity_sharing.unique_shared_ips} IPs) may reflect a public proxy. Verify before filing SAR.
+                </p>
+                <span style={{ fontSize: '11px', color: 'var(--risk-med)', fontWeight: 600 }}>Challenge Hypothesis →</span>
+              </div>
+            </div>
+          </Panel>
 
-          {/* ── HYPOTHESIS ENGINE ────────────────────────────────────────── */}
-          <HypothesisEnginePanel
-            community={community}
-            evidence={evidence}
-          />
-
-          {/* ── RECOMMENDED NEXT ACTIONS ─────────────────────────────────── */}
-          <RecommendedActionsPanel
-            community={community}
-            evidence={evidence}
-            graphData={graphData}
-            onFocusAccountInGraph={handleFocusAccountInGraph}
-            onScrollToFlow={() => setActiveTab('timeline')}
-          />
+          {/* ZONE 4 — OPEN FORENSIC WORKSPACE (top-level /forensics route) */}
+          <Panel title="Open Forensic Workspace" subtitle="Launch the dedicated forensic investigation workspace for this community." padding="md">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              <Button variant="primary" size="md" icon={ScanSearch} onClick={() => navigate(`/forensics?community=${communityId}&view=evidence`)}>
+                Open Forensic Workspace
+              </Button>
+              <Button variant="secondary" size="md" icon={Network} onClick={() => navigate(`/forensics?community=${communityId}&view=network`)}>
+                Investigate Network
+              </Button>
+              <Button variant="secondary" size="md" icon={ArrowRight} iconPosition="right" onClick={() => navigate(`/forensics?community=${communityId}&view=accounts`)}>
+                Inspect Accounts
+              </Button>
+              <Button variant="secondary" size="md" onClick={() => navigate(`/forensics?community=${communityId}&view=money-flow`)}>
+                Trace Money Flow
+              </Button>
+              <Button variant="secondary" size="md" onClick={() => navigate(`/forensics?community=${communityId}&view=story`)}>
+                Review Storyline
+              </Button>
+              <Button variant="secondary" size="md" onClick={() => navigate(`/forensics?community=${communityId}&view=hypotheses`)}>
+                Challenge Hypothesis
+              </Button>
+              <Button variant="secondary" size="md" onClick={() => navigate(`/forensics?community=${communityId}&view=decision`)}>
+                Case Decision
+              </Button>
+            </div>
+          </Panel>
         </div>
       )}
+
 
       {/* ── EVIDENCE ─────────────────────────────────────────────────────── */}
       {activeTab === 'evidence' && (
