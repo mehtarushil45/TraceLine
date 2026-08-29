@@ -91,27 +91,35 @@ export const DashboardPage: React.FC = () => {
       setLoading(false);
       setEvidenceLoading(true);
 
-      // Preload evidence for ALL communities in parallel batches so full queue displays instantly
-      const evidenceResults = await Promise.allSettled(
-        sorted.map(async (comm) => {
+      // Progressive hydration: update evidenceMap per-community as each request resolves.
+      // Do NOT wait for all 59 — each community row updates the moment its own data arrives.
+      let remaining = sorted.length;
+      sorted.forEach(async (comm) => {
+        try {
           const ev = await getCommunityEvidence(comm.community_id);
-          return { id: comm.community_id, evidence: ev };
-        })
-      );
-
-      const nextMap: Record<number, CommunityEvidenceResponse> = {};
-      evidenceResults.forEach((res) => {
-        if (res.status === 'fulfilled' && res.value.evidence) {
-          nextMap[res.value.id] = res.value.evidence;
+          if (ev) {
+            setEvidenceMap((prev) => ({ ...prev, [comm.community_id]: ev }));
+          }
+        } catch {
+          // Non-blocking: this community stays in "unavailable" state
+        } finally {
+          remaining -= 1;
+          if (remaining === 0) {
+            setEvidenceLoading(false);
+          }
         }
       });
-      setEvidenceMap(nextMap);
+
+      // Safety: if sorted is empty, clear the loading state immediately
+      if (sorted.length === 0) {
+        setEvidenceLoading(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to TraceLine API');
     } finally {
       setLoading(false);
-      setEvidenceLoading(false);
     }
+
   }, [loadCases, summary]);
 
   useEffect(() => {
@@ -360,10 +368,7 @@ export const DashboardPage: React.FC = () => {
             size="sm"
             icon={ArrowRight}
             iconPosition="right"
-            onClick={() => {
-              setSelectedId(community.community_id);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onClick={() => navigate(`/communities/${community.community_id}?tab=overview`)}
           >
             Review
           </Button>
@@ -639,7 +644,7 @@ export const DashboardPage: React.FC = () => {
                       size="md"
                       icon={ArrowRight}
                       iconPosition="right"
-                      onClick={() => navigate(`/communities/${selectedCommunity.community_id}`)}
+                      onClick={() => navigate(`/communities/${selectedCommunity.community_id}?tab=overview`)}
                     >
                       Inspect Community
                     </Button>

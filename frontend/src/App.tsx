@@ -20,7 +20,7 @@ export const App: React.FC = () => {
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<Navigate to="/" replace />} />
 
-          {/* Communities Registry & Deep Investigation */}
+          {/* Page 2: Community Intelligence — browse and select investigation targets */}
           <Route path="communities" element={<CommunitiesPage />} />
           <Route path="communities/:communityId" element={<CommunityDetailPage />} />
 

@@ -113,7 +113,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         type: 'COMMUNITY',
         title: `Community #${c.community_id}`,
         subtitle: `${c.member_count} member accounts · ML Risk ${c.risk_score.toFixed(0)}/100`,
-        path: `/communities/${c.community_id}`,
+        path: `/communities/${c.community_id}?tab=overview`,
         badge: c.risk_level,
         badgeVariant: c.risk_level === 'HIGH' ? 'high' : c.risk_level === 'MEDIUM' ? 'med' : 'low',
       }));
@@ -133,14 +133,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
           id: 'nav-risk-queue',
           type: 'NAVIGATION',
           title: 'Risk Queue (Triage Desk)',
-          subtitle: 'Prioritized graph clusters awaiting investigator review',
+          subtitle: 'Prioritized graph clusters awaiting investigator review — full community directory',
           path: '/',
         },
         {
           id: 'nav-communities',
           type: 'NAVIGATION',
-          title: 'Community Registry',
-          subtitle: 'Louvain graph partition clusters across payment network',
+          title: 'Community Intelligence',
+          subtitle: 'Browse all detected community partitions and select an investigation target',
           path: '/communities',
         },
         {
@@ -198,7 +198,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         type: 'COMMUNITY',
         title: `Community #${c.community_id}`,
         subtitle: `${c.member_count} member accounts · ML Risk ${c.risk_score.toFixed(0)}/100 · ${c.top_signal_1 || 'Graph anomaly'}`,
-        path: `/communities/${c.community_id}`,
+        path: `/communities/${c.community_id}?tab=overview`,
         badge: c.risk_level,
         badgeVariant: c.risk_level === 'HIGH' ? 'high' : c.risk_level === 'MEDIUM' ? 'med' : 'low',
       }));
