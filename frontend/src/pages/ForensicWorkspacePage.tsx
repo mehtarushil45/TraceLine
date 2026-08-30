@@ -526,8 +526,8 @@ export const ForensicWorkspacePage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
               {[
                 { label: 'Evidence Triggers',     value: String(evidence?.evidence_count ?? '—'),   sub: (evidence?.high_count ?? 0) + ' High severity' },
-                { label: 'Shared Identifiers',    value: String(community.entity_sharing.unique_shared_devices + community.entity_sharing.unique_shared_ips + community.entity_sharing.unique_shared_instruments), sub: 'devices + IPs + instruments' },
-                { label: 'Transaction Volume',    value: '$' + community.transaction_statistics.total_transaction_amount.toLocaleString(undefined, { maximumFractionDigits: 0 }), sub: 'observed movement' },
+                { label: 'Shared Identifiers',    value: String((community.entity_sharing?.unique_shared_devices || 0) + (community.entity_sharing?.unique_shared_ips || 0) + (community.entity_sharing?.unique_shared_instruments || 0)), sub: 'devices + IPs + instruments' },
+                { label: 'Transaction Volume',    value: '$' + (community.transaction_statistics?.total_transaction_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }), sub: 'observed movement' },
                 { label: 'Hypotheses Evaluated',  value: '2',                                        sub: 'coordinated vs benign' },
               ].map(({ label, value, sub }) => (
                 <div key={label} style={{ padding: '12px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '5px' }}>

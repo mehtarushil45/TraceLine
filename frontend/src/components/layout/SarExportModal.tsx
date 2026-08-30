@@ -21,7 +21,7 @@ export const SarExportModal: React.FC<SarExportModalProps> = ({ isOpen, onClose 
 
   const openCases = cases.filter((c) => c.status !== 'CLOSED');
 
-  const reportMarkdown = `# RAZORPAY FRAUD INTELLIGENCE | SUSPICIOUS ACTIVITY REPORT (SAR)
+  const reportMarkdown = `# TRACELINE FRAUD INTELLIGENCE | SUSPICIOUS ACTIVITY REPORT (SAR)
 Generated: ${new Date().toLocaleString()}
 System: TraceLine Neural Graph Risk Platform v1.0
 Classification: RESTRICTED // FORENSIC INVESTIGATION DOSSIER
@@ -87,7 +87,7 @@ Analyst Status: SUBMITTED FOR COMPLIANCE & RISK OPERATIONS REVIEW
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Razorpay_SAR_Dossier_${Date.now()}.md`;
+    link.download = `TraceLine_SAR_Dossier_${Date.now()}.md`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -224,7 +224,7 @@ Analyst Status: SUBMITTED FOR COMPLIANCE & RISK OPERATIONS REVIEW
             color: 'var(--text-dim)',
           }}
         >
-          <span>Razorpay Risk Intelligence Compliance Specification // ISO-20022 Aligned</span>
+          <span>TraceLine Risk Intelligence Compliance Specification // ISO-20022 Aligned</span>
           <span className="font-mono text-cyan-400">STATUS: VERIFIED SECURE</span>
         </div>
       </div>

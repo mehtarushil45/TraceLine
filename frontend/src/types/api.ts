@@ -265,8 +265,10 @@ export interface EvidenceItem {
 
 export interface CommunityEvidenceResponse {
   community_id: number;
-  /** Deterministic observable-rule strength [0–100]. NOT the ML risk_score. */
+  /** Deterministic observable-rule strength [0–100], CAPPED. Always saturates at 100 for medium+ communities. */
   evidence_score: number;
+  /** Uncapped total: High×25 + Med×12 + Low×5. Use this to compare evidence load across communities. */
+  raw_evidence_score: number;
   evidence_count: number;
   high_count: number;
   medium_count: number;
@@ -274,6 +276,7 @@ export interface CommunityEvidenceResponse {
   items: EvidenceItem[];
   runtime_ms: number;
 }
+
 
 export interface AccountEvidenceResponse {
   account_id: string;

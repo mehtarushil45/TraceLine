@@ -343,12 +343,17 @@ class CommunityEvidenceResponse(BaseModel):
     """Observable-only evidence analysis result for a community.
 
     evidence_score is DISTINCT from risk_score:
-      risk_score     = ML-derived ensemble prioritization
-      evidence_score = deterministic observable rule strength
+      risk_score          = ML-derived ensemble prioritization (LR model output)
+      evidence_score      = deterministic observable rule strength, capped at 100.
+                            For large communities this always saturates at 100.
+      raw_evidence_score  = uncapped point total before the 100-point cap.
+                            Use this to meaningfully compare evidence load across
+                            communities when evidence_score is saturated.
     """
 
     community_id: int = Field(..., description="Community ID")
-    evidence_score: int = Field(..., description="Aggregate observable-rule evidence strength [0-100]")
+    evidence_score: int = Field(..., description="Aggregate observable-rule evidence strength [0-100] (capped)")
+    raw_evidence_score: int = Field(..., description="Uncapped aggregate rule point total (High×25 + Med×12 + Low×5)")
     evidence_count: int = Field(..., description="Total evidence items found")
     high_count: int = Field(..., description="Number of HIGH severity evidence items")
     medium_count: int = Field(..., description="Number of MEDIUM severity evidence items")

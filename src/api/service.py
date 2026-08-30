@@ -795,9 +795,20 @@ class TraceLineService:
 
         result = engine.get_community_evidence(community_id)
 
+        # Compute uncapped raw score from severity counts.
+        # evidence_score is always capped at 100 (saturated for large communities).
+        # raw_evidence_score preserves the actual rule-weight total for comparison.
+        from src.intelligence.evidence_rules import SCORE_CONTRIBUTION
+        raw_score = int(
+            result.high_count * SCORE_CONTRIBUTION.get("HIGH", 25)
+            + result.medium_count * SCORE_CONTRIBUTION.get("MEDIUM", 12)
+            + result.low_count * SCORE_CONTRIBUTION.get("LOW", 5)
+        )
+
         return CommunityEvidenceResponse(
             community_id=result.community_id,
             evidence_score=result.evidence_score,
+            raw_evidence_score=raw_score,
             evidence_count=result.evidence_count,
             high_count=result.high_count,
             medium_count=result.medium_count,
@@ -820,6 +831,7 @@ class TraceLineService:
                 for item in result.items
             ],
         )
+
 
     def get_account_evidence(self, account_id: str) -> AccountEvidenceResponse | None:
         """Run observable evidence analysis for an account.
