@@ -126,6 +126,59 @@ class CommunityDetailResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class AccountRegistryItem(BaseModel):
+    """Account summary item in the global accounts registry index."""
+
+    account_id: str = Field(..., description="Account identifier")
+    customer_name: str = Field(..., description="Customer name")
+    balance: float = Field(..., description="Current ledger balance")
+    account_risk_score: float | None = Field(None, description="Account baseline risk score [0, 1]")
+    risk_level: str = Field("LOW", description="Derived risk level (HIGH, MEDIUM, LOW)")
+    creation_date: str | None = Field(None, description="Account creation / registration date")
+    community_id: int | None = Field(None, description="Assigned community ID")
+    community_risk_score: int | None = Field(None, description="Assigned community risk score [0-100]")
+    community_risk_level: str | None = Field(None, description="Assigned community risk tier")
+    connected_account_count: int = Field(0, description="Count of connected accounts in graph")
+    tx_count: int = Field(0, description="Total transactions involving this account")
+    tx_volume: float = Field(0.0, description="Total transacted amount (sent + received)")
+    declined_count: int = Field(0, description="Count of declined transactions")
+    decline_rate: float = Field(0.0, description="Fraction of transactions declined")
+
+
+class PaginatedAccountsRegistryResponse(BaseModel):
+    """Paginated global accounts registry."""
+
+    total: int = Field(..., description="Total matching accounts")
+    page: int = Field(..., description="Current page number (1-indexed)")
+    page_size: int = Field(..., description="Items per page")
+    total_pages: int = Field(..., description="Total pages available")
+    items: list[AccountRegistryItem] = Field(..., description="List of account records for current page")
+
+
+class AccountPeerStatsResponse(BaseModel):
+    """Peer comparison metrics for an account against its assigned community peer group."""
+
+    account_id: str = Field(..., description="Target account identifier")
+    community_id: int | None = Field(None, description="Community ID used as peer baseline")
+    peer_count: int = Field(0, description="Total member accounts in peer group")
+    peer_sample_size: int = Field(0, description="Number of peers sampled for baseline calculation")
+    has_peer_data: bool = Field(True, description="Whether sufficient peer data is available")
+
+    # Target account metrics
+    account_tx_count: int = Field(0, description="Account transaction count")
+    account_tx_volume: float = Field(0.0, description="Account total transacted volume")
+    account_decline_rate: float = Field(0.0, description="Account decline rate (0-1)")
+    account_connections: int = Field(0, description="Account graph connection count")
+    account_avg_tx_amount: float = Field(0.0, description="Account average transaction amount")
+
+    # Peer baseline medians
+    peer_median_tx_count: float | None = Field(None, description="Peer median transaction count")
+    peer_median_tx_volume: float | None = Field(None, description="Peer median transaction volume")
+    peer_median_decline_rate: float | None = Field(None, description="Peer median decline rate")
+    peer_median_connections: float | None = Field(None, description="Peer median connection count")
+    peer_median_avg_tx_amount: float | None = Field(None, description="Peer median average transaction amount")
+
+
 class AccountSummary(BaseModel):
     """Account summary item within a community."""
 
@@ -166,12 +219,16 @@ class AccountDetailResponse(BaseModel):
     customer_name: str = Field(..., description="Customer name")
     balance: float = Field(..., description="Current balance")
     account_risk_score: float | None = Field(None, description="Account baseline risk score")
+    risk_level: str = Field("LOW", description="Derived risk level (HIGH, MEDIUM, LOW)")
     creation_date: str | None = Field(None, description="Account creation date")
+    first_observed_activity: str | None = Field(None, description="Earliest observed transaction timestamp")
+    last_observed_activity: str | None = Field(None, description="Latest observed transaction timestamp")
     community_id: int | None = Field(None, description="Assigned community ID")
     community_risk_score: int | None = Field(None, description="Risk score of the assigned community")
     community_risk_level: str | None = Field(None, description="Risk tier of the assigned community")
     connected_account_count: int = Field(..., description="Number of connected accounts in the evidence graph")
     transaction_statistics: AccountTransactionStats = Field(..., description="Transaction metrics for this account")
+
 
 
 class ConnectionItem(BaseModel):

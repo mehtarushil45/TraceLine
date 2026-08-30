@@ -25,6 +25,8 @@ from src.api.schemas import (
     AccountConnectionsResponse,
     AccountDetailResponse,
     AccountEvidenceResponse,
+    AccountPeerStatsResponse,
+    AccountRegistryItem,
     AccountSummary,
     AccountTransactionStats,
     CommunityDetailResponse,
@@ -38,6 +40,7 @@ from src.api.schemas import (
     EvidenceItemSchema,
     GraphEdge,
     GraphNode,
+    PaginatedAccountsRegistryResponse,
     PaginatedAccountsResponse,
     PaginatedTransactionsResponse,
     SummaryResponse,
@@ -107,6 +110,7 @@ class TraceLineService:
         self.account_to_community: dict[str, int] = {}
         self.account_sent_tx_indices: dict[str, list[int]] = {}
         self.account_recv_tx_indices: dict[str, list[int]] = {}
+        self.account_tx_aggregates: dict[str, list[Any]] = {}
         self.tx_id_to_index: dict[str, int] = {}
         self.account_connections_map: dict[str, list[dict[str, Any]]] = {}
         self.community_edges_map: dict[int, list[dict[str, Any]]] = {}
@@ -194,11 +198,33 @@ class TraceLineService:
             src_col = self.transactions_df["src_account_id"].astype(str).values
             dst_col = self.transactions_df["dst_account_id"].astype(str).values
             tx_id_col = self.transactions_df["transaction_id"].astype(str).values
+            amount_col = self.transactions_df["amount"].values
+            status_col = self.transactions_df["transaction_status"].values
 
-            for idx, (src, dst, tx_id) in enumerate(zip(src_col, dst_col, tx_id_col)):
+            for idx, (src, dst, tx_id, amt, st) in enumerate(
+                zip(src_col, dst_col, tx_id_col, amount_col, status_col)
+            ):
                 self.account_sent_tx_indices.setdefault(src, []).append(idx)
                 self.account_recv_tx_indices.setdefault(dst, []).append(idx)
                 self.tx_id_to_index[tx_id] = idx
+
+                is_dec = 1 if st == "declined" else 0
+                if src not in self.account_tx_aggregates:
+                    self.account_tx_aggregates[src] = [0, 0, 0.0, 0.0, 0]
+                s = self.account_tx_aggregates[src]
+                s[0] += 1
+                s[2] += float(amt)
+                if is_dec:
+                    s[4] += 1
+
+                if dst not in self.account_tx_aggregates:
+                    self.account_tx_aggregates[dst] = [0, 0, 0.0, 0.0, 0]
+                r = self.account_tx_aggregates[dst]
+                r[1] += 1
+                r[3] += float(amt)
+                if is_dec:
+                    r[4] += 1
+
 
         # 6. Community edges / connections
         # Try loading precomputed community edges if present
@@ -444,6 +470,170 @@ class TraceLineService:
             items=items,
         )
 
+    def get_accounts_registry(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        community_id: int | None = None,
+        risk_tier: str | None = None,
+        min_risk_score: float | None = None,
+        max_risk_score: float | None = None,
+        search: str | None = None,
+        sort_by: str = "risk_score",
+        sort_order: str = "desc",
+    ) -> PaginatedAccountsRegistryResponse:
+        """Return paginated, filterable, sortable global account registry."""
+        self.load_data()
+
+        if self.accounts_df.empty:
+            return PaginatedAccountsRegistryResponse(
+                total=0, page=page, page_size=page_size, total_pages=1, items=[]
+            )
+
+        # Start with all account IDs
+        account_ids = list(self.accounts_df.index)
+
+        # Filter by search (case-insensitive substring of account_id or customer_name)
+        if search:
+            s_clean = search.strip().lower()
+            filtered_ids = []
+            for aid in account_ids:
+                if s_clean in aid.lower():
+                    filtered_ids.append(aid)
+                else:
+                    cname = str(self.accounts_df.loc[aid, "customer_name"] if aid in self.accounts_df.index else "").lower()
+                    if s_clean in cname:
+                        filtered_ids.append(aid)
+            account_ids = filtered_ids
+
+        # Filter by community_id
+        if community_id is not None:
+            account_ids = [aid for aid in account_ids if self.account_to_community.get(aid) == community_id]
+
+        # Filter by risk_tier (HIGH, MEDIUM, LOW)
+        if risk_tier:
+            tier_upper = risk_tier.strip().upper()
+            filtered_ids = []
+            for aid in account_ids:
+                acc_row = self.accounts_df.loc[aid] if aid in self.accounts_df.index else None
+                rscore = float(acc_row.get("risk_score", 0.0)) if acc_row is not None and pd.notna(acc_row.get("risk_score")) else 0.0
+                if rscore >= 0.60:
+                    tier = "HIGH"
+                elif rscore >= 0.35:
+                    tier = "MEDIUM"
+                else:
+                    tier = "LOW"
+                if tier == tier_upper:
+                    filtered_ids.append(aid)
+            account_ids = filtered_ids
+
+        # Filter by min_risk_score / max_risk_score
+        if min_risk_score is not None or max_risk_score is not None:
+            min_s = min_risk_score if min_risk_score is not None else 0.0
+            max_s = max_risk_score if max_risk_score is not None else 1.0
+            filtered_ids = []
+            for aid in account_ids:
+                acc_row = self.accounts_df.loc[aid] if aid in self.accounts_df.index else None
+                rscore = float(acc_row.get("risk_score", 0.0)) if acc_row is not None and pd.notna(acc_row.get("risk_score")) else 0.0
+                if min_s <= rscore <= max_s:
+                    filtered_ids.append(aid)
+            account_ids = filtered_ids
+
+        # Sorting
+        def get_sort_key(aid: str):
+            acc_row = self.accounts_df.loc[aid] if aid in self.accounts_df.index else None
+            cid = self.account_to_community.get(aid)
+            tx_stat = self.account_tx_aggregates.get(aid, [0, 0, 0.0, 0.0, 0])
+            tot_cnt = tx_stat[0] + tx_stat[1]
+            tot_vol = tx_stat[2] + tx_stat[3]
+            
+            if sort_by == "risk_score":
+                return float(acc_row.get("risk_score", 0.0)) if acc_row is not None and pd.notna(acc_row.get("risk_score")) else 0.0
+            elif sort_by == "community_risk":
+                if cid is not None and cid in self.community_risk_scores_df.index:
+                    return int(self.community_risk_scores_df.loc[cid, "risk_score"])
+                return 0
+            elif sort_by == "tx_count":
+                return tot_cnt
+            elif sort_by == "tx_volume":
+                return tot_vol
+            elif sort_by == "connections":
+                return len(self.account_connections_map.get(aid, []))
+            elif sort_by == "balance":
+                return float(acc_row.get("balance", 0.0)) if acc_row is not None and pd.notna(acc_row.get("balance")) else 0.0
+            elif sort_by == "declined":
+                return tx_stat[4]
+            elif sort_by == "account_id":
+                return aid
+            return float(acc_row.get("risk_score", 0.0)) if acc_row is not None and pd.notna(acc_row.get("risk_score")) else 0.0
+
+        reverse_order = (sort_order.lower() == "desc")
+        account_ids.sort(key=get_sort_key, reverse=reverse_order)
+
+        total = len(account_ids)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, math.ceil(total / page_size))
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        page_slice = account_ids[start_idx:end_idx]
+
+        items: list[AccountRegistryItem] = []
+        for aid in page_slice:
+            acc_row = self.accounts_df.loc[aid] if aid in self.accounts_df.index else None
+            cid = self.account_to_community.get(aid)
+            comm_risk_score = None
+            comm_risk_level = None
+            if cid is not None and cid in self.community_risk_scores_df.index:
+                c_row = self.community_risk_scores_df.loc[cid]
+                comm_risk_score = int(c_row["risk_score"])
+                comm_risk_level = str(c_row["risk_level"])
+
+            tx_stat = self.account_tx_aggregates.get(aid, [0, 0, 0.0, 0.0, 0])
+            tot_cnt = tx_stat[0] + tx_stat[1]
+            tot_vol = round(tx_stat[2] + tx_stat[3], 2)
+            dec_cnt = tx_stat[4]
+            dec_rate = round(dec_cnt / max(1, tot_cnt), 4)
+
+            rscore = _sanitize_float(acc_row.get("risk_score")) if acc_row is not None else None
+            if rscore is not None:
+                if rscore >= 0.60:
+                    rlevel = "HIGH"
+                elif rscore >= 0.35:
+                    rlevel = "MEDIUM"
+                else:
+                    rlevel = "LOW"
+            else:
+                rlevel = "LOW"
+
+            items.append(
+                AccountRegistryItem(
+                    account_id=aid,
+                    customer_name=str(acc_row.get("customer_name", f"Customer {aid}")) if acc_row is not None else f"Customer {aid}",
+                    balance=round(float(acc_row.get("balance", 0.0)), 2) if acc_row is not None else 0.0,
+                    account_risk_score=rscore,
+                    risk_level=rlevel,
+                    creation_date=str(acc_row.get("creation_date", "")) if acc_row is not None and pd.notna(acc_row.get("creation_date")) else None,
+                    community_id=cid,
+                    community_risk_score=comm_risk_score,
+                    community_risk_level=comm_risk_level,
+                    connected_account_count=len(self.account_connections_map.get(aid, [])),
+                    tx_count=tot_cnt,
+                    tx_volume=tot_vol,
+                    declined_count=dec_cnt,
+                    decline_rate=dec_rate,
+                )
+            )
+
+        return PaginatedAccountsRegistryResponse(
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+            items=items,
+        )
+
     def get_account(self, account_id: str) -> AccountDetailResponse | None:
         """Return detail information for an account."""
         self.load_data()
@@ -472,6 +662,15 @@ class TraceLineService:
         total_amount_sent = 0.0
         total_amount_recv = 0.0
         declined_count = 0
+        first_observed = None
+        last_observed = None
+
+        all_indices = sent_indices + recv_indices
+        if all_indices and not self.transactions_df.empty:
+            sub_df = self.transactions_df.iloc[all_indices]
+            ts_series = sub_df["timestamp"]
+            first_observed = str(ts_series.min()) if not ts_series.empty else None
+            last_observed = str(ts_series.max()) if not ts_series.empty else None
 
         if sent_indices and not self.transactions_df.empty:
             sent_df = self.transactions_df.iloc[sent_indices]
@@ -484,13 +683,26 @@ class TraceLineService:
             declined_count += int((recv_df["transaction_status"] == "declined").sum())
 
         conn_count = len(self.account_connections_map.get(account_id, []))
+        rscore = _sanitize_float(acc_row.get("risk_score"))
+        if rscore is not None:
+            if rscore >= 0.60:
+                rlevel = "HIGH"
+            elif rscore >= 0.35:
+                rlevel = "MEDIUM"
+            else:
+                rlevel = "LOW"
+        else:
+            rlevel = "LOW"
 
         return AccountDetailResponse(
             account_id=account_id,
             customer_name=str(acc_row.get("customer_name", "Unknown")),
             balance=round(float(acc_row.get("balance", 0.0)), 2),
-            account_risk_score=_sanitize_float(acc_row.get("risk_score")),
+            account_risk_score=rscore,
+            risk_level=rlevel,
             creation_date=str(acc_row.get("creation_date", "")) if pd.notna(acc_row.get("creation_date")) else None,
+            first_observed_activity=first_observed,
+            last_observed_activity=last_observed,
             community_id=cid,
             community_risk_score=comm_risk_score,
             community_risk_level=comm_risk_level,
@@ -504,6 +716,95 @@ class TraceLineService:
                 declined_count=declined_count,
             ),
         )
+
+    def get_account_peer_stats(self, account_id: str) -> AccountPeerStatsResponse | None:
+        """Return peer comparison statistics against the account's community peer group."""
+        self.load_data()
+
+        if self.accounts_df.empty or account_id not in self.accounts_df.index:
+            return None
+
+        import numpy as np
+
+        cid = self.account_to_community.get(account_id)
+        acc_tx = self.account_tx_aggregates.get(account_id, [0, 0, 0.0, 0.0, 0])
+        acc_tot_cnt = acc_tx[0] + acc_tx[1]
+        acc_tot_vol = round(acc_tx[2] + acc_tx[3], 2)
+        acc_dec_cnt = acc_tx[4]
+        acc_dec_rate = round(acc_dec_cnt / max(1, acc_tot_cnt), 4)
+        acc_conns = len(self.account_connections_map.get(account_id, []))
+        acc_avg_amount = round(acc_tot_vol / max(1, acc_tot_cnt), 2)
+
+        if cid is None:
+            return AccountPeerStatsResponse(
+                account_id=account_id,
+                community_id=None,
+                peer_count=0,
+                peer_sample_size=0,
+                has_peer_data=False,
+                account_tx_count=acc_tot_cnt,
+                account_tx_volume=acc_tot_vol,
+                account_decline_rate=acc_dec_rate,
+                account_connections=acc_conns,
+                account_avg_tx_amount=acc_avg_amount,
+            )
+
+        members = [m for m in self.community_to_accounts.get(cid, []) if m != account_id]
+        peer_count = len(members)
+
+        if peer_count == 0:
+            return AccountPeerStatsResponse(
+                account_id=account_id,
+                community_id=cid,
+                peer_count=0,
+                peer_sample_size=0,
+                has_peer_data=False,
+                account_tx_count=acc_tot_cnt,
+                account_tx_volume=acc_tot_vol,
+                account_decline_rate=acc_dec_rate,
+                account_connections=acc_conns,
+                account_avg_tx_amount=acc_avg_amount,
+            )
+
+        # Sample up to 150 peers for instant calculation
+        sample_size = min(len(members), 150)
+        peer_sample = members[:sample_size]
+
+        peer_tx_counts: list[int] = []
+        peer_tx_vols: list[float] = []
+        peer_decline_rates: list[float] = []
+        peer_conns: list[int] = []
+        peer_avg_amounts: list[float] = []
+
+        for p in peer_sample:
+            p_tx = self.account_tx_aggregates.get(p, [0, 0, 0.0, 0.0, 0])
+            p_cnt = p_tx[0] + p_tx[1]
+            p_vol = p_tx[2] + p_tx[3]
+            p_dec = p_tx[4]
+            peer_tx_counts.append(p_cnt)
+            peer_tx_vols.append(p_vol)
+            peer_decline_rates.append(p_dec / max(1, p_cnt))
+            peer_conns.append(len(self.account_connections_map.get(p, [])))
+            peer_avg_amounts.append(p_vol / max(1, p_cnt))
+
+        return AccountPeerStatsResponse(
+            account_id=account_id,
+            community_id=cid,
+            peer_count=peer_count,
+            peer_sample_size=sample_size,
+            has_peer_data=True,
+            account_tx_count=acc_tot_cnt,
+            account_tx_volume=acc_tot_vol,
+            account_decline_rate=acc_dec_rate,
+            account_connections=acc_conns,
+            account_avg_tx_amount=acc_avg_amount,
+            peer_median_tx_count=round(float(np.median(peer_tx_counts)), 1),
+            peer_median_tx_volume=round(float(np.median(peer_tx_vols)), 2),
+            peer_median_decline_rate=round(float(np.median(peer_decline_rates)), 4),
+            peer_median_connections=round(float(np.median(peer_conns)), 1),
+            peer_median_avg_tx_amount=round(float(np.median(peer_avg_amounts)), 2),
+        )
+
 
     def get_account_transactions(
         self,

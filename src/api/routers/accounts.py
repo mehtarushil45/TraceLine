@@ -6,11 +6,40 @@ from src.api.schemas import (
     AccountConnectionsResponse,
     AccountDetailResponse,
     AccountEvidenceResponse,
+    AccountPeerStatsResponse,
+    PaginatedAccountsRegistryResponse,
     PaginatedTransactionsResponse,
 )
 from src.api.service import service
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
+
+
+@router.get("", response_model=PaginatedAccountsRegistryResponse, summary="List Accounts Registry")
+def list_accounts(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(50, ge=1, le=100, description="Items per page (max 100)"),
+    community_id: int | None = Query(None, description="Filter by assigned community ID"),
+    risk_tier: str | None = Query(None, pattern="^(HIGH|MEDIUM|LOW|all)$", description="Filter by risk tier"),
+    min_risk_score: float | None = Query(None, ge=0.0, le=1.0, description="Minimum risk score (0-1)"),
+    max_risk_score: float | None = Query(None, ge=0.0, le=1.0, description="Maximum risk score (0-1)"),
+    search: str | None = Query(None, description="Search account ID or customer name"),
+    sort_by: str = Query("risk_score", description="Sort by field: risk_score, community_risk, tx_count, tx_volume, connections, balance, account_id"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order: asc or desc"),
+) -> PaginatedAccountsRegistryResponse:
+    """Return a paginated, filterable, sortable index of accounts."""
+    tier_filter = None if (risk_tier is None or risk_tier.lower() == "all") else risk_tier
+    return service.get_accounts_registry(
+        page=page,
+        page_size=page_size,
+        community_id=community_id,
+        risk_tier=tier_filter,
+        min_risk_score=min_risk_score,
+        max_risk_score=max_risk_score,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
 
 @router.get("/{account_id}", response_model=AccountDetailResponse, summary="Get Account Details")
@@ -23,6 +52,23 @@ def get_account(account_id: str) -> AccountDetailResponse:
             detail=f"Account '{account_id}' not found.",
         )
     return account
+
+
+@router.get(
+    "/{account_id}/peer-stats",
+    response_model=AccountPeerStatsResponse,
+    summary="Get Account Peer Comparison Stats",
+)
+def get_account_peer_stats(account_id: str) -> AccountPeerStatsResponse:
+    """Return peer comparison statistics for an account against its assigned community peer group."""
+    stats = service.get_account_peer_stats(account_id)
+    if stats is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account '{account_id}' not found.",
+        )
+    return stats
+
 
 
 @router.get(

@@ -89,6 +89,49 @@ export interface CommunityDetailResponse {
   entity_sharing: EntitySharingStats;
 }
 
+export interface AccountRegistryItem {
+  account_id: string;
+  customer_name: string;
+  balance: number;
+  account_risk_score: number | null;
+  risk_level: RiskLevel;
+  creation_date: string | null;
+  community_id: number | null;
+  community_risk_score: number | null;
+  community_risk_level: RiskLevel | null;
+  connected_account_count: number;
+  tx_count: number;
+  tx_volume: number;
+  declined_count: number;
+  decline_rate: number;
+}
+
+export interface PaginatedAccountsRegistryResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  items: AccountRegistryItem[];
+}
+
+export interface AccountPeerStatsResponse {
+  account_id: string;
+  community_id: number | null;
+  peer_count: number;
+  peer_sample_size: number;
+  has_peer_data: boolean;
+  account_tx_count: number;
+  account_tx_volume: number;
+  account_decline_rate: number;
+  account_connections: number;
+  account_avg_tx_amount: number;
+  peer_median_tx_count: number | null;
+  peer_median_tx_volume: number | null;
+  peer_median_decline_rate: number | null;
+  peer_median_connections: number | null;
+  peer_median_avg_tx_amount: number | null;
+}
+
 export interface AccountSummary {
   account_id: string;
   customer_name: string;
@@ -121,13 +164,17 @@ export interface AccountDetailResponse {
   customer_name: string;
   balance: number;
   account_risk_score: number | null;
+  risk_level: RiskLevel;
   creation_date: string | null;
+  first_observed_activity: string | null;
+  last_observed_activity: string | null;
   community_id: number | null;
   community_risk_score: number | null;
   community_risk_level: RiskLevel | null;
   connected_account_count: number;
   transaction_statistics: AccountTransactionStats;
 }
+
 
 export interface ConnectionItem {
   connected_account_id: string;
