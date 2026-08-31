@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity, ArrowLeft, BookOpen, Briefcase, CheckSquare,
-  Clock, FileText, FlaskConical, Layers, Network,
+  CheckCircle2, Clock, FileText, FlaskConical, Layers, Network,
   Scale, ScanSearch, Search, Users,
 } from 'lucide-react';
 import {
@@ -13,8 +13,9 @@ import type {
   AccountSummary, CommunityDetailResponse, CommunityEvidenceResponse,
   CommunityGraphResponse, EvidenceItem, TimelineEvent,
 } from '../types/api';
+import type { FormalDecision } from '../types/cases';
 import {
-  AddToInvestigationButton, Badge, Button, DataTable, EmptyState,
+  Badge, Button, DataTable, EmptyState,
   EntityLink, LoadingState, Pagination, Panel, RiskBadge, RiskScore,
 } from '../components/common';
 import type { Column } from '../components/common';
@@ -29,7 +30,14 @@ import { EntityRoleMatrix } from '../components/investigation/EntityRoleMatrix';
 import { CaseReadinessAudit } from '../components/investigation/CaseReadinessAudit';
 import { InvestigatorNarrativeBlock } from '../components/investigation/InvestigatorNarrativeBlock';
 import { RecommendedActionsPanel } from '../components/investigation/RecommendedActionsPanel';
-import { getCases, subscribeToCaseUpdates } from '../utils/caseManager';
+import {
+  createFormalCase,
+  findCaseForCommunity,
+  getCases,
+  recordDecision,
+  recordSarExport,
+  subscribeToCaseUpdates,
+} from '../utils/caseManager';
 
 // ---------------------------------------------------------------------------
 // URL-driven view keys
@@ -101,6 +109,13 @@ export const ForensicWorkspacePage: React.FC = () => {
   const [isSarModalOpen, setIsSarModalOpen] = useState(false);
   const [openCasesCount, setOpenCasesCount] = useState(0);
 
+  // Decision form state
+  const [existingCaseId, setExistingCaseId] = useState<string | null>(null);
+  const [decisionDisposition, setDecisionDisposition] = useState<FormalDecision['disposition']>('ESCALATE_SAR');
+  const [decisionRationale, setDecisionRationale] = useState('');
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [decisionSuccess, setDecisionSuccess] = useState<string | null>(null);
+
   // loading flags
   const [loadingCore, setLoadingCore] = useState(false);
   const [loadingGraph, setLoadingGraph] = useState(false);
@@ -108,12 +123,18 @@ export const ForensicWorkspacePage: React.FC = () => {
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [coreError, setCoreError] = useState<string | null>(null);
 
-  // case count from real local storage
+  // case count from real local storage + existing case detection
   useEffect(() => {
-    const update = () => setOpenCasesCount(getCases().filter((c) => c.status !== 'CLOSED').length);
+    const update = () => {
+      setOpenCasesCount(getCases().filter((c) => c.status !== 'CLOSED').length);
+      if (communityParam) {
+        const existing = findCaseForCommunity(communityParam);
+        setExistingCaseId(existing ? existing.id : null);
+      }
+    };
     update();
     return subscribeToCaseUpdates(update);
-  }, []);
+  }, [communityParam]);
 
   // core data on community change
   useEffect(() => {
@@ -348,14 +369,14 @@ export const ForensicWorkspacePage: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <AddToInvestigationButton
-            targetType="COMMUNITY"
-            targetId={community.community_id.toString()}
-            targetLabel={'Community #' + community.community_id}
-            riskScore={community.risk_score}
-            riskLevel={community.risk_level}
+          <Button
+            variant="secondary"
             size="sm"
-          />
+            icon={CheckSquare}
+            onClick={() => setView('decision')}
+          >
+            Decision
+          </Button>
           <Button variant="secondary" size="sm" icon={FileText} onClick={() => setIsSarModalOpen(true)}>
             Generate SAR
           </Button>
@@ -515,20 +536,25 @@ export const ForensicWorkspacePage: React.FC = () => {
       {activeView === 'decision' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Decision header / evidence summary */}
+          {/* Evidence summary at decision time */}
           <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
               <CheckSquare size={16} style={{ color: 'var(--accent)' }} />
-              <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>Investigation Decision</strong>
+              <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>Investigation Evidence Summary</strong>
               <Badge variant="neutral">Community #{community.community_id}</Badge>
+              <RiskBadge level={community.risk_level} size="sm" />
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '-4px' }}>
+              DERIVED — Computed from Forensic Workspace investigation data
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))', gap: '12px' }}>
               {[
-                { label: 'Evidence Triggers',     value: String(evidence?.evidence_count ?? '—'),   sub: (evidence?.high_count ?? 0) + ' High severity' },
-                { label: 'Shared Identifiers',    value: String((community.entity_sharing?.unique_shared_devices || 0) + (community.entity_sharing?.unique_shared_ips || 0) + (community.entity_sharing?.unique_shared_instruments || 0)), sub: 'devices + IPs + instruments' },
-                { label: 'Transaction Volume',    value: '$' + (community.transaction_statistics?.total_transaction_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }), sub: 'observed movement' },
-                { label: 'Hypotheses Evaluated',  value: '2',                                        sub: 'coordinated vs benign' },
+                { label: 'Evidence Triggers', value: String(evidence?.evidence_count ?? '—'), sub: `${evidence?.high_count ?? 0} High / ${evidence?.medium_count ?? 0} Med / ${evidence?.low_count ?? 0} Low` },
+                { label: 'Evidence Score', value: evidence?.evidence_score != null ? `${evidence.evidence_score}/100` : '—', sub: 'Composite evidence score' },
+                { label: 'Shared Infrastructure', value: String((community.entity_sharing?.unique_shared_devices || 0) + (community.entity_sharing?.unique_shared_ips || 0) + (community.entity_sharing?.unique_shared_instruments || 0)), sub: 'devices + IPs + instruments' },
+                { label: 'Transaction Volume', value: '$' + (community.transaction_statistics?.total_transaction_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }), sub: 'Observed community movement' },
+                { label: 'Member Accounts', value: String(community.member_count), sub: 'Accounts in Louvain partition' },
+                { label: 'ML Risk Score', value: String(community.risk_score), sub: `Tier: ${community.risk_level}` },
               ].map(({ label, value, sub }) => (
                 <div key={label} style={{ padding: '12px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '5px' }}>
                   <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>{label}</span>
@@ -536,15 +562,6 @@ export const ForensicWorkspacePage: React.FC = () => {
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>{sub}</span>
                 </div>
               ))}
-            </div>
-
-            <div style={{ padding: '12px 14px', backgroundColor: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '5px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              <strong style={{ color: '#f59e0b', display: 'block', marginBottom: '6px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Remaining Uncertainty
-              </strong>
-              Historical activity baseline prior to the observation window is unavailable.
-              Shared IPs ({community.entity_sharing.unique_shared_ips}) may reflect a shared corporate proxy or VPN exit node.
-              Verify merchant destination legitimacy before filing SAR.
             </div>
           </div>
 
@@ -555,22 +572,151 @@ export const ForensicWorkspacePage: React.FC = () => {
 
           <InvestigatorNarrativeBlock community={community} evidence={evidence} />
 
-          {/* Final actions */}
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '16px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px' }}>
-            <AddToInvestigationButton
-              targetType="COMMUNITY"
-              targetId={community.community_id.toString()}
-              targetLabel={'Community #' + community.community_id}
-              riskScore={community.risk_score}
-              riskLevel={community.risk_level}
+          {/* ── FORMAL DECISION & DOSSIER CREATION ─────────────────────────── */}
+          <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+              <CheckSquare size={16} style={{ color: 'var(--accent)' }} />
+              <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>Record Formal Decision & Create Dossier</strong>
+            </div>
+
+            {existingCaseId ? (
+              /* Already has a formal case — show link */
+              <div style={{ padding: '16px', backgroundColor: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CheckCircle2 size={16} style={{ color: '#86efac', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12px', color: '#86efac', fontWeight: 700 }}>Formal dossier already exists for this investigation.</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Case ID: <code className="font-mono">{existingCaseId}</code></div>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => navigate(`/investigations/${existingCaseId}`)}>
+                  Open Dossier →
+                </Button>
+              </div>
+            ) : decisionSuccess ? (
+              /* Decision recorded successfully */
+              <div style={{ padding: '16px', backgroundColor: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CheckCircle2 size={16} style={{ color: '#86efac', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12px', color: '#86efac', fontWeight: 700 }}>Formal dossier created and decision recorded.</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Case ID: <code className="font-mono">{decisionSuccess}</code></div>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => navigate(`/investigations/${decisionSuccess}`)}>
+                  Open Dossier →
+                </Button>
+              </div>
+            ) : (
+              /* Decision form */
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!decisionRationale.trim()) return;
+                  setDecisionSubmitting(true);
+                  const commId = community.community_id.toString();
+                  const snap = {
+                    evidenceCount: evidence?.evidence_count ?? 0,
+                    highCount: evidence?.high_count ?? 0,
+                    medCount: evidence?.medium_count ?? 0,
+                    lowCount: evidence?.low_count ?? 0,
+                    evidenceScore: evidence?.evidence_score ?? null,
+                    snapshotTimestamp: new Date().toISOString(),
+                    memberCount: community.member_count,
+                    sharedDevices: community.entity_sharing?.unique_shared_devices ?? 0,
+                    sharedIps: community.entity_sharing?.unique_shared_ips ?? 0,
+                    sharedInstruments: community.entity_sharing?.unique_shared_instruments ?? 0,
+                    totalTransactionAmount: community.transaction_statistics?.total_transaction_amount ?? 0,
+                  };
+                  const newCase = createFormalCase(
+                    commId,
+                    `Investigation: Community #${commId} — ${decisionDisposition.replace(/_/g, ' ')}`,
+                    community.risk_level as 'HIGH' | 'MEDIUM' | 'LOW',
+                    { type: 'COMMUNITY', id: commId, label: `Community #${commId}`, riskScore: community.risk_score, riskLevel: community.risk_level as 'HIGH' | 'MEDIUM' | 'LOW', addedAt: new Date().toISOString() },
+                    snap
+                  );
+                  recordDecision(newCase.id, {
+                    disposition: decisionDisposition,
+                    rationale: decisionRationale.trim(),
+                    timestamp: new Date().toISOString(),
+                    evidenceSnapshot: snap,
+                  });
+                  setDecisionSuccess(newCase.id);
+                  setDecisionSubmitting(false);
+                }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+              >
+                <div style={{ padding: '10px 12px', backgroundColor: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '4px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  <strong style={{ color: 'var(--accent)', display: 'block', marginBottom: '3px' }}>INVESTIGATOR ENTERED</strong>
+                  Record your formal disposition and rationale. This creates a permanent dossier that cannot be undone.
+                  SAR generation is available after recording the decision.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)' }}>
+                    Disposition
+                  </label>
+                  <select
+                    value={decisionDisposition}
+                    onChange={(e) => setDecisionDisposition(e.target.value as FormalDecision['disposition'])}
+                    required
+                    style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '8px 10px', borderRadius: '5px', fontSize: '13px', outline: 'none' }}
+                  >
+                    <option value="ESCALATE_SAR">ESCALATE — File Suspicious Activity Report (SAR)</option>
+                    <option value="REFER_COMPLIANCE">REFER — Send to Compliance for review</option>
+                    <option value="MONITOR">MONITOR — Continue observation, no immediate action</option>
+                    <option value="CLOSE_NO_ACTION">CLOSE — No suspicious activity found</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)' }}>
+                    Decision Rationale <span style={{ color: 'var(--risk-high)' }}>*</span>
+                  </label>
+                  <textarea
+                    value={decisionRationale}
+                    onChange={(e) => setDecisionRationale(e.target.value)}
+                    placeholder="Document your reasoning: evidence assessed, alternative hypotheses ruled out, outstanding uncertainties, and basis for this disposition..."
+                    required
+                    rows={5}
+                    style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', outline: 'none', width: '100%' }}
+                  />
+                  <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>{decisionRationale.length} characters — minimum 20 characters required</span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    type="submit"
+                    icon={CheckSquare}
+                    disabled={decisionSubmitting || decisionRationale.trim().length < 20}
+                  >
+                    {decisionSubmitting ? 'Creating Dossier...' : 'Record Decision & Create Dossier'}
+                  </Button>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>This action creates a formal case record. It cannot be undone.</span>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* SAR generation — available from Decision view only */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '16px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', alignItems: 'center' }}>
+            <Button
+              variant="secondary"
               size="md"
-            />
-            <Button variant="primary" size="md" icon={FileText} onClick={() => setIsSarModalOpen(true)}>
+              icon={FileText}
+              onClick={() => {
+                setIsSarModalOpen(true);
+                // If a case exists, record the SAR export audit event
+                const cid = existingCaseId || decisionSuccess;
+                if (cid) recordSarExport(cid);
+              }}
+            >
               Generate SAR
             </Button>
             <Button variant="secondary" size="md" onClick={() => navigate('/investigations')}>
-              View All Cases
+              View All Dossiers
             </Button>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+              SAR generation is available exclusively from this Decision view.
+            </span>
           </div>
         </div>
       )}
