@@ -303,6 +303,68 @@ class TransactionDetailResponse(BaseModel):
     transaction_status: str = Field(..., description="Transaction status")
 
 
+class TransactionListItem(BaseModel):
+    """Lightweight transaction row for the investigator registry listing."""
+
+    transaction_id: str = Field(..., description="Transaction identifier")
+    timestamp: str = Field(..., description="ISO 8601 transaction timestamp")
+    amount: float = Field(..., description="Transaction amount")
+    src_account_id: str = Field(..., description="Source account ID")
+    dst_account_id: str = Field(..., description="Destination account ID")
+    transaction_status: str = Field(..., description="Status: settled, pending, declined")
+    payment_method: str | None = Field(None, description="Payment method: card, upi, wallet, netbanking")
+    merchant_id: str | None = Field(None, description="Merchant identifier if present")
+
+
+class PaginatedTransactionListResponse(BaseModel):
+    """Paginated transaction registry response for the investigator queue."""
+
+    total: int = Field(..., description="Total transactions matching filters")
+    page: int = Field(..., description="Current page (1-indexed)")
+    page_size: int = Field(..., description="Items per page")
+    total_pages: int = Field(..., description="Total pages available")
+    items: list[TransactionListItem] = Field(..., description="Transaction records")
+    filtered_declined_count: int = Field(0, description="Declined transactions in filtered result set")
+    filtered_total_amount: float = Field(0.0, description="Total amount in filtered result set")
+
+
+class CounterpartyTransactionItem(BaseModel):
+    """A transaction between the same counterparty pair, for the relationship preview."""
+
+    transaction_id: str
+    timestamp: str
+    amount: float
+    transaction_status: str
+    payment_method: str | None
+
+
+class TransactionCounterpartyResponse(BaseModel):
+    """Observed relationship between the src and dst accounts of a given transaction.
+
+    All values are deterministically computed from the enriched_transactions dataset.
+    No ML scores. No fabricated values.
+    """
+
+    transaction_id: str = Field(..., description="The focal transaction ID")
+    src_account_id: str = Field(..., description="Source account")
+    dst_account_id: str = Field(..., description="Destination account")
+    total_transactions_between: int = Field(..., description="All transactions between src and dst (both directions)")
+    transactions_src_to_dst: int = Field(..., description="Transactions in the src->dst direction")
+    transactions_dst_to_src: int = Field(..., description="Transactions in the dst->src direction")
+    total_flow_src_to_dst: float = Field(..., description="Sum of amounts flowing src->dst")
+    total_flow_dst_to_src: float = Field(..., description="Sum of amounts flowing dst->src")
+    first_observed_between: str | None = Field(None, description="Earliest transaction timestamp between this pair")
+    last_observed_between: str | None = Field(None, description="Latest transaction timestamp between this pair")
+    declined_between: int = Field(0, description="Count of declined transactions between this pair")
+    src_community_id: int | None = Field(None, description="Source account community (Louvain partition)")
+    dst_community_id: int | None = Field(None, description="Destination account community")
+    same_community: bool = Field(False, description="Whether src and dst belong to the same community")
+    recent_transactions: list[CounterpartyTransactionItem] = Field(
+        default_factory=list,
+        description="Most recent transactions between this pair (max 5)",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Graph & Timeline
 # ---------------------------------------------------------------------------

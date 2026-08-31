@@ -233,6 +233,53 @@ export interface TransactionDetailResponse {
   transaction_status: string;
 }
 
+export interface TransactionListItem {
+  transaction_id: string;
+  timestamp: string;
+  amount: number;
+  src_account_id: string;
+  dst_account_id: string;
+  transaction_status: string;
+  payment_method: string | null;
+  merchant_id: string | null;
+}
+
+export interface PaginatedTransactionListResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  items: TransactionListItem[];
+  filtered_declined_count: number;
+  filtered_total_amount: number;
+}
+
+export interface CounterpartyTransactionItem {
+  transaction_id: string;
+  timestamp: string;
+  amount: number;
+  transaction_status: string;
+  payment_method: string | null;
+}
+
+export interface TransactionCounterpartyResponse {
+  transaction_id: string;
+  src_account_id: string;
+  dst_account_id: string;
+  total_transactions_between: number;
+  transactions_src_to_dst: number;
+  transactions_dst_to_src: number;
+  total_flow_src_to_dst: number;
+  total_flow_dst_to_src: number;
+  first_observed_between: string | null;
+  last_observed_between: string | null;
+  declined_between: number;
+  src_community_id: number | null;
+  dst_community_id: number | null;
+  same_community: boolean;
+  recent_transactions: CounterpartyTransactionItem[];
+}
+
 export interface GraphNode {
   id: string;
   label: string;

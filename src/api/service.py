@@ -36,18 +36,22 @@ from src.api.schemas import (
     CommunitySummary,
     CommunityTimelineResponse,
     ConnectionItem,
+    CounterpartyTransactionItem,
     EntitySharingStats,
     EvidenceItemSchema,
     GraphEdge,
     GraphNode,
     PaginatedAccountsRegistryResponse,
     PaginatedAccountsResponse,
+    PaginatedTransactionListResponse,
     PaginatedTransactionsResponse,
     SummaryResponse,
     TemporalStats,
     TimelineEvent,
+    TransactionCounterpartyResponse,
     TransactionDetailResponse,
     TransactionItem,
+    TransactionListItem,
     TransactionStats,
 )
 from src.features.community_features import FEATURE_NAMES, FORBIDDEN_COLUMNS
@@ -930,6 +934,190 @@ class TraceLineService:
             payment_method=str(row["payment_method"]) if pd.notna(row.get("payment_method")) else None,
             account_age_days=int(row["account_age_days"]) if pd.notna(row.get("account_age_days")) else None,
             transaction_status=str(row["transaction_status"]),
+        )
+
+    def get_transactions_list(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        status: str | None = None,
+        payment_method: str | None = None,
+        min_amount: float | None = None,
+        max_amount: float | None = None,
+        search: str | None = None,
+        sort_by: str = "timestamp",
+        sort_order: str = "desc",
+    ) -> PaginatedTransactionListResponse:
+        """Return a paginated, filterable, sortable investigator transaction registry.
+
+        All filters and sort fields map directly to real dataset columns.
+        No fabricated values are returned.
+        """
+        self.load_data()
+
+        if self.transactions_df.empty:
+            return PaginatedTransactionListResponse(
+                total=0, page=1, page_size=page_size, total_pages=0,
+                items=[], filtered_declined_count=0, filtered_total_amount=0.0,
+            )
+
+        df = self.transactions_df.copy()
+
+        # Apply filters — all real dataset fields
+        if status:
+            df = df[df["transaction_status"] == status]
+        if payment_method:
+            df = df[df["payment_method"] == payment_method]
+        if min_amount is not None:
+            df = df[df["amount"] >= min_amount]
+        if max_amount is not None:
+            df = df[df["amount"] <= max_amount]
+        if search:
+            s = search.strip().lower()
+            mask = (
+                df["transaction_id"].str.lower().str.startswith(s)
+                | df["src_account_id"].str.lower().str.startswith(s)
+                | df["dst_account_id"].str.lower().str.startswith(s)
+            )
+            df = df[mask]
+
+        # Compute aggregate stats from the filtered set before slicing
+        filtered_total = len(df)
+        filtered_declined = int((df["transaction_status"] == "declined").sum())
+        filtered_amount = round(float(df["amount"].sum()), 2)
+
+        # Sort — only real dataset columns allowed
+        valid_sort_fields = {"timestamp", "amount", "transaction_status"}
+        if sort_by not in valid_sort_fields:
+            sort_by = "timestamp"
+        ascending = sort_order == "asc"
+        df = df.sort_values(sort_by, ascending=ascending, na_position="last")
+
+        # Paginate
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, math.ceil(filtered_total / page_size))
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_df = df.iloc[start:end]
+
+        items: list[TransactionListItem] = []
+        for _, row in page_df.iterrows():
+            items.append(
+                TransactionListItem(
+                    transaction_id=str(row["transaction_id"]),
+                    timestamp=str(row["timestamp"]),
+                    amount=round(float(row["amount"]), 2),
+                    src_account_id=str(row["src_account_id"]),
+                    dst_account_id=str(row["dst_account_id"]),
+                    transaction_status=str(row["transaction_status"]),
+                    payment_method=str(row["payment_method"]) if pd.notna(row.get("payment_method")) else None,
+                    merchant_id=str(row["merchant_id"]) if pd.notna(row.get("merchant_id")) else None,
+                )
+            )
+
+        return PaginatedTransactionListResponse(
+            total=filtered_total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+            items=items,
+            filtered_declined_count=filtered_declined,
+            filtered_total_amount=filtered_amount,
+        )
+
+    def get_transaction_counterparty(
+        self, transaction_id: str
+    ) -> TransactionCounterpartyResponse | None:
+        """Return the observed relationship between the src and dst accounts of a transaction.
+
+        Computes deterministically from enriched_transactions:
+        - Total transaction count between this pair (both directions)
+        - Flow totals in each direction
+        - First and last observed timestamp between the pair
+        - Declined transaction count between the pair
+        - Community membership of each account
+        - Preview of 5 most recent transactions between the pair
+        """
+        self.load_data()
+
+        if transaction_id not in self.tx_id_to_index or self.transactions_df.empty:
+            return None
+
+        idx = self.tx_id_to_index[transaction_id]
+        focal_row = self.transactions_df.iloc[idx]
+        src = str(focal_row["src_account_id"])
+        dst = str(focal_row["dst_account_id"])
+
+        # Find all transactions between this exact pair (both directions)
+        src_col = self.transactions_df["src_account_id"].astype(str)
+        dst_col = self.transactions_df["dst_account_id"].astype(str)
+
+        mask_fwd = (src_col == src) & (dst_col == dst)
+        mask_rev = (src_col == dst) & (dst_col == src)
+
+        fwd_df = self.transactions_df[mask_fwd]
+        rev_df = self.transactions_df[mask_rev]
+
+        # Forward flow (src -> dst)
+        n_fwd = len(fwd_df)
+        total_flow_fwd = round(float(fwd_df["amount"].sum()), 2) if n_fwd > 0 else 0.0
+
+        # Reverse flow (dst -> src)
+        n_rev = len(rev_df)
+        total_flow_rev = round(float(rev_df["amount"].sum()), 2) if n_rev > 0 else 0.0
+
+        # Combined pair
+        pair_df = pd.concat([fwd_df, rev_df], ignore_index=True)
+        n_total = len(pair_df)
+
+        first_obs: str | None = None
+        last_obs: str | None = None
+        declined_between = 0
+
+        if n_total > 0:
+            pair_df_sorted = pair_df.sort_values("timestamp")
+            first_obs = str(pair_df_sorted.iloc[0]["timestamp"])
+            last_obs = str(pair_df_sorted.iloc[-1]["timestamp"])
+            declined_between = int((pair_df["transaction_status"] == "declined").sum())
+
+            # Most recent 5
+            recent_rows = pair_df_sorted.tail(5).iloc[::-1]
+            recent: list[CounterpartyTransactionItem] = []
+            for _, rrow in recent_rows.iterrows():
+                recent.append(
+                    CounterpartyTransactionItem(
+                        transaction_id=str(rrow["transaction_id"]),
+                        timestamp=str(rrow["timestamp"]),
+                        amount=round(float(rrow["amount"]), 2),
+                        transaction_status=str(rrow["transaction_status"]),
+                        payment_method=str(rrow["payment_method"]) if pd.notna(rrow.get("payment_method")) else None,
+                    )
+                )
+        else:
+            recent = []
+
+        # Community membership from the existing community data
+        src_cid = self.account_to_community.get(src)
+        dst_cid = self.account_to_community.get(dst)
+        same_community = (src_cid is not None) and (dst_cid is not None) and (src_cid == dst_cid)
+
+        return TransactionCounterpartyResponse(
+            transaction_id=transaction_id,
+            src_account_id=src,
+            dst_account_id=dst,
+            total_transactions_between=n_total,
+            transactions_src_to_dst=n_fwd,
+            transactions_dst_to_src=n_rev,
+            total_flow_src_to_dst=total_flow_fwd,
+            total_flow_dst_to_src=total_flow_rev,
+            first_observed_between=first_obs,
+            last_observed_between=last_obs,
+            declined_between=declined_between,
+            src_community_id=src_cid,
+            dst_community_id=dst_cid,
+            same_community=same_community,
+            recent_transactions=recent,
         )
 
     def get_community_graph(
