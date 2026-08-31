@@ -54,9 +54,14 @@ export const AccountDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navState = location.state as { fromForensics?: boolean; communityId?: string } | null;
+  const navState = location.state as {
+    fromForensics?: boolean;
+    communityId?: string;
+    fromTransaction?: string;
+  } | null;
   const fromForensics = Boolean(navState?.fromForensics);
   const forensicCommunityId = navState?.communityId;
+  const fromTransactionId = navState?.fromTransaction;
 
   const [account, setAccount] = useState<AccountDetailResponse | null>(null);
   const [evidence, setEvidence] = useState<AccountEvidenceResponse | null>(null);
@@ -696,7 +701,9 @@ export const AccountDetailPage: React.FC = () => {
         breadcrumbs={
           <button
             onClick={() => {
-              if (fromForensics && (forensicCommunityId || account.community_id)) {
+              if (fromTransactionId) {
+                navigate(`/transactions/${fromTransactionId}`);
+              } else if (fromForensics && (forensicCommunityId || account.community_id)) {
                 const targetComm = forensicCommunityId || String(account.community_id);
                 navigate(`/forensics?community=${targetComm}&view=accounts`);
               } else {
@@ -720,7 +727,9 @@ export const AccountDetailPage: React.FC = () => {
           >
             <ArrowLeft size={13} />
             <span>
-              {fromForensics && (forensicCommunityId || account.community_id)
+              {fromTransactionId
+                ? `Back to Transaction ${fromTransactionId}`
+                : fromForensics && (forensicCommunityId || account.community_id)
                 ? `Back to Community #${forensicCommunityId || account.community_id} Forensic Workspace`
                 : 'Back to Accounts Registry'}
             </span>

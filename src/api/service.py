@@ -196,12 +196,16 @@ class TraceLineService:
                 if col in self.transactions_df.columns:
                     self.transactions_df.drop(columns=[col], inplace=True)
 
+            self.transactions_df["transaction_id"] = self.transactions_df["transaction_id"].astype(str)
+            self.transactions_df["src_account_id"] = self.transactions_df["src_account_id"].astype(str)
+            self.transactions_df["dst_account_id"] = self.transactions_df["dst_account_id"].astype(str)
+
             self.total_transactions = len(self.transactions_df)
 
             # Build fast lookup indices for transactions
-            src_col = self.transactions_df["src_account_id"].astype(str).values
-            dst_col = self.transactions_df["dst_account_id"].astype(str).values
-            tx_id_col = self.transactions_df["transaction_id"].astype(str).values
+            src_col = self.transactions_df["src_account_id"].values
+            dst_col = self.transactions_df["dst_account_id"].values
+            tx_id_col = self.transactions_df["transaction_id"].values
             amount_col = self.transactions_df["amount"].values
             status_col = self.transactions_df["transaction_status"].values
 
@@ -1049,15 +1053,17 @@ class TraceLineService:
         src = str(focal_row["src_account_id"])
         dst = str(focal_row["dst_account_id"])
 
-        # Find all transactions between this exact pair (both directions)
-        src_col = self.transactions_df["src_account_id"].astype(str)
-        dst_col = self.transactions_df["dst_account_id"].astype(str)
+        # Find all transactions between this exact pair (both directions) using fast indices
+        src_sent = set(self.account_sent_tx_indices.get(src, []))
+        dst_recv = set(self.account_recv_tx_indices.get(dst, []))
+        fwd_idx = sorted(src_sent.intersection(dst_recv))
 
-        mask_fwd = (src_col == src) & (dst_col == dst)
-        mask_rev = (src_col == dst) & (dst_col == src)
+        dst_sent = set(self.account_sent_tx_indices.get(dst, []))
+        src_recv = set(self.account_recv_tx_indices.get(src, []))
+        rev_idx = sorted(dst_sent.intersection(src_recv))
 
-        fwd_df = self.transactions_df[mask_fwd]
-        rev_df = self.transactions_df[mask_rev]
+        fwd_df = self.transactions_df.iloc[fwd_idx] if fwd_idx else pd.DataFrame()
+        rev_df = self.transactions_df.iloc[rev_idx] if rev_idx else pd.DataFrame()
 
         # Forward flow (src -> dst)
         n_fwd = len(fwd_df)
@@ -1068,14 +1074,15 @@ class TraceLineService:
         total_flow_rev = round(float(rev_df["amount"].sum()), 2) if n_rev > 0 else 0.0
 
         # Combined pair
-        pair_df = pd.concat([fwd_df, rev_df], ignore_index=True)
-        n_total = len(pair_df)
+        pair_indices = sorted(set(fwd_idx + rev_idx))
+        n_total = len(pair_indices)
 
         first_obs: str | None = None
         last_obs: str | None = None
         declined_between = 0
 
         if n_total > 0:
+            pair_df = self.transactions_df.iloc[pair_indices]
             pair_df_sorted = pair_df.sort_values("timestamp")
             first_obs = str(pair_df_sorted.iloc[0]["timestamp"])
             last_obs = str(pair_df_sorted.iloc[-1]["timestamp"])

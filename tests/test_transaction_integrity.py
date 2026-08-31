@@ -524,3 +524,77 @@ def test_counterparty_no_forbidden_keys(settled_tx_id: str):
     }
     for key in forbidden:
         assert key not in data, f"Forbidden key in counterparty response: {key}"
+
+
+def test_counterparty_bidirectional_pair_reconciliation(tx_df: pd.DataFrame):
+    """Find a pair with bidirectional transfers and verify directional flow sums."""
+    # Find account pairs that have both fwd and rev activity
+    pair_counts = tx_df.groupby(["src_account_id", "dst_account_id"]).size().reset_index(name="count")
+    pair_set = set(zip(pair_counts["src_account_id"], pair_counts["dst_account_id"]))
+
+    bidi_tx = None
+    for src, dst in pair_set:
+        if (dst, src) in pair_set:
+            # Found bidirectional pair
+            match = tx_df[(tx_df["src_account_id"] == src) & (tx_df["dst_account_id"] == dst)]
+            if not match.empty:
+                bidi_tx = str(match.iloc[0]["transaction_id"])
+                break
+
+    if not bidi_tx:
+        pytest.skip("No bidirectional transaction pairs found in dataset")
+
+    res = client.get(f"/api/transactions/{bidi_tx}/counterparty")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["transactions_src_to_dst"] > 0
+    assert data["transactions_dst_to_src"] > 0
+    assert data["total_flow_src_to_dst"] > 0
+    assert data["total_flow_dst_to_src"] > 0
+    assert data["total_transactions_between"] == data["transactions_src_to_dst"] + data["transactions_dst_to_src"]
+
+
+def test_counterparty_single_transaction_pair(tx_df: pd.DataFrame):
+    """Pair with only 1 transaction must have total=1 and equal first/last timestamps."""
+    pair_counts = tx_df.groupby(["src_account_id", "dst_account_id"]).size()
+    single_fwd = pair_counts[pair_counts == 1].index
+
+    single_tx_id = None
+    for src, dst in single_fwd[:100]:
+        if (dst, src) not in pair_counts:
+            match = tx_df[(tx_df["src_account_id"] == src) & (tx_df["dst_account_id"] == dst)]
+            if not match.empty:
+                single_tx_id = str(match.iloc[0]["transaction_id"])
+                break
+
+    if not single_tx_id:
+        pytest.skip("No single-transaction pairs in dataset")
+
+    res = client.get(f"/api/transactions/{single_tx_id}/counterparty")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total_transactions_between"] == 1
+    assert data["first_observed_between"] == data["last_observed_between"]
+    assert len(data["recent_transactions"]) == 1
+    assert data["recent_transactions"][0]["transaction_id"] == single_tx_id
+
+
+def test_account_transactions_pagination_and_direction(settled_tx_id: str, tx_df: pd.DataFrame):
+    """Account transaction endpoint must support sent/received/all direction filtering."""
+    sample_acc = str(tx_df.iloc[0]["src_account_id"])
+    res_all = client.get(f"/api/accounts/{sample_acc}/transactions?direction=all&page=1&page_size=50")
+    assert res_all.status_code == 200
+    data_all = res_all.json()
+    assert data_all["account_id"] == sample_acc
+    assert data_all["total"] >= 1
+
+    res_sent = client.get(f"/api/accounts/{sample_acc}/transactions?direction=sent&page=1&page_size=50")
+    assert res_sent.status_code == 200
+    for item in res_sent.json()["items"]:
+        assert item["src_account_id"] == sample_acc
+
+    res_recv = client.get(f"/api/accounts/{sample_acc}/transactions?direction=received&page=1&page_size=50")
+    assert res_recv.status_code == 200
+    for item in res_recv.json()["items"]:
+        assert item["dst_account_id"] == sample_acc
+
