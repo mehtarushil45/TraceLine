@@ -1,16 +1,9 @@
 import React, { useState } from 'react';
-import {
-  Command,
-  FileText,
-  Search,
-  Shield,
-} from 'lucide-react';
+import { Command, Search, Shield } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
-import { SarExportModal } from './SarExportModal';
 
 export const Header: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isSarOpen, setIsSarOpen] = useState(false);
 
   return (
     <>
@@ -96,41 +89,10 @@ export const Header: React.FC = () => {
             <Shield size={12} />
             <span>OBSERVABLE ZERO-LEAKAGE</span>
           </div>
-
-          {/* SAR Forensic Export Trigger */}
-          <button
-            onClick={() => setIsSarOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '5px 12px',
-              backgroundColor: 'var(--bg-subtle)',
-              border: '1px solid var(--border)',
-              borderRadius: '5px',
-              color: 'var(--text-main)',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-              e.currentTarget.style.borderColor = 'var(--border-light)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-subtle)';
-              e.currentTarget.style.borderColor = 'var(--border)';
-            }}
-          >
-            <FileText size={13} style={{ color: 'var(--accent)' }} />
-            <span>SAR Export</span>
-          </button>
         </div>
       </header>
 
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-      <SarExportModal isOpen={isSarOpen} onClose={() => setIsSarOpen(false)} />
     </>
   );
 };

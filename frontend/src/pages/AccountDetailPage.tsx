@@ -9,7 +9,6 @@ import {
   Cpu,
   CreditCard,
   ExternalLink,
-  FileText,
   History,
   Network,
   Shield,
@@ -48,7 +47,7 @@ import {
   RiskScore,
 } from '../components/common';
 import type { Column, FilterOption } from '../components/common';
-import { SarExportModal } from '../components/layout/SarExportModal';
+
 
 export const AccountDetailPage: React.FC = () => {
   const { accountId } = useParams<{ accountId: string }>();
@@ -64,7 +63,7 @@ export const AccountDetailPage: React.FC = () => {
   const [peerStats, setPeerStats] = useState<AccountPeerStatsResponse | null>(null);
   const [connections, setConnections] = useState<AccountConnectionsResponse | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<TransactionItem[]>([]);
-  const [isSarModalOpen, setIsSarModalOpen] = useState(false);
+
 
   // Deep Dive Tabs State
   const [activeTab, setActiveTab] = useState<'transactions' | 'connections'>('transactions');
@@ -99,9 +98,6 @@ export const AccountDetailPage: React.FC = () => {
         setConnections(connRes);
         if (txRes) {
           setRecentTransactions(txRes.items);
-          setTransactions(txRes.items);
-          setTxTotal(txRes.total);
-          setTxTotalPages(txRes.total_pages);
         }
       })
       .catch((err) => {
@@ -114,18 +110,33 @@ export const AccountDetailPage: React.FC = () => {
 
   // 2. Load Paginated Transactions in Tab
   useEffect(() => {
-    if (!accountId || activeTab !== 'transactions' || (txPage === 1 && txDirection === 'all' && transactions.length > 0)) return;
+    if (!accountId || activeTab !== 'transactions') return;
 
+    let isMounted = true;
     setLoadingTx(true);
     getAccountTransactions(accountId, txPage, 50, txDirection)
       .then((res) => {
-        setTransactions(res.items);
-        setTxTotal(res.total);
-        setTxTotalPages(res.total_pages);
+        if (isMounted) {
+          setTransactions(res.items);
+          setTxTotal(res.total);
+          setTxTotalPages(res.total_pages);
+        }
       })
-      .catch((err) => console.error('Failed to load transactions:', err))
-      .finally(() => setLoadingTx(false));
-  }, [accountId, activeTab, txPage, txDirection, transactions.length]);
+      .catch((err) => {
+        if (isMounted) {
+          console.error('Failed to load transactions:', err);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingTx(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accountId, activeTab, txPage, txDirection]);
 
   // Derived: Behavioral Profile Metrics
   const behavioralProfile = useMemo(() => {
@@ -579,7 +590,11 @@ export const AccountDetailPage: React.FC = () => {
           size="sm"
           icon={ArrowRight}
           iconPosition="right"
-          onClick={() => navigate(`/transactions/${tx.transaction_id}`)}
+          onClick={() =>
+            navigate(`/transactions/${tx.transaction_id}`, {
+              state: { fromAccount: account.account_id },
+            })
+          }
         >
           Inspect
         </Button>
@@ -732,14 +747,6 @@ export const AccountDetailPage: React.FC = () => {
               riskLevel={account.risk_level}
               size="md"
             />
-            <Button
-              variant="secondary"
-              size="md"
-              icon={FileText}
-              onClick={() => setIsSarModalOpen(true)}
-            >
-              Generate SAR
-            </Button>
           </div>
         }
       />
@@ -766,9 +773,13 @@ export const AccountDetailPage: React.FC = () => {
             subtext="Model output (relative risk ranking)"
           />
           <Metric
-            label="Cluster Prioritization"
+            label="Parent Community Risk"
             value={account.community_risk_score !== null ? `${account.community_risk_score}/100` : '—'}
-            subtext={account.community_risk_level ? `${account.community_risk_level} Risk Tier` : 'Unassigned partition'}
+            subtext={
+              account.community_risk_level
+                ? `Community #${account.community_id} — ${account.community_risk_level} risk tier (Louvain partition score)`
+                : 'Not assigned to a community partition'
+            }
             variant={account.community_risk_level === 'HIGH' ? 'high' : account.community_risk_level === 'MEDIUM' ? 'med' : 'default'}
           />
           <Metric
@@ -1248,7 +1259,11 @@ export const AccountDetailPage: React.FC = () => {
                     variant="secondary"
                     size="sm"
                     icon={ExternalLink}
-                    onClick={() => navigate(`/transactions/${evt.txId}`)}
+                    onClick={() =>
+                      navigate(`/transactions/${evt.txId}`, {
+                        state: { fromAccount: account.account_id },
+                      })
+                    }
                     title="Inspect transaction"
                   >
                     Inspect
@@ -1315,38 +1330,54 @@ export const AccountDetailPage: React.FC = () => {
           padding="lg"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {nextActions.map((action, idx) => (
+            {nextActions.length > 0 ? (
+              nextActions.map((action, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--bg-input)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {action.title}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {action.reason}
+                    </span>
+                  </div>
+
+                  <Button
+                    variant={action.priority === 'high' ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={action.onClick}
+                  >
+                    {action.actionLabel}
+                  </Button>
+                </div>
+              ))
+            ) : (
               <div
-                key={idx}
                 style={{
-                  padding: '10px 12px',
+                  padding: '14px',
                   borderRadius: '4px',
                   backgroundColor: 'var(--bg-input)',
                   border: '1px solid var(--border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
+                  fontSize: '12px',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1.5,
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {action.title}
-                  </span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {action.reason}
-                  </span>
-                </div>
-
-                <Button
-                  variant={action.priority === 'high' ? 'primary' : 'secondary'}
-                  size="sm"
-                  onClick={action.onClick}
-                >
-                  {action.actionLabel}
-                </Button>
+                Insufficient observable evidence to generate a specific next-step recommendation for this account. No shared devices, shared instruments, or high-risk community membership detected in available graph data.
               </div>
-            ))}
+            )}
           </div>
         </Panel>
       </div>
@@ -1487,7 +1518,6 @@ export const AccountDetailPage: React.FC = () => {
         )}
       </div>
 
-      <SarExportModal isOpen={isSarModalOpen} onClose={() => setIsSarModalOpen(false)} />
     </div>
   );
 };

@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
-  FileText,
   Network,
   Smartphone,
   Store,
@@ -41,24 +40,30 @@ import {
   RiskBadge,
 } from '../components/common';
 import type { Column } from '../components/common';
-import { SarExportModal } from '../components/layout/SarExportModal';
+
 
 export const TransactionDetailPage: React.FC = () => {
   const { transactionId } = useParams<{ transactionId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navState = location.state as { fromForensics?: boolean; communityId?: string; forensicView?: string } | null;
+  const navState = location.state as {
+    fromForensics?: boolean;
+    communityId?: string;
+    forensicView?: string;
+    fromAccount?: string;
+  } | null;
   const fromForensics = Boolean(navState?.fromForensics);
   const forensicCommunityId = navState?.communityId;
   const forensicView = navState?.forensicView || 'timeline';
+  const fromAccountId = navState?.fromAccount ?? null;
 
   const [tx, setTx] = useState<TransactionDetailResponse | null>(null);
   const [srcAccount, setSrcAccount] = useState<AccountDetailResponse | null>(null);
   const [dstAccount, setDstAccount] = useState<AccountDetailResponse | null>(null);
   const [srcEvidence, setSrcEvidence] = useState<AccountEvidenceResponse | null>(null);
   const [relatedTxs, setRelatedTxs] = useState<TransactionItem[]>([]);
-  const [isSarModalOpen, setIsSarModalOpen] = useState(false);
+
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -350,9 +355,11 @@ export const TransactionDetailPage: React.FC = () => {
         breadcrumbs={
           <button
             onClick={() => {
-              if (fromForensics && (forensicCommunityId || srcAccount?.community_id)) {
+            if (fromForensics && (forensicCommunityId || srcAccount?.community_id)) {
                 const targetComm = forensicCommunityId || String(srcAccount?.community_id);
                 navigate(`/forensics?community=${targetComm}&view=${forensicView}`);
+              } else if (fromAccountId) {
+                navigate(`/accounts/${fromAccountId}`);
               } else if (srcAccount) {
                 navigate(`/accounts/${tx.src_account_id}`);
               } else {
@@ -378,6 +385,8 @@ export const TransactionDetailPage: React.FC = () => {
             <span>
               {fromForensics && (forensicCommunityId || srcAccount?.community_id)
                 ? `Back to Community #${forensicCommunityId || srcAccount?.community_id} Forensic Workspace`
+                : fromAccountId
+                ? `Back to Account ${fromAccountId}`
                 : srcAccount
                 ? `Back to Account ${tx.src_account_id}`
                 : 'Back to Transactions'}
@@ -406,14 +415,6 @@ export const TransactionDetailPage: React.FC = () => {
               riskLevel={srcAccount?.community_risk_level}
               size="md"
             />
-            <Button
-              variant="secondary"
-              size="md"
-              icon={FileText}
-              onClick={() => setIsSarModalOpen(true)}
-            >
-              Generate SAR
-            </Button>
           </div>
         }
       />
@@ -755,7 +756,6 @@ export const TransactionDetailPage: React.FC = () => {
         )}
       </Panel>
 
-      <SarExportModal isOpen={isSarModalOpen} onClose={() => setIsSarModalOpen(false)} />
     </div>
   );
 };
