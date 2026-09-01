@@ -20,6 +20,7 @@ import {
 } from '../components/common';
 import type { Column } from '../components/common';
 import { NetworkGraph } from '../components/graph/NetworkGraph';
+import type { InvestigationLens } from '../components/graph/NetworkGraph';
 import { TimelineView } from '../components/timeline/TimelineView';
 import { SarExportModal } from '../components/layout/SarExportModal';
 import { EvidenceConvergencePanel } from '../components/investigation/EvidenceConvergencePanel';
@@ -78,6 +79,13 @@ export const ForensicWorkspacePage: React.FC = () => {
   const communityParam = searchParams.get('community');
   const activeView = normalizeView(searchParams.get('view'));
   const focusParam = searchParams.get('focus');
+
+  // Investigation lens — drives NetworkGraph contextual focus mode
+  const VALID_LENSES: InvestigationLens[] = [
+    'relationship', 'flow-of-funds', 'shared-infrastructure', 'temporal', 'community',
+  ];
+  const rawLens = searchParams.get('lens') as InvestigationLens | null;
+  const lensParam: InvestigationLens = VALID_LENSES.includes(rawLens!) ? rawLens! : 'community';
 
   const setView = useCallback(
     (view: ForensicView, extra?: Record<string, string>) => {
@@ -440,6 +448,7 @@ export const ForensicWorkspacePage: React.FC = () => {
                 allEvidenceItems={evidence?.items ?? []}
                 communityId={community.community_id}
                 initialSelectedNodeId={focusedNodeId}
+                initialLens={lensParam}
                 onClearFocus={handleClearFocus}
               />
             )
@@ -492,14 +501,11 @@ export const ForensicWorkspacePage: React.FC = () => {
 
       {/* VIEW: TIMELINE */}
       {activeView === 'timeline' && (
-        <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
-          {loadingTimeline
-            ? <LoadingState type="table" count={8} />
-            : timelineEvents.length === 0
-              ? <EmptyState title="No timeline events" message="No transaction events found for this community." />
-              : <TimelineView events={timelineEvents} evidenceFocus={evidenceFocus} communityId={community.community_id} />
-          }
-        </div>
+        loadingTimeline
+          ? <div style={{ padding: '24px' }}><LoadingState type="table" count={8} /></div>
+          : timelineEvents.length === 0
+            ? <EmptyState title="No timeline events" message="No transaction events found for this community." />
+            : <TimelineView events={timelineEvents} evidenceFocus={evidenceFocus} communityId={community.community_id} />
       )}
 
       {/* VIEW: MONEY FLOW */}
