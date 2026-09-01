@@ -492,14 +492,11 @@ export const ForensicWorkspacePage: React.FC = () => {
 
       {/* VIEW: TIMELINE */}
       {activeView === 'timeline' && (
-        <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
-          {loadingTimeline
-            ? <LoadingState type="table" count={8} />
-            : timelineEvents.length === 0
-              ? <EmptyState title="No timeline events" message="No transaction events found for this community." />
-              : <TimelineView events={timelineEvents} evidenceFocus={evidenceFocus} communityId={community.community_id} />
-          }
-        </div>
+        loadingTimeline
+          ? <div style={{ padding: '24px' }}><LoadingState type="table" count={8} /></div>
+          : timelineEvents.length === 0
+            ? <EmptyState title="No timeline events" message="No transaction events found for this community." />
+            : <TimelineView events={timelineEvents} evidenceFocus={evidenceFocus} communityId={community.community_id} />
       )}
 
       {/* VIEW: MONEY FLOW */}
