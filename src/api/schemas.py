@@ -391,6 +391,10 @@ class GraphEdge(BaseModel):
     shared_ips: list[str] = Field(default_factory=list, description="Shared IPs")
     shared_merchants: list[str] = Field(default_factory=list, description="Shared merchants")
     temporal_overlap: int = Field(0, description="Temporal co-occurrence days")
+    has_transaction_flow: bool = Field(False, description="Whether direct transactions occurred between these accounts")
+    transaction_count: int = Field(0, description="Count of direct transactions between these accounts")
+    total_amount: float = Field(0.0, description="Total amount of direct transactions between these accounts")
+    flow_direction: str | None = Field(None, description="Flow direction: source_to_target, target_to_source, or bidirectional")
 
 
 class CommunityGraphResponse(BaseModel):

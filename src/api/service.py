@@ -1128,7 +1128,11 @@ class TraceLineService:
         )
 
     def get_community_graph(
-        self, community_id: int, max_nodes: int = 200, max_edges: int = 500
+        self,
+        community_id: int,
+        max_nodes: int = 200,
+        max_edges: int = 500,
+        focal_account_id: str | None = None,
     ) -> CommunityGraphResponse | None:
         """Return graph nodes and edges for community visualization."""
         self.load_data()
@@ -1156,6 +1160,18 @@ class TraceLineService:
         sorted_members = sorted(member_accounts, key=lambda a: degrees.get(a, 0), reverse=True)
         selected_nodes_set = set(sorted_members[:max_nodes])
 
+        # If a focal account is requested and in this community, guarantee inclusion of focal and its direct neighbors
+        if focal_account_id and focal_account_id in degrees:
+            selected_nodes_set.add(focal_account_id)
+            focal_neighbors = [
+                e["target"] if e["source"] == focal_account_id else e["source"]
+                for e in all_edges
+                if e["source"] == focal_account_id or e["target"] == focal_account_id
+            ]
+            for nbr in focal_neighbors:
+                if len(selected_nodes_set) < max_nodes + len(focal_neighbors):
+                    selected_nodes_set.add(nbr)
+
         nodes: list[GraphNode] = []
         for acc in selected_nodes_set:
             acc_row = self.accounts_df.loc[acc] if acc in self.accounts_df.index else None
@@ -1171,12 +1187,34 @@ class TraceLineService:
                 )
             )
 
-        # Select edges between selected nodes
+        # Select edges between selected nodes and compute observable fund flow
         edges: list[GraphEdge] = []
         for e in all_edges:
             src = e["source"]
             dst = e["target"]
             if src in selected_nodes_set and dst in selected_nodes_set:
+                src_sent = self.account_sent_tx_indices.get(src, [])
+                dst_recv = self.account_recv_tx_indices.get(dst, [])
+                fwd_indices = set(src_sent) & set(dst_recv)
+
+                dst_sent = self.account_sent_tx_indices.get(dst, [])
+                src_recv = self.account_recv_tx_indices.get(src, [])
+                rev_indices = set(dst_sent) & set(src_recv)
+
+                all_tx = fwd_indices | rev_indices
+                tx_count = len(all_tx)
+                if tx_count > 0:
+                    tx_amt = round(float(self.transactions_df.iloc[list(all_tx)]["amount"].sum()), 2)
+                    if fwd_indices and rev_indices:
+                        direction = "bidirectional"
+                    elif fwd_indices:
+                        direction = "source_to_target"
+                    else:
+                        direction = "target_to_source"
+                else:
+                    tx_amt = 0.0
+                    direction = None
+
                 edges.append(
                     GraphEdge(
                         source=src,
@@ -1187,6 +1225,10 @@ class TraceLineService:
                         shared_ips=list(e.get("shared_ips", [])),
                         shared_merchants=list(e.get("shared_merchants", [])),
                         temporal_overlap=int(e.get("temporal_overlap", 0)),
+                        has_transaction_flow=tx_count > 0,
+                        transaction_count=tx_count,
+                        total_amount=tx_amt,
+                        flow_direction=direction,
                     )
                 )
                 if len(edges) >= max_edges:

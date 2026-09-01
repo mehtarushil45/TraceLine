@@ -17,9 +17,12 @@ def get_community_graph(
     community_id: int,
     max_nodes: int = Query(200, ge=1, le=1000, description="Max nodes to return for visualization"),
     max_edges: int = Query(500, ge=1, le=2000, description="Max edges to return for visualization"),
+    focal_account_id: str | None = Query(None, description="Optional focal account ID to prioritize in node set"),
 ) -> CommunityGraphResponse:
     """Return nodes and edges formatted for frontend network graph visualization."""
-    graph = service.get_community_graph(community_id, max_nodes=max_nodes, max_edges=max_edges)
+    graph = service.get_community_graph(
+        community_id, max_nodes=max_nodes, max_edges=max_edges, focal_account_id=focal_account_id
+    )
     if graph is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
