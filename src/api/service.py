@@ -559,8 +559,8 @@ class TraceLineService:
                 return float(acc_row.get("risk_score", 0.0)) if acc_row is not None and pd.notna(acc_row.get("risk_score")) else 0.0
             elif sort_by == "community_risk":
                 if cid is not None and cid in self.community_risk_scores_df.index:
-                    return int(self.community_risk_scores_df.loc[cid, "risk_score"])
-                return 0
+                    return _to_float(self.community_risk_scores_df.loc[cid, "risk_score"], 0.0)
+                return 0.0
             elif sort_by == "tx_count":
                 return tot_cnt
             elif sort_by == "tx_volume":
@@ -755,6 +755,11 @@ class TraceLineService:
                 account_decline_rate=acc_dec_rate,
                 account_connections=acc_conns,
                 account_avg_tx_amount=acc_avg_amount,
+                peer_median_tx_count=None,
+                peer_median_tx_volume=None,
+                peer_median_decline_rate=None,
+                peer_median_connections=None,
+                peer_median_avg_tx_amount=None,
             )
 
         members = [m for m in self.community_to_accounts.get(cid, []) if m != account_id]
@@ -772,6 +777,11 @@ class TraceLineService:
                 account_decline_rate=acc_dec_rate,
                 account_connections=acc_conns,
                 account_avg_tx_amount=acc_avg_amount,
+                peer_median_tx_count=None,
+                peer_median_tx_volume=None,
+                peer_median_decline_rate=None,
+                peer_median_connections=None,
+                peer_median_avg_tx_amount=None,
             )
 
         # Sample up to 150 peers for instant calculation
