@@ -358,7 +358,10 @@ export const AccountDetailPage: React.FC = () => {
         reason: `Account shares hardware fingerprint with ${relationshipExposure.sharedDevicesCount} connected entities in the graph.`,
         actionLabel: 'Inspect in Network Graph →',
         onClick: () =>
-          navigate(`/forensics?community=${account.community_id}&view=network&focus=${account.account_id}&lens=shared-infrastructure`),
+          navigate(
+            `/forensics?community=${account.community_id}&view=network&focus=${account.account_id}&lens=shared-infrastructure`,
+            { state: { fromAccount: account.account_id } }
+          ),
         priority: 'high',
       });
     }
@@ -953,7 +956,10 @@ export const AccountDetailPage: React.FC = () => {
                 size="sm"
                 icon={Network}
                 onClick={() =>
-                  navigate(`/forensics?community=${account.community_id}&view=network&focus=${account.account_id}&lens=relationship`)
+                  navigate(
+                    `/forensics?community=${account.community_id}&view=network&focus=${account.account_id}&lens=relationship`,
+                    { state: { fromAccount: account.account_id } }
+                  )
                 }
               >
                 Explore Relationship Network →

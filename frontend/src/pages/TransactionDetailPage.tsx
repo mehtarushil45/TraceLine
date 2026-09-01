@@ -338,7 +338,8 @@ export const TransactionDetailPage: React.FC = () => {
             size="sm"
             icon={Network}
             onClick={() => navigate(
-              `/forensics?community=${srcAccount.community_id}&view=network&focus=${srcAccount.account_id}&lens=relationship`
+              `/forensics?community=${srcAccount.community_id}&view=network&focus=${srcAccount.account_id}&lens=relationship`,
+              { state: { fromTransaction: tx.transaction_id } }
             )}
           >
             Explore Graph

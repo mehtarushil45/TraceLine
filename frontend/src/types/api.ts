@@ -297,6 +297,10 @@ export interface GraphEdge {
   shared_ips: string[];
   shared_merchants: string[];
   temporal_overlap: number;
+  has_transaction_flow?: boolean;
+  transaction_count?: number;
+  total_amount?: number;
+  flow_direction?: 'source_to_target' | 'target_to_source' | 'bidirectional' | null;
 }
 
 export interface CommunityGraphResponse {

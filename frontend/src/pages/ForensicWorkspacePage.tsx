@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity, ArrowLeft, BookOpen, Briefcase, CheckSquare,
   CheckCircle2, Clock, FileText, FlaskConical, Layers, Network,
@@ -74,7 +74,15 @@ const NAV_ITEMS: { view: ForensicView; label: string; icon: React.ElementType }[
 // ---------------------------------------------------------------------------
 export const ForensicWorkspacePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const navState = location.state as {
+    fromAccount?: string;
+    fromTransaction?: string;
+    fromForensics?: boolean;
+    forensicView?: string;
+  } | null;
 
   const communityParam = searchParams.get('community');
   const activeView = normalizeView(searchParams.get('view'));
@@ -164,9 +172,9 @@ export const ForensicWorkspacePage: React.FC = () => {
   useEffect(() => {
     if (!communityParam || !['network', 'accounts'].includes(activeView) || graphData || loadingGraph) return;
     setLoadingGraph(true);
-    getCommunityGraph(communityParam, 200, 500)
+    getCommunityGraph(communityParam, 200, 500, focusParam)
       .then(setGraphData).catch(console.error).finally(() => setLoadingGraph(false));
-  }, [communityParam, activeView, graphData, loadingGraph]);
+  }, [communityParam, activeView, graphData, loadingGraph, focusParam]);
 
   // accounts on demand
   useEffect(() => {
@@ -191,19 +199,60 @@ export const ForensicWorkspacePage: React.FC = () => {
   useEffect(() => { if (focusParam) setFocusedNodeId(focusParam); }, [focusParam]);
 
   // cross-view helpers
-  const handleFocusInNetwork = useCallback((accountId: string) => {
-    setFocusedNodeId(accountId); setView('network', { focus: accountId });
+  const handleFocusInNetwork = useCallback((accountId: string, lens: InvestigationLens = 'relationship') => {
+    setFocusedNodeId(accountId);
+    setView('network', { focus: accountId, lens });
   }, [setView]);
 
   const handleSelectEvidence = useCallback((item: EvidenceItem) => {
     setEvidenceFocus(item);
     const fe = item.supporting_entities[0];
-    setView('network', fe ? { focus: fe } : {});
+    let mappedLens: InvestigationLens = 'relationship';
+    if (['SHARED_INSTRUMENT_CONCENTRATION', 'DEVICE_REUSE', 'IP_CONCENTRATION'].includes(item.type)) {
+      mappedLens = 'shared-infrastructure';
+    } else if (['TEMPORAL_BURST', 'MERCHANT_TEMPORAL_OVERLAP', 'RAPID_INTERACTION'].includes(item.type)) {
+      mappedLens = 'temporal';
+    }
+    const extra: Record<string, string> = { lens: mappedLens };
+    if (fe) extra.focus = fe;
+    setView('network', extra);
   }, [setView]);
 
   const handleClearFocus = useCallback(() => {
-    setEvidenceFocus(null); setFocusedNodeId(null);
-  }, []);
+    setEvidenceFocus(null);
+    setFocusedNodeId(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('focus');
+      next.delete('lens');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleFocalChange = useCallback((nodeId: string | null) => {
+    setFocusedNodeId(nodeId);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nodeId) {
+        next.set('focus', nodeId);
+      } else {
+        next.delete('focus');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleLensChange = useCallback((lens: InvestigationLens) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (lens && lens !== 'community') {
+        next.set('lens', lens);
+      } else {
+        next.delete('lens');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   // account columns
   const accountColumns: Column<AccountSummary>[] = [
@@ -348,15 +397,37 @@ export const ForensicWorkspacePage: React.FC = () => {
       {/* COMPACT FORENSIC HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)', gap: '16px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => navigate('/communities/' + communityParam)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
-            onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
-            onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-          >
-            <ArrowLeft size={13} />
-            <span>Community #{community.community_id}</span>
-          </button>
+          {navState?.fromAccount ? (
+            <button
+              onClick={() => navigate('/accounts/' + navState.fromAccount)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              <ArrowLeft size={13} />
+              <span>Back to Account {navState.fromAccount}</span>
+            </button>
+          ) : navState?.fromTransaction ? (
+            <button
+              onClick={() => navigate('/transactions/' + navState.fromTransaction)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              <ArrowLeft size={13} />
+              <span>Back to Transaction {navState.fromTransaction}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/communities/' + communityParam)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              <ArrowLeft size={13} />
+              <span>Community #{community.community_id}</span>
+            </button>
+          )}
           <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FlaskConical size={14} style={{ color: 'var(--accent)' }} />
@@ -450,6 +521,8 @@ export const ForensicWorkspacePage: React.FC = () => {
                 initialSelectedNodeId={focusedNodeId}
                 initialLens={lensParam}
                 onClearFocus={handleClearFocus}
+                onFocalChange={handleFocalChange}
+                onLensChange={handleLensChange}
               />
             )
           }
@@ -512,7 +585,12 @@ export const ForensicWorkspacePage: React.FC = () => {
       {activeView === 'money-flow' && (
         loadingTimeline
           ? <div style={{ padding: '24px' }}><LoadingState type="card" count={2} /></div>
-          : <MoneyMovementFlow timelineEvents={timelineEvents} onFocusAccountInGraph={handleFocusInNetwork} />
+          : (
+            <MoneyMovementFlow
+              timelineEvents={timelineEvents}
+              onFocusAccountInGraph={(accId) => handleFocusInNetwork(accId, 'flow-of-funds')}
+            />
+          )
       )}
 
       {/* VIEW: STORYLINE */}

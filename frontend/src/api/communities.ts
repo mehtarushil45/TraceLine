@@ -29,10 +29,12 @@ export async function getCommunityAccounts(
 export async function getCommunityGraph(
   communityId: number | string,
   maxNodes: number = 200,
-  maxEdges: number = 500
+  maxEdges: number = 500,
+  focalAccountId?: string | null
 ): Promise<CommunityGraphResponse> {
+  const focalQuery = focalAccountId ? `&focal_account_id=${encodeURIComponent(focalAccountId)}` : '';
   return fetchApi<CommunityGraphResponse>(
-    `/graph/community/${communityId}?max_nodes=${maxNodes}&max_edges=${maxEdges}`
+    `/graph/community/${communityId}?max_nodes=${maxNodes}&max_edges=${maxEdges}${focalQuery}`
   );
 }
 

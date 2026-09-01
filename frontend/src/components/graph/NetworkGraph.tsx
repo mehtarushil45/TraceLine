@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import cytoscape from 'cytoscape';
 import type { Core, EventObject } from 'cytoscape';
 import {
-  ChevronLeft, ChevronRight, ExternalLink,
+  AlertCircle, ChevronLeft, ChevronRight, ExternalLink,
   GitCommit, Layers, Link2, Maximize2, Minimize2, Network,
   Route, RotateCcw, ScanSearch, Search, Share2, Timer,
   X, ZoomIn, ZoomOut,
@@ -15,29 +15,61 @@ import { Badge, Button } from '../common';
 // Investigation Intelligence — Lens Definitions
 // ---------------------------------------------------------------------------
 export type InvestigationLens =
-  | 'relationship'          // WHY are these entities connected?
-  | 'flow-of-funds'         // WHAT temporal activity overlap exists?
-  | 'shared-infrastructure' // WHAT hardware / tokens / IPs are shared?
-  | 'temporal'              // WHEN did concurrent activity occur?
-  | 'community';            // Full community partition structure
+  | 'relationship'          // Focal account's observed 1-hop neighborhood
+  | 'flow-of-funds'         // Direct inter-account funds movement
+  | 'shared-infrastructure' // Shared hardware, tokens, or IP addresses
+  | 'temporal'              // Concurrent activity calendar days
+  | 'community';            // Full Louvain community partition structure
 
 const LENS_CONFIG: {
   id: InvestigationLens;
   label: string;
   icon: React.ElementType;
   question: string;
+  description: string;
 }[] = [
-  { id: 'relationship',          label: 'Relationship',          icon: Link2,   question: 'Why are these accounts connected?' },
-  { id: 'flow-of-funds',         label: 'Flow of Funds',         icon: Route,   question: 'What temporal activity overlap exists?' },
-  { id: 'shared-infrastructure', label: 'Shared Infrastructure', icon: Share2,  question: 'What hardware, tokens, or IPs are shared?' },
-  { id: 'temporal',              label: 'Temporal Convergence',  icon: Timer,   question: 'When did concurrent transaction activity occur?' },
-  { id: 'community',             label: 'Community Structure',   icon: Network, question: 'What is the full partition structure?' },
+  {
+    id: 'relationship',
+    label: 'Relationship',
+    icon: Link2,
+    question: 'Why are these accounts connected?',
+    description: '1-hop observed relationship neighborhood centered on the focal account.',
+  },
+  {
+    id: 'flow-of-funds',
+    label: 'Flow of Funds',
+    icon: Route,
+    question: 'Where did direct fund movement occur between accounts?',
+    description: 'Direct transaction flow and transfer velocity between accounts.',
+  },
+  {
+    id: 'shared-infrastructure',
+    label: 'Shared Infrastructure',
+    icon: Share2,
+    question: 'What hardware, tokens, or IPs are shared?',
+    description: 'Hardware fingerprints, payment instruments, and IP addresses common to multiple accounts.',
+  },
+  {
+    id: 'temporal',
+    label: 'Temporal Convergence',
+    icon: Timer,
+    question: 'When did concurrent transaction activity occur?',
+    description: 'Calendar days on which both accounts engaged in transaction activity.',
+  },
+  {
+    id: 'community',
+    label: 'Community Structure',
+    icon: Network,
+    question: 'What is the full Louvain partition structure?',
+    description: 'Structural graph modularity partition. Community membership reflects network topology, not a fraud determination.',
+  },
 ];
 
 // ---------------------------------------------------------------------------
 // Edge Relationship Types
 // ---------------------------------------------------------------------------
 type EdgeRelType =
+  | 'TRANSACTION_FLOW'
   | 'SHARED_DEVICE'
   | 'SHARED_INSTRUMENT'
   | 'SHARED_IP'
@@ -47,27 +79,29 @@ type EdgeRelType =
   | 'WEIGHT_ONLY';
 
 const EDGE_REL_COLORS: Record<EdgeRelType, string> = {
-  SHARED_DEVICE:     '#fb923c',
-  SHARED_INSTRUMENT: '#fbbf24',
-  SHARED_IP:         '#60a5fa',
-  SHARED_MERCHANT:   '#34d399',
-  TEMPORAL_OVERLAP:  '#38bdf8',
-  MULTI_LAYER:       '#c084fc',
-  WEIGHT_ONLY:       '#374151',
+  TRANSACTION_FLOW:  '#10b981', // emerald
+  SHARED_DEVICE:     '#fb923c', // orange
+  SHARED_INSTRUMENT: '#fbbf24', // amber
+  SHARED_IP:         '#60a5fa', // blue
+  SHARED_MERCHANT:   '#34d399', // green
+  TEMPORAL_OVERLAP:  '#38bdf8', // sky
+  MULTI_LAYER:       '#c084fc', // purple
+  WEIGHT_ONLY:       '#4b5563', // gray
 };
 
 const EDGE_REL_LABELS: Record<EdgeRelType, string> = {
+  TRANSACTION_FLOW:  'TRANSACTION FLOW',
   SHARED_DEVICE:     'SHARED DEVICE',
   SHARED_INSTRUMENT: 'SHARED INSTRUMENT',
   SHARED_IP:         'SHARED IP ADDRESS',
   SHARED_MERCHANT:   'SHARED MERCHANT',
   TEMPORAL_OVERLAP:  'TEMPORAL OVERLAP',
   MULTI_LAYER:       'MULTI-LAYER EVIDENCE',
-  WEIGHT_ONLY:       'OBSERVED LINK',
+  WEIGHT_ONLY:       'PROJECTED WEIGHT',
 };
 
 // ---------------------------------------------------------------------------
-// Evidence display config (kept for backward compat with evidenceFocus)
+// Evidence display config (for backward compat with evidenceFocus)
 // ---------------------------------------------------------------------------
 const EVIDENCE_DISPLAY_LABELS: Record<string, string> = {
   SHARED_INSTRUMENT_CONCENTRATION: 'Shared Payment Instrument',
@@ -97,14 +131,16 @@ const EVIDENCE_COLORS: Record<string, string> = {
 // Pure helper — derive primary edge relationship type
 // ---------------------------------------------------------------------------
 function deriveEdgeRelType(edge: GraphEdge): EdgeRelType {
-  const hasDevice     = edge.shared_devices.length > 0;
-  const hasInstrument = edge.shared_instruments.length > 0;
-  const hasIp         = edge.shared_ips.length > 0;
-  const hasMerchant   = edge.shared_merchants.length > 0;
-  const hasTemporal   = edge.temporal_overlap > 0;
+  const hasTx         = Boolean(edge.has_transaction_flow || (edge.transaction_count && edge.transaction_count > 0));
+  const hasDevice     = (edge.shared_devices || []).length > 0;
+  const hasInstrument = (edge.shared_instruments || []).length > 0;
+  const hasIp         = (edge.shared_ips || []).length > 0;
+  const hasMerchant   = (edge.shared_merchants || []).length > 0;
+  const hasTemporal   = (edge.temporal_overlap || 0) > 0;
 
-  const count = [hasDevice, hasInstrument, hasIp, hasMerchant, hasTemporal].filter(Boolean).length;
+  const count = [hasTx, hasDevice, hasInstrument, hasIp, hasMerchant, hasTemporal].filter(Boolean).length;
   if (count >= 2) return 'MULTI_LAYER';
+  if (hasTx)         return 'TRANSACTION_FLOW';
   if (hasDevice)     return 'SHARED_DEVICE';
   if (hasInstrument) return 'SHARED_INSTRUMENT';
   if (hasIp)         return 'SHARED_IP';
@@ -113,7 +149,6 @@ function deriveEdgeRelType(edge: GraphEdge): EdgeRelType {
   return 'WEIGHT_ONLY';
 }
 
-// Cytoscape class name from EdgeRelType
 function edgeRelClass(rel: EdgeRelType): string {
   return `rel-${rel.toLowerCase().replace(/_/g, '-')}`;
 }
@@ -123,28 +158,59 @@ function edgeRelClass(rel: EdgeRelType): string {
 // ---------------------------------------------------------------------------
 function buildEdgeWhyLines(edge: GraphEdge): string[] {
   const lines: string[] = [];
-  if (edge.shared_devices.length > 0) {
-    const extra = edge.shared_devices.length > 2 ? ` (+${edge.shared_devices.length - 2} more)` : '';
-    lines.push(`Shared device: ${edge.shared_devices.slice(0, 2).join(', ')}${extra}`);
+
+  // 1. Direct transaction flow
+  if (edge.has_transaction_flow || (edge.transaction_count && edge.transaction_count > 0)) {
+    const count = edge.transaction_count || 1;
+    const amtStr = edge.total_amount != null
+      ? ` totaling $${edge.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : '';
+    let dirStr = '';
+    if (edge.flow_direction === 'source_to_target') {
+      dirStr = ` (${edge.source} → ${edge.target})`;
+    } else if (edge.flow_direction === 'target_to_source') {
+      dirStr = ` (${edge.target} → ${edge.source})`;
+    } else if (edge.flow_direction === 'bidirectional') {
+      dirStr = ' (Bidirectional flow)';
+    }
+    lines.push(`Direct transaction flow: ${count} transfer${count !== 1 ? 's' : ''}${amtStr}${dirStr}`);
   }
-  if (edge.shared_instruments.length > 0) {
-    const extra = edge.shared_instruments.length > 2 ? ` (+${edge.shared_instruments.length - 2} more)` : '';
-    lines.push(`Shared payment instrument: ${edge.shared_instruments.slice(0, 2).join(', ')}${extra}`);
+
+  // 2. Hardware / Device sharing
+  if (edge.shared_devices && edge.shared_devices.length > 0) {
+    const extra = edge.shared_devices.length > 3 ? ` (+${edge.shared_devices.length - 3} more)` : '';
+    lines.push(`Shared device hardware: ${edge.shared_devices.slice(0, 3).join(', ')}${extra}`);
   }
-  if (edge.shared_ips.length > 0) {
-    const extra = edge.shared_ips.length > 2 ? ` (+${edge.shared_ips.length - 2} more)` : '';
-    lines.push(`Shared IP address: ${edge.shared_ips.slice(0, 2).join(', ')}${extra}`);
+
+  // 3. Payment instrument sharing
+  if (edge.shared_instruments && edge.shared_instruments.length > 0) {
+    const extra = edge.shared_instruments.length > 3 ? ` (+${edge.shared_instruments.length - 3} more)` : '';
+    lines.push(`Shared payment instrument: ${edge.shared_instruments.slice(0, 3).join(', ')}${extra}`);
   }
-  if (edge.shared_merchants.length > 0) {
-    const extra = edge.shared_merchants.length > 2 ? ` (+${edge.shared_merchants.length - 2} more)` : '';
-    lines.push(`Shared merchant: ${edge.shared_merchants.slice(0, 2).join(', ')}${extra}`);
+
+  // 4. IP address sharing
+  if (edge.shared_ips && edge.shared_ips.length > 0) {
+    const extra = edge.shared_ips.length > 3 ? ` (+${edge.shared_ips.length - 3} more)` : '';
+    lines.push(`Shared IP address: ${edge.shared_ips.slice(0, 3).join(', ')}${extra}`);
   }
-  if (edge.temporal_overlap > 0) {
+
+  // 5. Merchant sharing
+  if (edge.shared_merchants && edge.shared_merchants.length > 0) {
+    const extra = edge.shared_merchants.length > 3 ? ` (+${edge.shared_merchants.length - 3} more)` : '';
+    lines.push(`Shared merchant activity: ${edge.shared_merchants.slice(0, 3).join(', ')}${extra}`);
+  }
+
+  // 6. Temporal overlap
+  if (edge.temporal_overlap && edge.temporal_overlap > 0) {
     lines.push(
-      `Same-day transaction activity overlap: ${edge.temporal_overlap} observed day${edge.temporal_overlap !== 1 ? 's' : ''}`
+      `Temporal convergence: ${edge.temporal_overlap} calendar day${edge.temporal_overlap !== 1 ? 's' : ''} with concurrent transaction activity`
     );
   }
-  return lines.length > 0 ? lines : ['Relationship established by multi-factor graph evidence weight'];
+
+  // Fallback when telemetry does not contain specific lists
+  return lines.length > 0
+    ? lines
+    : ['Relationship established by projected evidence weight; specific shared entity telemetry is unavailable in current records.'];
 }
 
 // ---------------------------------------------------------------------------
@@ -169,8 +235,19 @@ function buildInvestigativeThread(
     );
   }
 
+  // Direct transaction flow
+  const txEdges = focalEdges.filter((e) => Boolean(e.has_transaction_flow || (e.transaction_count && e.transaction_count > 0)));
+  if (txEdges.length > 0) {
+    const totalTx = txEdges.reduce((sum, e) => sum + (e.transaction_count || 1), 0);
+    const totalAmt = txEdges.reduce((sum, e) => sum + (e.total_amount || 0), 0);
+    obs.push(
+      `Direct transaction flow observed across ${txEdges.length} relationship${txEdges.length !== 1 ? 's' : ''} ` +
+      `(${totalTx} direct transfer${totalTx !== 1 ? 's' : ''} totaling $${totalAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
+    );
+  }
+
   // Device sharing
-  const deviceEdges = focalEdges.filter((e) => e.shared_devices.length > 0);
+  const deviceEdges = focalEdges.filter((e) => (e.shared_devices || []).length > 0);
   if (deviceEdges.length > 0) {
     const peers = deviceEdges.map(getPeer);
     obs.push(
@@ -180,7 +257,7 @@ function buildInvestigativeThread(
   }
 
   // Instrument sharing
-  const instrEdges = focalEdges.filter((e) => e.shared_instruments.length > 0);
+  const instrEdges = focalEdges.filter((e) => (e.shared_instruments || []).length > 0);
   if (instrEdges.length > 0) {
     obs.push(
       `Observed payment instrument infrastructure shared with ${instrEdges.length} account${instrEdges.length !== 1 ? 's' : ''} in this partition.`
@@ -188,7 +265,7 @@ function buildInvestigativeThread(
   }
 
   // IP sharing
-  const ipEdges = focalEdges.filter((e) => e.shared_ips.length > 0);
+  const ipEdges = focalEdges.filter((e) => (e.shared_ips || []).length > 0);
   if (ipEdges.length > 0) {
     obs.push(
       `Observed IP address sharing across ${ipEdges.length} relationship${ipEdges.length !== 1 ? 's' : ''} in this partition.`
@@ -196,9 +273,9 @@ function buildInvestigativeThread(
   }
 
   // Temporal overlap
-  const temporalEdges = focalEdges.filter((e) => e.temporal_overlap > 0);
+  const temporalEdges = focalEdges.filter((e) => (e.temporal_overlap || 0) > 0);
   if (temporalEdges.length > 0) {
-    const totalDays = temporalEdges.reduce((s, e) => s + e.temporal_overlap, 0);
+    const totalDays = temporalEdges.reduce((s, e) => s + (e.temporal_overlap || 0), 0);
     obs.push(
       `Same-day transaction activity overlap observed across ${temporalEdges.length} relationship${temporalEdges.length !== 1 ? 's' : ''} ` +
       `(total: ${totalDays} concurrent day${totalDays !== 1 ? 's' : ''}).`
@@ -207,10 +284,11 @@ function buildInvestigativeThread(
 
   // Multi-layer links
   const multiEdges = focalEdges.filter((e) => {
-    const n = (e.shared_devices.length > 0 ? 1 : 0)
-      + (e.shared_instruments.length > 0 ? 1 : 0)
-      + (e.shared_ips.length > 0 ? 1 : 0)
-      + (e.temporal_overlap > 0 ? 1 : 0);
+    const n = ((e.shared_devices || []).length > 0 ? 1 : 0)
+      + ((e.shared_instruments || []).length > 0 ? 1 : 0)
+      + ((e.shared_ips || []).length > 0 ? 1 : 0)
+      + ((e.temporal_overlap || 0) > 0 ? 1 : 0)
+      + (Boolean(e.has_transaction_flow || (e.transaction_count && e.transaction_count > 0)) ? 1 : 0);
     return n >= 2;
   });
   if (multiEdges.length > 0) {
@@ -228,7 +306,7 @@ function buildInvestigativeThread(
     );
   }
 
-  // Evidence items from community evidence engine
+  // Deterministic rule triggers from community evidence engine
   const nodeEvidence = allEvidence.filter(
     (e) => (e.supporting_entities || []).includes(focalId)
   );
@@ -247,6 +325,8 @@ function findGraphPath(
   fromId: string,
   toId: string
 ): string[] | null {
+  const nodeIds = new Set(graphData.nodes.map((n) => n.id));
+  if (!nodeIds.has(fromId) || !nodeIds.has(toId)) return null;
   if (fromId === toId) return [fromId];
 
   const adj = new Map<string, string[]>();
@@ -286,25 +366,47 @@ function getEdgeBetween(
 }
 
 // ---------------------------------------------------------------------------
-// Cytoscape lens application (pure, called inside effects)
+// Cytoscape lens application (pure function called inside effects)
 // ---------------------------------------------------------------------------
 function applyLens(
   cy: Core,
   lens: InvestigationLens,
   focalId: string | null
-): void {
+): { statusMessage?: string } {
   cy.elements().removeClass('lens-focus lens-dim');
 
-  if (lens === 'community') return;
+  if (lens === 'community') {
+    return {};
+  }
 
   if (lens === 'relationship') {
-    if (!focalId) return;
-    const focal = cy.nodes().filter((n: any) => n.id() === focalId);
-    if (focal.length === 0) return;
+    let focal: any = focalId ? cy.nodes().filter((n: any) => n.id() === focalId) : cy.collection();
+    if (focal.length === 0) {
+      // If no focal is specified, highlight the highest degree hub as contextual start
+      focal = cy.nodes().sort((a: any, b: any) => (b.data('degree') || 0) - (a.data('degree') || 0)).slice(0, 1);
+    }
+    if (!focal || focal.length === 0) return {};
     const neighborhood = focal.neighborhood().add(focal);
     cy.elements().difference(neighborhood).addClass('lens-dim');
     neighborhood.addClass('lens-focus');
-    return;
+    return {};
+  }
+
+  if (lens === 'flow-of-funds') {
+    const flowEdges = cy.edges().filter((e: any) => {
+      const hasTx = Boolean(e.data('has_transaction_flow'));
+      const count = (e.data('transaction_count') as number) || 0;
+      return hasTx || count > 0;
+    });
+    if (flowEdges.length === 0) {
+      cy.elements().addClass('lens-dim');
+      return { statusMessage: 'No direct inter-account fund transfers recorded between these nodes in available telemetry.' };
+    }
+    const flowNodes = flowEdges.connectedNodes();
+    const flowSet   = flowNodes.add(flowEdges);
+    cy.elements().difference(flowSet).addClass('lens-dim');
+    flowSet.addClass('lens-focus');
+    return {};
   }
 
   if (lens === 'shared-infrastructure') {
@@ -314,24 +416,33 @@ function applyLens(
       const sip = (e.data('shared_ips') as string[]) || [];
       return sd.length > 0 || si.length > 0 || sip.length > 0;
     });
-    if (infraEdges.length === 0) return;
+    if (infraEdges.length === 0) {
+      cy.elements().addClass('lens-dim');
+      return { statusMessage: 'No shared hardware, token, or IP telemetry recorded among current nodes.' };
+    }
     const infraNodes = infraEdges.connectedNodes();
     const infraSet   = infraNodes.add(infraEdges);
     cy.elements().difference(infraSet).addClass('lens-dim');
     infraSet.addClass('lens-focus');
-    return;
+    return {};
   }
 
-  if (lens === 'flow-of-funds' || lens === 'temporal') {
+  if (lens === 'temporal') {
     const temporalEdges = cy.edges().filter(
-      (e: any) => (e.data('temporal_overlap') as number || 0) > 0
+      (e: any) => ((e.data('temporal_overlap') as number) || 0) > 0
     );
-    if (temporalEdges.length === 0) return;
+    if (temporalEdges.length === 0) {
+      cy.elements().addClass('lens-dim');
+      return { statusMessage: 'No same-day transaction activity overlap observed among current nodes.' };
+    }
     const temporalNodes = temporalEdges.connectedNodes();
     const temporalSet   = temporalNodes.add(temporalEdges);
     cy.elements().difference(temporalSet).addClass('lens-dim');
     temporalSet.addClass('lens-focus');
+    return {};
   }
+
+  return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +459,9 @@ interface NetworkGraphProps {
   onClearFocus?: () => void;
   /** Pre-selected investigation lens (from URL ?lens= param) */
   initialLens?: InvestigationLens;
+  /** Notification callbacks to keep URL params synchronized */
+  onFocalChange?: (nodeId: string | null) => void;
+  onLensChange?: (lens: InvestigationLens) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -358,9 +472,12 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   height = '640px',
   evidenceFocus = null,
   allEvidenceItems = [],
+  communityId,
   initialSelectedNodeId = null,
   onClearFocus,
   initialLens = 'community',
+  onFocalChange,
+  onLensChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef        = useRef<Core | null>(null);
@@ -369,16 +486,34 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   // ── Internal state ────────────────────────────────────────────────────────
   const [focalNodeId, setFocalNodeId]       = useState<string | null>(initialSelectedNodeId);
   const [activeLens, setActiveLens]         = useState<InvestigationLens>(initialLens);
+  const [lensStatusMessage, setLensStatusMessage] = useState<string | null>(null);
   const [selectedNode, setSelectedNode]     = useState<GraphNode | null>(null);
   const [selectedEdge, setSelectedEdge]     = useState<GraphEdge | null>(null);
   const [layoutName, setLayoutName]         = useState<'cose' | 'concentric' | 'circle'>('cose');
   const [graphSearchQuery, setGraphSearchQuery] = useState('');
   const [isFullscreen, setIsFullscreen]     = useState(false);
-  const [showThreadPanel, setShowThreadPanel] = useState(!!initialSelectedNodeId);
+  const [showThreadPanel, setShowThreadPanel] = useState(Boolean(initialSelectedNodeId));
   const [showPathPanel, setShowPathPanel]   = useState(false);
   const [pathFrom, setPathFrom]             = useState(initialSelectedNodeId || '');
   const [pathTo, setPathTo]                 = useState('');
   const [pathResult, setPathResult]         = useState<string[] | null | 'not-found'>(null);
+
+  // Sync state if initial props change via URL navigation
+  useEffect(() => {
+    if (initialSelectedNodeId !== undefined) {
+      setFocalNodeId(initialSelectedNodeId);
+      if (initialSelectedNodeId) {
+        setPathFrom(initialSelectedNodeId);
+        setShowThreadPanel(true);
+      }
+    }
+  }, [initialSelectedNodeId]);
+
+  useEffect(() => {
+    if (initialLens) {
+      setActiveLens(initialLens);
+    }
+  }, [initialLens]);
 
   // ── Derived: available node IDs for focus checks ──────────────────────────
   const availableNodeIds = useMemo(
@@ -396,7 +531,11 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       if (!isFocal) continue;
       const peer = e.source === initialSelectedNodeId ? e.target : e.source;
       neighborIds.add(peer);
-      if (e.shared_devices.length > 0 || e.shared_instruments.length > 0 || e.shared_ips.length > 0) {
+      if (
+        (e.shared_devices || []).length > 0 ||
+        (e.shared_instruments || []).length > 0 ||
+        (e.shared_ips || []).length > 0
+      ) {
         sharedInfraIds.add(peer);
       }
     }
@@ -441,11 +580,15 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           source: edge.source,
           target: edge.target,
           weight: edge.weight,
-          shared_instruments: edge.shared_instruments,
-          shared_devices: edge.shared_devices,
-          shared_ips: edge.shared_ips,
-          shared_merchants: edge.shared_merchants,
-          temporal_overlap: edge.temporal_overlap,
+          shared_instruments: edge.shared_instruments || [],
+          shared_devices: edge.shared_devices || [],
+          shared_ips: edge.shared_ips || [],
+          shared_merchants: edge.shared_merchants || [],
+          temporal_overlap: edge.temporal_overlap || 0,
+          has_transaction_flow: edge.has_transaction_flow,
+          transaction_count: edge.transaction_count,
+          total_amount: edge.total_amount,
+          flow_direction: edge.flow_direction,
         },
         classes: edgeRelClass(relType),
       });
@@ -571,13 +714,14 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           },
         },
         // ── Edge relationship type colors ──
-        { selector: 'edge.rel-shared-device',         style: { 'line-color': '#fb923c', opacity: 0.78 } },
-        { selector: 'edge.rel-shared-instrument',     style: { 'line-color': '#fbbf24', opacity: 0.78 } },
-        { selector: 'edge.rel-shared-ip',             style: { 'line-color': '#60a5fa', opacity: 0.78 } },
-        { selector: 'edge.rel-shared-merchant',       style: { 'line-color': '#34d399', opacity: 0.78 } },
-        { selector: 'edge.rel-temporal-overlap',      style: { 'line-color': '#38bdf8', opacity: 0.78 } },
-        { selector: 'edge.rel-multi-layer',           style: { 'line-color': '#c084fc', opacity: 0.82 } },
-        { selector: 'edge.rel-weight-only',           style: { 'line-color': '#374151', opacity: 0.4  } },
+        { selector: 'edge.rel-transaction-flow',      style: { 'line-color': '#10b981', opacity: 0.85, width: 2.8 } },
+        { selector: 'edge.rel-shared-device',         style: { 'line-color': '#fb923c', opacity: 0.8 } },
+        { selector: 'edge.rel-shared-instrument',     style: { 'line-color': '#fbbf24', opacity: 0.8 } },
+        { selector: 'edge.rel-shared-ip',             style: { 'line-color': '#60a5fa', opacity: 0.8 } },
+        { selector: 'edge.rel-shared-merchant',       style: { 'line-color': '#34d399', opacity: 0.8 } },
+        { selector: 'edge.rel-temporal-overlap',      style: { 'line-color': '#38bdf8', opacity: 0.8 } },
+        { selector: 'edge.rel-multi-layer',           style: { 'line-color': '#c084fc', opacity: 0.85 } },
+        { selector: 'edge.rel-weight-only',           style: { 'line-color': '#4b5563', opacity: 0.45 } },
         // ── Lens dim edge ──
         { selector: 'edge.lens-dim',  style: { opacity: 0.04 } },
         // ── Lens focus edge ──
@@ -606,12 +750,18 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
     cy.on('tap', 'edge', (evt: EventObject) => {
       const d = evt.target.data();
       setSelectedEdge({
-        source: d.source, target: d.target, weight: d.weight,
+        source: d.source,
+        target: d.target,
+        weight: d.weight,
         shared_instruments: d.shared_instruments || [],
         shared_devices: d.shared_devices || [],
         shared_ips: d.shared_ips || [],
         shared_merchants: d.shared_merchants || [],
         temporal_overlap: d.temporal_overlap || 0,
+        has_transaction_flow: d.has_transaction_flow,
+        transaction_count: d.transaction_count,
+        total_amount: d.total_amount,
+        flow_direction: d.flow_direction,
       });
       setSelectedNode(null);
     });
@@ -627,7 +777,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       try {
         cy.resize();
         cy.fit(undefined, 50);
-        applyLens(cy, initialLens, initialSelectedNodeId);
+        const res = applyLens(cy, initialLens, initialSelectedNodeId);
+        setLensStatusMessage(res.statusMessage || null);
         if (initialSelectedNodeId) {
           const focal = cy.nodes().filter((n: any) => n.id() === initialSelectedNodeId);
           if (focal.length > 0) {
@@ -649,7 +800,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    applyLens(cy, activeLens, focalNodeId);
+    const res = applyLens(cy, activeLens, focalNodeId);
+    setLensStatusMessage(res.statusMessage || null);
   }, [activeLens, focalNodeId, graphData]);
 
   // ── Node role update when focalNodeId changes ─────────────────────────────
@@ -674,7 +826,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
     );
     const infraSet = new Set(
       focalEdges
-        .filter((e) => e.shared_devices.length > 0 || e.shared_instruments.length > 0 || e.shared_ips.length > 0)
+        .filter((e) => (e.shared_devices || []).length > 0 || (e.shared_instruments || []).length > 0 || (e.shared_ips || []).length > 0)
         .map((e) => (e.source === focalNodeId ? e.target : e.source))
     );
 
@@ -730,6 +882,11 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   }, [evidenceFocus, graphData, availableNodeIds]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleLensSelect = (lens: InvestigationLens) => {
+    setActiveLens(lens);
+    onLensChange?.(lens);
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const q = graphSearchQuery.trim().toLowerCase();
@@ -763,12 +920,12 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
     setFocalNodeId(nodeId);
     setShowThreadPanel(true);
     setPathFrom(nodeId);
+    onFocalChange?.(nodeId);
     const cy = cyRef.current;
     if (!cy) return;
-    // Lens will re-apply via effect; center on focal
     const focal = cy.nodes().filter((n: any) => n.id() === nodeId);
     if (focal.length > 0) { cy.center(focal); }
-  }, []);
+  }, [onFocalChange]);
 
   const handleTracePath = () => {
     if (!pathFrom.trim() || !pathTo.trim()) return;
@@ -799,19 +956,20 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
     cy.elements().removeStyle();
     cy.nodes().unselect(); cy.edges().unselect();
     setSelectedNode(null); setSelectedEdge(null);
-    setGraphSearchQuery(''); setPathResult(null);
+    setGraphSearchQuery(''); setPathResult(null); setLensStatusMessage(null);
+    onClearFocus?.();
+
     // Re-apply lens and node roles after style flush
     setTimeout(() => {
       if (!cyRef.current) return;
       applyLens(cyRef.current, activeLens, focalNodeId);
-      // Re-apply role classes after removeStyle() wiped them
       if (focalNodeId) {
         const focalEdges = graphData.edges.filter(
           (e) => e.source === focalNodeId || e.target === focalNodeId
         );
         const neighborSet = new Set(focalEdges.map((e) => (e.source === focalNodeId ? e.target : e.source)));
         const infraSet = new Set(
-          focalEdges.filter((e) => e.shared_devices.length > 0 || e.shared_instruments.length > 0 || e.shared_ips.length > 0)
+          focalEdges.filter((e) => (e.shared_devices || []).length > 0 || (e.shared_instruments || []).length > 0 || (e.shared_ips || []).length > 0)
             .map((e) => (e.source === focalNodeId ? e.target : e.source))
         );
         cyRef.current.nodes().forEach((n: any) => {
@@ -825,7 +983,6 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       }
       try { cyRef.current.fit(undefined, 50); } catch { /* ignore */ }
     }, 0);
-    onClearFocus?.();
   }, [activeLens, focalNodeId, graphData.edges, onClearFocus]);
 
   const handleZoomIn  = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.25);
@@ -833,7 +990,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const handleFit     = () => { try { cyRef.current?.fit(undefined, 50); } catch { /* ignore */ } };
 
   // ── Derived display values ────────────────────────────────────────────────
-  const hasFocus       = !!evidenceFocus;
+  const hasFocus       = Boolean(evidenceFocus);
   const focusLabel     = evidenceFocus
     ? (EVIDENCE_DISPLAY_LABELS[evidenceFocus.type] || evidenceFocus.type.replace(/_/g, ' '))
     : '';
@@ -865,11 +1022,11 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       const nextId  = (pathResult as string[])[i + 1];
       const edge    = getEdgeBetween(graphData, id, nextId);
       const relType = edge ? deriveEdgeRelType(edge) : ('WEIGHT_ONLY' as EdgeRelType);
-      return { from: id, to: nextId, relType };
+      return { from: id, to: nextId, relType, edge };
     });
   }, [pathResult, graphData]);
 
-  const activeLensConfig = LENS_CONFIG.find((l) => l.id === activeLens)!;
+  const activeLensConfig = LENS_CONFIG.find((l) => l.id === activeLens) || LENS_CONFIG[0];
 
   // ── Toolbar button shared style helpers ───────────────────────────────────
   const tbBtn = (active: boolean, activeColor: string) => ({
@@ -930,8 +1087,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             return (
               <button
                 key={lens.id}
-                onClick={() => setActiveLens(lens.id)}
-                title={lens.question}
+                onClick={() => handleLensSelect(lens.id)}
+                title={lens.description}
                 style={tbBtn(isActive, '#60a5fa')}
               >
                 <Icon size={11} />
@@ -987,13 +1144,21 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             />
           </form>
 
-          {/* Active lens question */}
-          <span style={{
-            fontSize: '11px', color: 'var(--text-dim)', fontStyle: 'italic',
-            flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {activeLensConfig.question}
-          </span>
+          {/* Active lens question & description */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
+              fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {activeLensConfig.question}
+            </span>
+            <span style={{
+              fontSize: '10px', color: 'var(--text-dim)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              — {activeLensConfig.description}
+            </span>
+          </div>
 
           {/* Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
@@ -1031,6 +1196,18 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Informational status for sparse lens matches */}
+        {lensStatusMessage && (
+          <div style={{
+            padding: '6px 14px', backgroundColor: 'rgba(234,179,8,0.08)',
+            borderTop: '1px solid rgba(234,179,8,0.2)', display: 'flex', alignItems: 'center', gap: '8px',
+            fontSize: '11px', color: '#facc15',
+          }}>
+            <AlertCircle size={13} style={{ flexShrink: 0 }} />
+            <span>{lensStatusMessage}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Evidence focus banner ────────────────────────────────────────── */}
@@ -1222,7 +1399,6 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             <div style={{ borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '6px' }}>
               <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '4px' }}>Edge Types</span>
               {(Object.entries(EDGE_REL_COLORS) as [EdgeRelType, string][])
-                .filter(([rel]) => rel !== 'WEIGHT_ONLY')
                 .map(([rel, color]) => (
                   <div key={rel} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                     <span style={{ width: '14px', height: '2px', backgroundColor: color, flexShrink: 0 }} />
@@ -1263,7 +1439,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           {selectedNode && (
             <div style={{
               position: 'absolute', top: '14px', right: '14px',
-              width: '300px',
+              width: '310px',
               backgroundColor: 'var(--bg-panel)',
               border: '1px solid var(--border-light)',
               borderRadius: '8px', padding: '16px',
@@ -1271,16 +1447,16 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               boxShadow: '0 12px 32px rgba(0,0,0,0.7)', zIndex: 20,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Account Node
                   </span>
-                  <span style={{
-                    fontSize: '10px', fontWeight: 700, marginLeft: '8px',
-                    color: selectedNode.id === focalNodeId ? '#60a5fa' : 'var(--text-dim)',
-                  }}>
-                    {selectedNode.id === focalNodeId ? '· FOCAL' : ''}
-                  </span>
+                  {communityId != null && (
+                    <Badge variant="neutral">COMMUNITY #{communityId}</Badge>
+                  )}
+                  {selectedNode.id === focalNodeId && (
+                    <Badge variant="accent">FOCAL</Badge>
+                  )}
                 </div>
                 <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}>
                   <X size={14} />
@@ -1298,11 +1474,11 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
                 <div>
-                  <span style={{ color: 'var(--text-dim)', display: 'block' }}>Connections:</span>
-                  <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{selectedNode.degree}</span>
+                  <span style={{ color: 'var(--text-dim)', display: 'block' }}>Community Connections:</span>
+                  <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{selectedNode.degree} links</span>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-dim)', display: 'block' }}>Balance:</span>
+                  <span style={{ color: 'var(--text-dim)', display: 'block' }}>Ledger Balance:</span>
                   <span className="font-mono" style={{ fontWeight: 700, color: '#34d399' }}>
                     {selectedNode.balance != null
                       ? `$${selectedNode.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -1315,7 +1491,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               {nodeEvidenceTriggers.length > 0 && (
                 <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                    Associated Evidence ({nodeEvidenceTriggers.length})
+                    Associated Evidence Rules ({nodeEvidenceTriggers.length})
                   </span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {nodeEvidenceTriggers.map((item) => (
@@ -1327,9 +1503,21 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
                 </div>
               )}
 
-              {/* Actions — NO case/SAR creation */}
+              {/* Actions — strictly investigative analysis, NO case/SAR creation */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
-                <Button variant="primary" size="sm" icon={ExternalLink} iconPosition="right" onClick={() => navigate(`/accounts/${selectedNode.id}`)}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={ExternalLink}
+                  iconPosition="right"
+                  onClick={() => navigate(`/accounts/${selectedNode.id}`, {
+                    state: {
+                      fromForensics: true,
+                      communityId: communityId != null ? String(communityId) : undefined,
+                      forensicView: 'network',
+                    },
+                  })}
+                >
                   Inspect Account Profile
                 </Button>
                 <Button variant="secondary" size="sm" icon={ScanSearch} onClick={() => handleFocusNeighborhood(selectedNode.id)}>
@@ -1346,7 +1534,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           {selectedEdge && !selectedNode && (
             <div style={{
               position: 'absolute', top: '14px', right: '14px',
-              width: '300px',
+              width: '320px',
               backgroundColor: 'var(--bg-panel)',
               border: `1px solid ${selectedEdgeRelType ? `${EDGE_REL_COLORS[selectedEdgeRelType]}45` : 'rgba(251,191,36,0.35)'}`,
               borderRadius: '8px', padding: '16px',
@@ -1373,7 +1561,9 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               {/* Accounts */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{selectedEdge.source}</span>
-                <span style={{ color: 'var(--text-dim)', padding: '0 4px' }}>⇄</span>
+                <span style={{ color: 'var(--text-dim)', padding: '0 4px' }}>
+                  {selectedEdge.flow_direction === 'source_to_target' ? '→' : selectedEdge.flow_direction === 'target_to_source' ? '←' : '⇄'}
+                </span>
                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{selectedEdge.target}</span>
               </div>
 
@@ -1383,7 +1573,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
                   Classification
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  OBSERVED — Deterministic transaction telemetry
+                  OBSERVED — Deterministic payment network telemetry
                 </span>
               </div>
 
@@ -1397,7 +1587,9 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
               {/* Observable evidence lines */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', fontSize: '11px', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
-                <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Observable Evidence</span>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                  Observable Relationship Evidence
+                </span>
                 {selectedEdgeWhyLines.map((line, i) => (
                   <div key={i} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
                     <span style={{ color: selectedEdgeRelType ? EDGE_REL_COLORS[selectedEdgeRelType] : '#fbbf24', flexShrink: 0, marginTop: '1px' }}>•</span>
