@@ -231,7 +231,8 @@ def enrich_chunk(chunk: pd.DataFrame, ctx: EnrichmentContext) -> pd.DataFrame:
 
     # One deterministic 64-bit hash per transaction; every per-tx decision is
     # a different bit-slice of it (single Python-level pass per chunk).
-    h = tx_id.map(lambda t: stable_int(t, "tx")).to_numpy(dtype=np.uint64)
+    tx_key = tx_id.fillna("").astype(str)
+    h = tx_key.map(lambda t: stable_int(str(t), "tx")).to_numpy(dtype=np.uint64)
     u = h.astype(np.uint64)
 
     def ratio(shift: int) -> np.ndarray:
@@ -377,7 +378,7 @@ def _build_context(
     """Generate the payment world and wrap it in an enrichment context."""
     world = generate_world(accounts, fraud_cases, seed)
     creation_ns = {
-        str(row.account_id): int(pd.Timestamp(row.creation_date).value)
+        str(row.account_id): int(pd.Timestamp(str(row.creation_date)).value)
         for row in accounts.itertuples(index=False)
     }
     return world, EnrichmentContext(world, creation_ns)

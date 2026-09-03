@@ -475,7 +475,7 @@ def test_f4_single_tx_amount_cv_nan(community_c, tx_df, merchant_df) -> None:
 def test_f4_no_merchant_df_entropy_nan(community_a, tx_df) -> None:
     """merchant_category_entropy is NaN when no merchant catalog is supplied."""
     df = compute_community_features([community_a], tx_df, merchant_df=None)
-    assert math.isnan(df.loc[0, "merchant_category_entropy"])
+    assert pd.isna(df.loc[0, "merchant_category_entropy"])
 
 
 # ---------------------------------------------------------------------------
@@ -609,7 +609,7 @@ def test_communities_do_not_bleed_transactions(
     assert df.loc[0, "total_transaction_amount"] == pytest.approx(450.0)
 
     # Community B – no transactions
-    assert math.isnan(df.loc[1, "total_transaction_amount"])
+    assert pd.isna(df.loc[1, "total_transaction_amount"])
 
     # Community C – 1 transaction of 300
     assert df.loc[2, "total_transaction_amount"] == pytest.approx(300.0)
