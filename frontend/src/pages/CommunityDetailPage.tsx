@@ -108,7 +108,7 @@ export const CommunityDetailPage: React.FC = () => {
         badge={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Badge variant="neutral">COMMUNITY #{community.community_id}</Badge>
-            <RiskBadge level={community.risk_level} size="md" />
+            <RiskBadge level={community.risk_level} size="md" label={`${community.risk_level} PRIORITY`} />
           </div>
         }
       />
@@ -136,12 +136,15 @@ export const CommunityDetailPage: React.FC = () => {
 
           <div>
             <Metric
-              label="Rule Trigger Points"
+              label="RAW RULE EVIDENCE POINTS"
               value={evidence ? evidence.raw_evidence_score.toLocaleString() : '—'}
               variant={evidence && evidence.raw_evidence_score >= 5000 ? 'high' : 'default'}
             />
             <span style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'block', marginTop: '4px' }}>
-              Uncapped evidence rule-weight total (High×25 + Med×12 + Low×5)
+              Uncapped deterministic rule-weight total
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+              High × 25 · Medium × 12 · Low × 5
             </span>
           </div>
 
@@ -176,7 +179,7 @@ export const CommunityDetailPage: React.FC = () => {
               value={community.density !== null && community.density !== undefined ? community.density.toFixed(4) : '—'}
             />
             <span style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'block', marginTop: '4px' }}>
-              Fraction of possible account pairs sharing infrastructure
+              Fraction of possible account pairs connected by observed relationships
             </span>
           </div>
         </div>
@@ -214,14 +217,22 @@ export const CommunityDetailPage: React.FC = () => {
                     ML Pipeline Output
                   </span>
                   <strong style={{ fontSize: '15px', color: community.risk_level === 'HIGH' ? 'var(--risk-high)' : 'var(--text-primary)' }}>
-                    Score: {community.risk_score}/100 ({community.risk_level} Risk)
+                    Score: {community.risk_score}/100 ({community.risk_level} Priority)
                   </strong>
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block' }}>LR Model Output (not calibrated)</span>
+              <div
+                style={{ textAlign: 'right' }}
+                title="Raw logistic-regression model output; not a calibrated probability."
+              >
+                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block' }}>
+                  LR Model Output (not calibrated)
+                </span>
                 <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {community.risk_probability.toFixed(4)}
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                  Raw logistic-regression model output; not a calibrated probability.
                 </span>
               </div>
             </div>
@@ -376,7 +387,7 @@ export const CommunityDetailPage: React.FC = () => {
                     community.temporal_statistics?.temporal_compression_score !== undefined
                       ? community.temporal_statistics.temporal_compression_score.toFixed(2)
                       : '—',
-                  note: 'T÷(T+span_hours): activity density relative to temporal span (0–1)',
+                  note: 'Measures how concentrated observed activity is within its active time span (0–1). 0 = low concentration, 1 = high.',
                 },
               ].map(({ label, value, note }) => (
                 <div
@@ -402,7 +413,7 @@ export const CommunityDetailPage: React.FC = () => {
             </div>
 
             <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: 0, fontStyle: 'italic' }}>
-              * Rule triggers denote deterministic pattern matches across payment network graph telemetry. Corroborate in Forensic Workspace before formal case creation.
+              * Rule triggers represent deterministic pattern matches observed in payment-network telemetry; they are corroborating signals, not conclusions of wrongdoing.
             </p>
           </div>
         </Panel>

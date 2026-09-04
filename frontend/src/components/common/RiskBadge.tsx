@@ -5,12 +5,14 @@ interface RiskBadgeProps {
   level: RiskLevel | string;
   size?: 'sm' | 'md' | 'lg';
   showDot?: boolean;
+  label?: string;
 }
 
 export const RiskBadge: React.FC<RiskBadgeProps> = ({
   level,
   size = 'md',
   showDot = true,
+  label,
 }) => {
   const normLevel = (level || 'LOW').toUpperCase() as RiskLevel;
 
@@ -64,7 +66,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({
           }}
         />
       )}
-      {normLevel}
+      {label ?? normLevel}
     </span>
   );
 };
