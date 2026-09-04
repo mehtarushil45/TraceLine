@@ -467,20 +467,42 @@
   flex: 1;
 }
 
-.rq-ev-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 6px;
-  border-top: 1px solid var(--border-subtle);
+
+/* Representative signal count in section heading */
+.rq-ev-signal-count {
   color: var(--text-dim);
   font-size: 10px;
   font-family: var(--font-mono);
 }
 
-.rq-ev-pts {
+/* "View all N signals" action below the evidence grid */
+.rq-ev-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0;
+  background: none;
+  border: none;
   color: var(--accent);
+  font-size: 11px;
   font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: opacity 0.15s ease;
+}
+
+.rq-ev-view-all:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
+/* Zero-signal empty state inside the grid */
+.rq-ev-empty {
+  padding: 12px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-style: italic;
 }
 
 /* D. Network & Entity Context Stats */

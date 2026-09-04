@@ -12,7 +12,6 @@ import { getCommunities, getCommunityEvidence, getSummary } from '../api';
 import type {
   CommunityEvidenceResponse,
   CommunitySummary,
-  EvidenceItem,
   SummaryResponse,
 } from '../types/api';
 import type { InvestigationCase } from '../types/cases';
@@ -34,6 +33,7 @@ import {
 import type { Column, FilterOption } from '../components/common';
 import { getCases, isTargetInAnyCase, subscribeToCaseUpdates } from '../utils/caseManager';
 import './risk-queue.css';
+
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -182,29 +182,18 @@ export const DashboardPage: React.FC = () => {
     return index >= 0 ? index + 1 : 1;
   }, [communities, selectedCommunity]);
 
-  // Up to 3 distinct evidence items for the selected lead
-  const distinctEvidenceItems = useMemo(() => {
+  // Top 3 representative signals for the selected lead.
+  // The backend already sorts by severity (HIGH > MEDIUM > LOW) then score_contribution descending
+  // via sort_evidence(), so items[0..2] are deterministically the highest-priority signals.
+  // We simply take the first 3 to preserve that backend-defined priority order.
+  const representativeItems = useMemo(() => {
     if (!selectedEvidence || !selectedEvidence.items.length) return [];
-    const seen = new Set<string>();
-    const distinct: EvidenceItem[] = [];
-    for (const item of selectedEvidence.items) {
-      const key = `${item.type}_${item.title}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        distinct.push(item);
-      }
-      if (distinct.length === 3) break;
-    }
-    if (distinct.length < 3) {
-      for (const item of selectedEvidence.items) {
-        if (!distinct.includes(item)) {
-          distinct.push(item);
-        }
-        if (distinct.length === 3) break;
-      }
-    }
-    return distinct;
+    return selectedEvidence.items.slice(0, 3);
   }, [selectedEvidence]);
+
+  // Total count of observable signals for the selected community
+  const totalSignalCount = selectedEvidence?.evidence_count ?? 0;
+  const shownCount = representativeItems.length;
 
   // Filtered list for the full directory queue table below
   const tableFilteredCommunities = useMemo(() => {
@@ -495,7 +484,10 @@ export const DashboardPage: React.FC = () => {
 
                 <div className="rq-lead-scorecard">
                   <div className="rq-lead-scorecard-item">
-                    <span className="rq-scorecard-label">ML Risk Score</span>
+                    <span
+                      className="rq-scorecard-label"
+                      title="How strongly the model prioritizes this community for investigation."
+                    >ML Risk Score</span>
                     <div className="rq-scorecard-value">
                       <RiskScore
                         score={selectedCommunity.risk_score}
@@ -506,7 +498,10 @@ export const DashboardPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="rq-lead-scorecard-item">
-                    <span className="rq-scorecard-label">Evidence Strength</span>
+                    <span
+                      className="rq-scorecard-label"
+                      title="The amount and strength of observable supporting evidence captured for this investigation."
+                    >Evidence Strength</span>
                     <div className="rq-scorecard-ev-score">
                       <strong>{selectedEvidence?.evidence_score ?? '—'}</strong>
                       <small>/ 100</small>
@@ -533,20 +528,27 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Observable Evidence Signals */}
+              {/* TOP OBSERVABLE EVIDENCE SIGNALS */}
               <div className="rq-lead-section">
                 <div className="rq-section-heading">
-                  <span>Observable Evidence Signals</span>
-                  <small>
-                    {selectedEvidence
-                      ? `${selectedEvidence.evidence_count} signals (${selectedEvidence.high_count} high severity)`
-                      : 'Deterministic graph & entity rules'}
-                  </small>
+                  <span>Top Observable Evidence Signals</span>
+                  {selectedEvidence && (
+                    <small className="rq-ev-signal-count">
+                      {totalSignalCount === 0
+                        ? 'No signals detected'
+                        : shownCount >= totalSignalCount
+                        ? `All ${totalSignalCount} signal${totalSignalCount === 1 ? '' : 's'} shown`
+                        : `${shownCount} representative signal${shownCount === 1 ? '' : 's'} shown · ${totalSignalCount.toLocaleString()} total`}
+                    </small>
+                  )}
+                  {!selectedEvidence && (
+                    <small>Deterministic graph &amp; entity rules</small>
+                  )}
                 </div>
 
                 <div className="rq-evidence-grid">
-                  {distinctEvidenceItems.length > 0 ? (
-                    distinctEvidenceItems.map((item) => (
+                  {representativeItems.length > 0 ? (
+                    representativeItems.map((item) => (
                       <div key={item.evidence_id} className={`rq-ev-card rq-ev-card--${item.severity.toLowerCase()}`}>
                         <div className="rq-ev-card-top">
                           <span className="rq-ev-card-type">{item.type.replace(/_/g, ' ')}</span>
@@ -565,21 +567,15 @@ export const DashboardPage: React.FC = () => {
                         </div>
                         <strong className="rq-ev-card-title">{item.title}</strong>
                         <p className="rq-ev-card-desc">{item.description}</p>
-                        <div className="rq-ev-card-footer">
-                          {item.score_contribution > 0 ? (
-                            <span className="rq-ev-pts">Contribution: +{item.score_contribution.toFixed(0)} pts</span>
-                          ) : (
-                            <span className="rq-ev-pts">Observable rule</span>
-                          )}
-                          {item.supporting_entities.length > 0 && (
-                            <span>{item.supporting_entities.length} supporting entit{item.supporting_entities.length === 1 ? 'y' : 'ies'}</span>
-                          )}
-                        </div>
                       </div>
                     ))
+                  ) : totalSignalCount === 0 && selectedEvidence ? (
+                    <div className="rq-ev-empty" style={{ gridColumn: '1 / -1' }}>
+                      <span>No observable evidence signals detected for this community.</span>
+                    </div>
                   ) : (
-                    // Fallback to top signals if evidence detail is still loading
-                    [selectedCommunity.top_signal_1, selectedCommunity.top_signal_2, selectedCommunity.top_signal_3]
+                    // Fallback to top signals while evidence is still loading
+                    [selectedCommunity!.top_signal_1, selectedCommunity!.top_signal_2, selectedCommunity!.top_signal_3]
                       .filter(Boolean)
                       .map((signal, sIdx) => (
                         <div key={sIdx} className="rq-ev-card rq-ev-card--high">
@@ -593,14 +589,25 @@ export const DashboardPage: React.FC = () => {
                           <p className="rq-ev-card-desc">
                             Observable structural pattern detected during graph community analysis.
                           </p>
-                          <div className="rq-ev-card-footer">
-                            <span className="rq-ev-pts">Top Signal #{sIdx + 1}</span>
-                            <span>Structural pattern</span>
-                          </div>
                         </div>
                       ))
                   )}
                 </div>
+
+                {/* View all signals link — only shown when there are more signals than shown */}
+                {selectedEvidence && totalSignalCount > shownCount && (
+                  <button
+                    className="rq-ev-view-all"
+                    onClick={() =>
+                      navigate(
+                        `/forensics?community=${selectedCommunity!.community_id}&view=evidence`
+                      )
+                    }
+                    title={`View all ${totalSignalCount.toLocaleString()} observable evidence signals in the Forensic Workspace`}
+                  >
+                    View all {totalSignalCount.toLocaleString()} signal{totalSignalCount === 1 ? '' : 's'} in Evidence Workspace →
+                  </button>
+                )}
               </div>
 
               {/* Network & Entity Context Stats */}
