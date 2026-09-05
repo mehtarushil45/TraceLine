@@ -60,8 +60,8 @@ function normalizeView(raw: string | null): ForensicView {
 
 const NAV_ITEMS: { view: ForensicView; label: string; icon: React.ElementType }[] = [
   { view: 'evidence',   label: 'Evidence',   icon: Layers      },
-  { view: 'network',    label: 'Network',    icon: Network     },
   { view: 'accounts',   label: 'Accounts',   icon: Users       },
+  { view: 'network',    label: 'Network',    icon: Network     },
   { view: 'timeline',   label: 'Timeline',   icon: Clock       },
   { view: 'money-flow', label: 'Money Flow', icon: Activity    },
   { view: 'story',      label: 'Storyline',  icon: BookOpen    },

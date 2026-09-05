@@ -467,7 +467,7 @@ export const CaseDetailPage: React.FC = () => {
                   indent={1}
                   onClick={() => navigate(`/forensics?community=${investigationCase.sourceCommunityId}&view=evidence`)}
                 />
-                {['Evidence', 'Network', 'Accounts', 'Timeline', 'Money Flow', 'Storyline', 'Hypotheses'].map((v) => (
+                {['Evidence', 'Accounts', 'Network', 'Timeline', 'Money Flow', 'Storyline', 'Hypotheses'].map((v) => (
                   <LineageNode
                     key={v}
                     label={v}

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import cytoscape from 'cytoscape';
 import type { Core, EventObject } from 'cytoscape';
 import {
-  AlertCircle, ChevronLeft, ChevronRight, ExternalLink,
-  GitCommit, Layers, Link2, Maximize2, Minimize2, Network,
-  Route, RotateCcw, ScanSearch, Search, Share2, Timer,
+  AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink,
+  GitCommit, Hand, Layers, Link2, Maximize2, Minimize2, MousePointer, Network,
+  Route, RotateCcw, ScanSearch, Search, Share2, Target, Timer,
   X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import type { CommunityGraphResponse, GraphEdge, GraphNode, EvidenceItem } from '../../types/api';
@@ -500,6 +500,18 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const [pathTo, setPathTo]                 = useState('');
   const [pathResult, setPathResult]         = useState<string[] | null | 'not-found'>(null);
 
+  // ── Pan & Zoom Interaction State ──────────────────────────────────────────
+  const [interactionMode, setInteractionMode] = useState<'select' | 'pan'>('select');
+  const interactionModeRef = useRef<'select' | 'pan'>('select');
+  interactionModeRef.current = interactionMode;
+
+  const [zoomLevel, setZoomLevel]             = useState<number>(100);
+  const [isSpaceHeld, setIsSpaceHeld]         = useState(false);
+  const isSpacePressedRef                     = useRef(false);
+  const isCanvasDraggingRef                   = useRef(false);
+  const pointerStartRef                       = useRef<{ x: number; y: number; time: number } | null>(null);
+  const lastPanPosRef                         = useRef<{ x: number; y: number } | null>(null);
+
   // Sync state if initial props change via URL navigation
   useEffect(() => {
     if (initialSelectedNodeId !== undefined) {
@@ -740,17 +752,23 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       layout: layoutName === 'cose'
         ? (coseOpts as any)
         : { name: layoutName, animate: false, padding: 50 },
-      minZoom: 0.15, maxZoom: 4.0, wheelSensitivity: 0.25,
+      minZoom: 0.15, maxZoom: 4.0, wheelSensitivity: 0.15,
     });
 
-    // ── Tap events ──
+    // ── Tap events with drag & pan suppression ──
     cy.on('tap', 'node', (evt: EventObject) => {
+      if (interactionModeRef.current === 'pan' || isSpacePressedRef.current || isCanvasDraggingRef.current) {
+        return;
+      }
       const id = evt.target.id();
       const match = graphData.nodes.find((n) => n.id === id);
       if (match) { setSelectedNode(match); setSelectedEdge(null); }
     });
 
     cy.on('tap', 'edge', (evt: EventObject) => {
+      if (interactionModeRef.current === 'pan' || isSpacePressedRef.current || isCanvasDraggingRef.current) {
+        return;
+      }
       const d = evt.target.data();
       setSelectedEdge({
         source: d.source,
@@ -770,7 +788,14 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
     });
 
     cy.on('tap', (evt: EventObject) => {
-      if (evt.target === cy) { setSelectedNode(null); setSelectedEdge(null); }
+      if (evt.target === cy && !isCanvasDraggingRef.current) {
+        setSelectedNode(null);
+        setSelectedEdge(null);
+      }
+    });
+
+    cy.on('zoom', () => {
+      setZoomLevel(Math.round(cy.zoom() * 100));
     });
 
     cyRef.current = cy;
@@ -990,9 +1015,185 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
     }, 0);
   }, [activeLens, focalNodeId, graphData.edges, onClearFocus]);
 
-  const handleZoomIn  = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.25);
-  const handleZoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() * 0.8);
-  const handleFit     = () => { try { cyRef.current?.fit(undefined, 50); } catch { /* ignore */ } };
+  // ── Zoom & Pan Helpers (anchored to viewport center) ──────────────────────
+  const zoomAroundCenter = useCallback((factor: number) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const currentZoom = cy.zoom();
+    const targetZoom = Math.min(4.0, Math.max(0.15, currentZoom * factor));
+    cy.zoom({
+      level: targetZoom,
+      renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+    });
+    setZoomLevel(Math.round(targetZoom * 100));
+  }, []);
+
+  const handleZoomIn  = useCallback(() => zoomAroundCenter(1.25), [zoomAroundCenter]);
+  const handleZoomOut = useCallback(() => zoomAroundCenter(0.8), [zoomAroundCenter]);
+  const handleZoomReset = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.zoom({
+      level: 1.0,
+      renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+    });
+    setZoomLevel(100);
+  }, []);
+
+  const handleFit = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    try {
+      cy.fit(undefined, 50);
+      setZoomLevel(Math.round(cy.zoom() * 100));
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleCenterFocal = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy || !focalNodeId) return;
+    const node = cy.getElementById(focalNodeId);
+    if (node && node.length > 0) {
+      cy.center(node);
+      cy.zoom(Math.min(cy.zoom(), 1.8));
+      setZoomLevel(Math.round(cy.zoom() * 100));
+    }
+  }, [focalNodeId]);
+
+  // ── Sync interaction mode with Cytoscape autoungrabify & cursor ───────────
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const isPan = interactionMode === 'pan' || isSpaceHeld;
+    cy.autoungrabify(isPan);
+    if (containerRef.current) {
+      containerRef.current.style.cursor = isPan ? 'grab' : 'default';
+    }
+  }, [interactionMode, isSpaceHeld]);
+
+  // ── Global keyboard shortcuts: Space (hold to pan), H/V, +/-, 0, Arrows ───
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        isSpacePressedRef.current = true;
+        setIsSpaceHeld(true);
+      } else if (e.key === 'h' || e.key === 'H') {
+        setInteractionMode('pan');
+      } else if (e.key === 'v' || e.key === 'V') {
+        setInteractionMode('select');
+      } else if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        handleZoomIn();
+      } else if (e.key === '-') {
+        e.preventDefault();
+        handleZoomOut();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        handleFit();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        cyRef.current?.panBy({ x: 0, y: 70 });
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        cyRef.current?.panBy({ x: 0, y: -70 });
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        cyRef.current?.panBy({ x: 70, y: 0 });
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        cyRef.current?.panBy({ x: -70, y: 0 });
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        isSpacePressedRef.current = false;
+        setIsSpaceHeld(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [handleZoomIn, handleZoomOut, handleFit]);
+
+  // ── Canvas Drag-to-Pan (Works anywhere: background, nodes, edges) ───────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onMouseDown = (e: MouseEvent) => {
+      const isPanTrigger =
+        interactionModeRef.current === 'pan' ||
+        isSpacePressedRef.current ||
+        e.button === 1 || // Middle mouse button
+        e.buttons === 4;
+
+      pointerStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+      lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+      isCanvasDraggingRef.current = false;
+
+      if (isPanTrigger) {
+        container.style.cursor = 'grabbing';
+      }
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!lastPanPosRef.current || !pointerStartRef.current) return;
+
+      const totalDist = Math.hypot(
+        e.clientX - pointerStartRef.current.x,
+        e.clientY - pointerStartRef.current.y
+      );
+
+      if (totalDist > 4) {
+        isCanvasDraggingRef.current = true;
+      }
+
+      const isPanTrigger =
+        interactionModeRef.current === 'pan' ||
+        isSpacePressedRef.current ||
+        e.buttons === 4 ||
+        (interactionModeRef.current === 'select' && (e.buttons === 1 && isSpacePressedRef.current));
+
+      if (isPanTrigger && cyRef.current) {
+        const dx = e.clientX - lastPanPosRef.current.x;
+        const dy = e.clientY - lastPanPosRef.current.y;
+        cyRef.current.panBy({ x: dx, y: dy });
+        lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+        container.style.cursor = 'grabbing';
+      }
+    };
+
+    const onMouseUp = () => {
+      lastPanPosRef.current = null;
+      const isPan = interactionModeRef.current === 'pan' || isSpacePressedRef.current;
+      container.style.cursor = isPan ? 'grab' : 'default';
+
+      // Keep dragging buffer so pending node/edge tap is suppressed
+      setTimeout(() => {
+        isCanvasDraggingRef.current = false;
+        pointerStartRef.current = null;
+      }, 70);
+    };
+
+    container.addEventListener('mousedown', onMouseDown, true);
+    window.addEventListener('mousemove', onMouseMove, true);
+    window.addEventListener('mouseup', onMouseUp, true);
+
+    return () => {
+      container.removeEventListener('mousedown', onMouseDown, true);
+      window.removeEventListener('mousemove', onMouseMove, true);
+      window.removeEventListener('mouseup', onMouseUp, true);
+    };
+  }, []);
 
   // ── Derived display values ────────────────────────────────────────────────
   const hasFocus       = Boolean(evidenceFocus);
@@ -1173,7 +1374,48 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           </div>
 
           {/* Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {/* Tool Mode: Select vs Pan */}
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              backgroundColor: 'var(--bg-subtle)',
+              borderRadius: '5px', padding: '2px',
+              border: '1px solid var(--border)',
+            }}>
+              <button
+                type="button"
+                onClick={() => setInteractionMode('select')}
+                title="Select Tool (V) — Click accounts or edges to inspect"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 8px', borderRadius: '4px', border: 'none',
+                  backgroundColor: interactionMode === 'select' ? 'var(--accent)' : 'transparent',
+                  color: interactionMode === 'select' ? '#fff' : 'var(--text-muted)',
+                  fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                }}
+              >
+                <MousePointer size={11} />
+                <span>Select</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInteractionMode('pan')}
+                title="Hand / Pan Tool (H / Space) — Drag anywhere to move graph"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 8px', borderRadius: '4px', border: 'none',
+                  backgroundColor: interactionMode === 'pan' ? 'var(--accent)' : 'transparent',
+                  color: interactionMode === 'pan' ? '#fff' : 'var(--text-muted)',
+                  fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                }}
+              >
+                <Hand size={11} />
+                <span>Pan</span>
+              </button>
+            </div>
+
             <button
               onClick={handleReset}
               title="Reset all view state"
@@ -1187,6 +1429,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             >
               <RotateCcw size={11} /><span>Reset</span>
             </button>
+
             <select
               value={layoutName}
               onChange={(e) => setLayoutName(e.target.value as typeof layoutName)}
@@ -1200,9 +1443,59 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
               <option value="concentric">Concentric</option>
               <option value="circle">Circular</option>
             </select>
-            <button onClick={handleZoomIn}                     title="Zoom In"      style={iconBtn}><ZoomIn  size={12} /></button>
-            <button onClick={handleZoomOut}                    title="Zoom Out"     style={iconBtn}><ZoomOut size={12} /></button>
-            <button onClick={handleFit}                        title="Fit to screen" style={iconBtn}><Maximize2 size={12} /></button>
+
+            {/* Zoom Controls */}
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              backgroundColor: 'var(--bg-subtle)',
+              borderRadius: '5px', border: '1px solid var(--border)',
+              overflow: 'hidden',
+            }}>
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                title="Zoom Out (-)"
+                style={{ ...iconBtn, border: 'none', borderRadius: 0, padding: '5px 7px' }}
+              >
+                <ZoomOut size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomReset}
+                title="Zoom Level (Click to reset to 100%)"
+                style={{
+                  background: 'none', border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: '10px', fontWeight: 700,
+                  fontFamily: 'var(--font-mono)',
+                  padding: '0 6px', cursor: 'pointer',
+                  minWidth: '38px', textAlign: 'center',
+                }}
+              >
+                {zoomLevel}%
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                title="Zoom In (+ / =)"
+                style={{ ...iconBtn, border: 'none', borderRadius: 0, padding: '5px 7px' }}
+              >
+                <ZoomIn size={12} />
+              </button>
+            </div>
+
+            <button onClick={handleFit} title="Fit to screen (0)" style={iconBtn}><Maximize2 size={12} /></button>
+
+            {focalNodeId && (
+              <button
+                onClick={handleCenterFocal}
+                title={`Center on focal ${focalNodeId}`}
+                style={{ ...iconBtn, color: '#86efac', borderColor: 'rgba(34,197,94,0.3)' }}
+              >
+                <Target size={12} />
+              </button>
+            )}
+
             <button onClick={() => setIsFullscreen(!isFullscreen)} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'} style={iconBtn}>
               {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
             </button>
@@ -1613,11 +1906,70 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             </button>
           )}
 
+          {/* ── Floating Navigation / Pan D-Pad (Bottom-Right) ── */}
+          <div
+            style={{
+              position: 'absolute', bottom: '14px', right: '14px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+              backgroundColor: 'rgba(13,17,23,0.92)', backdropFilter: 'blur(8px)',
+              border: '1px solid var(--border)', borderRadius: '6px',
+              padding: '4px', zIndex: 10,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => cyRef.current?.panBy({ x: 0, y: 70 })}
+              title="Pan Canvas Up (ArrowUp)"
+              style={iconBtn}
+            >
+              <ChevronUp size={14} />
+            </button>
+            <div style={{ display: 'flex', gap: '2px' }}>
+              <button
+                type="button"
+                onClick={() => cyRef.current?.panBy({ x: 70, y: 0 })}
+                title="Pan Canvas Left (ArrowLeft)"
+                style={iconBtn}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleFit}
+                title="Fit View to Screen (0)"
+                style={{ ...iconBtn, fontSize: '9px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}
+              >
+                FIT
+              </button>
+              <button
+                type="button"
+                onClick={() => cyRef.current?.panBy({ x: -70, y: 0 })}
+                title="Pan Canvas Right (ArrowRight)"
+                style={iconBtn}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => cyRef.current?.panBy({ x: 0, y: -70 })}
+              title="Pan Canvas Down (ArrowDown)"
+              style={iconBtn}
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+
           {/* ── Node Inspector ─────────────────────────────────────────────── */}
           {selectedNode && (
             <div style={{
               position: 'absolute', top: '14px', right: '14px',
-              width: '310px',
+              width: '350px',
+              maxWidth: 'calc(100% - 28px)',
+              maxHeight: 'calc(100% - 28px)',
+              overflowY: 'auto',
+              boxSizing: 'border-box',
               backgroundColor: 'var(--bg-panel)',
               border: '1px solid var(--border-light)',
               borderRadius: '8px', padding: '16px',
@@ -1636,17 +1988,19 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
                     <Badge variant="accent">FOCAL</Badge>
                   )}
                 </div>
-                <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}>
+                <button onClick={() => setSelectedNode(null)} title="Close Inspector" style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}>
                   <X size={14} />
                 </button>
               </div>
 
               <div>
-                <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>
+                <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', wordBreak: 'break-all' }}>
                   {selectedNode.id}
                 </span>
                 {selectedNode.customer_name && selectedNode.customer_name !== selectedNode.id && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{selectedNode.customer_name}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginTop: '1px' }}>
+                    {selectedNode.customer_name}
+                  </span>
                 )}
               </div>
 
@@ -1665,17 +2019,60 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
                 </div>
               </div>
 
-              {/* Evidence triggers */}
+              {/* Evidence triggers — 100% visible, structured cards with full text wrap */}
               {nodeEvidenceTriggers.length > 0 && (
                 <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Associated Evidence Rules ({nodeEvidenceTriggers.length})
                   </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', paddingRight: '2px' }}>
                     {nodeEvidenceTriggers.map((item) => (
-                      <Badge key={item.evidence_id} variant={item.severity === 'HIGH' ? 'high' : 'med'} size="sm">
-                        {item.title}
-                      </Badge>
+                      <div
+                        key={item.evidence_id}
+                        style={{
+                          padding: '6px 8px',
+                          borderRadius: '5px',
+                          backgroundColor: item.severity === 'HIGH' ? 'var(--risk-high-bg)' : 'var(--risk-med-bg)',
+                          border: `1px solid ${item.severity === 'HIGH' ? 'var(--risk-high-border)' : 'var(--risk-med-border)'}`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: item.severity === 'HIGH' ? '#ef4444' : '#f59e0b',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              color: item.severity === 'HIGH' ? 'var(--risk-high)' : 'var(--risk-med)',
+                              letterSpacing: '0.04em',
+                            }}
+                          >
+                            {item.type.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            lineHeight: 1.45,
+                            color: 'var(--text-primary)',
+                            fontWeight: 500,
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {item.title}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1712,7 +2109,11 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           {selectedEdge && !selectedNode && (
             <div style={{
               position: 'absolute', top: '14px', right: '14px',
-              width: '320px',
+              width: '350px',
+              maxWidth: 'calc(100% - 28px)',
+              maxHeight: 'calc(100% - 28px)',
+              overflowY: 'auto',
+              boxSizing: 'border-box',
               backgroundColor: 'var(--bg-panel)',
               border: `1px solid ${selectedEdgeRelType ? `${EDGE_REL_COLORS[selectedEdgeRelType]}45` : 'rgba(251,191,36,0.35)'}`,
               borderRadius: '8px', padding: '16px',
