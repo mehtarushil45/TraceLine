@@ -25,6 +25,7 @@ yarn-error.log*
 *.log
 
 # Data (Raw & Generated large datasets)
+data/
 data/raw/
 data/processed/
 data/validation_run/

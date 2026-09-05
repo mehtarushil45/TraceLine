@@ -3,7 +3,8 @@
 > **From risk signal to evidence-driven investigation.**
 
 Submitted to **Razorpay AI Buildathon 2026 — Track 02 (AI Risk Manager)**.  
-Repository: [https://github.com/mehtarushil45/TraceLine](https://github.com/mehtarushil45/TraceLine)
+Repository: [https://github.com/mehtarushil45/TraceLine](https://github.com/mehtarushil45/TraceLine)  
+🎬 **Demo Video**: [Watch the TraceLine End-to-End Walkthrough](https://drive.google.com/file/d/1SQOWNwXBkjDBwcQs4EttCpGgnNttrtdh/view?usp=drive_link)
 
 ---
 
@@ -276,6 +277,9 @@ All metrics and examples derive from the processed payment network dataset in `d
 | **High-Risk Communities (Score ≥ 60)** | `17` | `community_risk_scores.csv` |
 | **Medium-Risk Communities (Score 35–59)** | `13` | `community_risk_scores.csv` |
 | **Low-Risk Communities (Score < 35)** | `29` | `community_risk_scores.csv` |
+
+### Note on Dataset Size & Repository Exclusion
+The raw and processed payment network dataset totals **~6.8 GB** (450,546 enriched transactions with complete multi-entity device, IP, instrument, and merchant graph topologies). In accordance with standard Git best practices and GitHub file size limits, the entire `data/` directory is excluded from version control via `.gitignore`. The data artifacts can be generated or loaded using the deterministic generation and enrichment pipeline scripts in `scripts/`.
 
 ---
 
