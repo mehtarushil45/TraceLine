@@ -21,7 +21,7 @@ export const SarExportModal: React.FC<SarExportModalProps> = ({ isOpen, onClose 
 
   const openCases = cases.filter((c) => c.status !== 'CLOSED');
 
-  const reportMarkdown = `# TRACELINE FRAUD INTELLIGENCE | SUSPICIOUS ACTIVITY REPORT (SAR)
+  const reportMarkdown = `# TraceLine Risk Intelligence | Suspicious Activity Report (SAR)
 Generated: ${new Date().toLocaleString()}
 System: TraceLine Neural Graph Risk Platform v1.0
 Classification: RESTRICTED // FORENSIC INVESTIGATION DOSSIER
@@ -142,7 +142,7 @@ Analyst Status: SUBMITTED FOR COMPLIANCE & RISK OPERATIONS REVIEW
                 Generate Forensic SAR Dossier
               </h3>
               <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                Suspicious Activity Report & Network Evidence Export
+                Observable-evidence export — confirm readiness checklist before regulator submission
               </span>
             </div>
           </div>
@@ -224,8 +224,8 @@ Analyst Status: SUBMITTED FOR COMPLIANCE & RISK OPERATIONS REVIEW
             color: 'var(--text-dim)',
           }}
         >
-          <span>TraceLine Risk Intelligence Compliance Specification // ISO-20022 Aligned</span>
-          <span className="font-mono text-cyan-400">STATUS: VERIFIED SECURE</span>
+          <span>TraceLine Risk Intelligence // Forensic Investigation Dossier</span>
+          <span className="font-mono" style={{ color: 'var(--text-dim)' }}>DRAFT — PENDING INVESTIGATOR REVIEW</span>
         </div>
       </div>
     </div>

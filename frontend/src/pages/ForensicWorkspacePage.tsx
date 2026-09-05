@@ -47,6 +47,8 @@ type ForensicView =
   | 'evidence' | 'network' | 'accounts' | 'timeline'
   | 'money-flow' | 'story' | 'hypotheses' | 'decision';
 
+import { isAccountId, isEvidenceFocusCompatibleWithLens } from '../utils/forensicUtils';
+
 const VALID_VIEWS: readonly ForensicView[] = [
   'evidence','network','accounts','timeline','money-flow','story','hypotheses','decision',
 ];
@@ -86,7 +88,8 @@ export const ForensicWorkspacePage: React.FC = () => {
 
   const communityParam = searchParams.get('community');
   const activeView = normalizeView(searchParams.get('view'));
-  const focusParam = searchParams.get('focus');
+  const rawFocusParam = searchParams.get('focus');
+  const focusParam = isAccountId(rawFocusParam) ? rawFocusParam : null;
 
   // Investigation lens — drives NetworkGraph contextual focus mode
   const VALID_LENSES: InvestigationLens[] = [
@@ -196,17 +199,19 @@ export const ForensicWorkspacePage: React.FC = () => {
       .catch(console.error).finally(() => setLoadingTimeline(false));
   }, [communityParam, activeView, timelineEvents.length]);
 
-  useEffect(() => { if (focusParam) setFocusedNodeId(focusParam); }, [focusParam]);
+  useEffect(() => {
+    if (focusParam) setFocusedNodeId(focusParam);
+  }, [focusParam]);
 
   // cross-view helpers
   const handleFocusInNetwork = useCallback((accountId: string, lens: InvestigationLens = 'relationship') => {
+    if (!isAccountId(accountId)) return;
     setFocusedNodeId(accountId);
     setView('network', { focus: accountId, lens });
   }, [setView]);
 
   const handleSelectEvidence = useCallback((item: EvidenceItem) => {
     setEvidenceFocus(item);
-    const fe = item.supporting_entities[0];
     let mappedLens: InvestigationLens = 'relationship';
     if (['SHARED_INSTRUMENT_CONCENTRATION', 'DEVICE_REUSE', 'IP_CONCENTRATION'].includes(item.type)) {
       mappedLens = 'shared-infrastructure';
@@ -214,9 +219,23 @@ export const ForensicWorkspacePage: React.FC = () => {
       mappedLens = 'temporal';
     }
     const extra: Record<string, string> = { lens: mappedLens };
-    if (fe) extra.focus = fe;
+
+    // Strict separation: Valid focal types are account/entity IDs only.
+    // Transaction IDs (e.g. 'tx_103686') must NEVER become investigation focal.
+    const supportingAccounts = (item.supporting_entities || []).filter((id) => isAccountId(id));
+    if (supportingAccounts.length === 1) {
+      // Unambiguous supporting account
+      extra.focus = supportingAccounts[0];
+      setFocusedNodeId(supportingAccounts[0]);
+    } else if (focusedNodeId && isAccountId(focusedNodeId)) {
+      // Retain existing valid account investigation focal
+      extra.focus = focusedNodeId;
+    } else {
+      // Pure signal focus: do NOT fabricate an account focal
+      setFocusedNodeId(null);
+    }
     setView('network', extra);
-  }, [setView]);
+  }, [setView, focusedNodeId]);
 
   const handleClearFocus = useCallback(() => {
     setEvidenceFocus(null);
@@ -230,11 +249,12 @@ export const ForensicWorkspacePage: React.FC = () => {
   }, [setSearchParams]);
 
   const handleFocalChange = useCallback((nodeId: string | null) => {
-    setFocusedNodeId(nodeId);
+    const validNodeId = isAccountId(nodeId) ? nodeId : null;
+    setFocusedNodeId(validNodeId);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (nodeId) {
-        next.set('focus', nodeId);
+      if (validNodeId) {
+        next.set('focus', validNodeId);
       } else {
         next.delete('focus');
       }
@@ -243,6 +263,13 @@ export const ForensicWorkspacePage: React.FC = () => {
   }, [setSearchParams]);
 
   const handleLensChange = useCallback((lens: InvestigationLens) => {
+    // Issue 1: Clear evidence focus when the new lens is semantically incompatible.
+    // This prevents a stale Temporal Burst / IP / Device focus from appearing as
+    // if it belongs to, e.g., the Relationship or Flow-of-Funds lens.
+    setEvidenceFocus((prev) => {
+      if (!prev) return null;
+      return isEvidenceFocusCompatibleWithLens(prev.type, lens) ? prev : null;
+    });
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (lens && lens !== 'community') {

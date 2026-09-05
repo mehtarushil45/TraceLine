@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { CommunityGraphResponse, GraphEdge, GraphNode, EvidenceItem } from '../../types/api';
 import { Badge, Button } from '../common';
+import { isAccountId, getEvidenceSubject } from '../../utils/forensicUtils';
 
 // ---------------------------------------------------------------------------
 // Investigation Intelligence — Lens Definitions
@@ -484,7 +485,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const navigate     = useNavigate();
 
   // ── Internal state ────────────────────────────────────────────────────────
-  const [focalNodeId, setFocalNodeId]       = useState<string | null>(initialSelectedNodeId);
+  const safeInitialFocal = isAccountId(initialSelectedNodeId) ? initialSelectedNodeId : null;
+  const [focalNodeId, setFocalNodeId]       = useState<string | null>(safeInitialFocal);
   const [activeLens, setActiveLens]         = useState<InvestigationLens>(initialLens);
   const [lensStatusMessage, setLensStatusMessage] = useState<string | null>(null);
   const [selectedNode, setSelectedNode]     = useState<GraphNode | null>(null);
@@ -492,18 +494,19 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const [layoutName, setLayoutName]         = useState<'cose' | 'concentric' | 'circle'>('cose');
   const [graphSearchQuery, setGraphSearchQuery] = useState('');
   const [isFullscreen, setIsFullscreen]     = useState(false);
-  const [showThreadPanel, setShowThreadPanel] = useState(Boolean(initialSelectedNodeId));
+  const [showThreadPanel, setShowThreadPanel] = useState(Boolean(safeInitialFocal || evidenceFocus));
   const [showPathPanel, setShowPathPanel]   = useState(false);
-  const [pathFrom, setPathFrom]             = useState(initialSelectedNodeId || '');
+  const [pathFrom, setPathFrom]             = useState(safeInitialFocal || '');
   const [pathTo, setPathTo]                 = useState('');
   const [pathResult, setPathResult]         = useState<string[] | null | 'not-found'>(null);
 
   // Sync state if initial props change via URL navigation
   useEffect(() => {
     if (initialSelectedNodeId !== undefined) {
-      setFocalNodeId(initialSelectedNodeId);
-      if (initialSelectedNodeId) {
-        setPathFrom(initialSelectedNodeId);
+      const valid = isAccountId(initialSelectedNodeId) ? initialSelectedNodeId : null;
+      setFocalNodeId(valid);
+      if (valid) {
+        setPathFrom(valid);
         setShowThreadPanel(true);
       }
     }
@@ -917,6 +920,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   };
 
   const handleSetFocal = useCallback((nodeId: string) => {
+    // Strict invariant: only genuine account/entity IDs can be focal. Never transaction IDs.
+    if (!isAccountId(nodeId)) return;
     setFocalNodeId(nodeId);
     setShowThreadPanel(true);
     setPathFrom(nodeId);
@@ -998,6 +1003,13 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const focusedCount   = evidenceFocus
     ? (evidenceFocus.supporting_entities || []).filter((id) => availableNodeIds.has(id)).length
     : 0;
+
+  const evidenceSubject = useMemo(() => {
+    if (!evidenceFocus) return { primary: '' };
+    return getEvidenceSubject(evidenceFocus);
+  }, [evidenceFocus]);
+
+  const isZeroRelationships = Boolean(lensStatusMessage) || graphData.nodes.length === 0;
 
   const nodeEvidenceTriggers = useMemo(() => {
     if (!selectedNode || !allEvidenceItems.length) return [];
@@ -1109,11 +1121,11 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             <span>Trace Path</span>
           </button>
 
-          {/* Investigative thread toggle (only when focal set) */}
-          {focalNodeId && (
+          {/* Investigative thread toggle (available when focal set OR evidenceFocus active) */}
+          {(focalNodeId || evidenceFocus) && (
             <button
               onClick={() => setShowThreadPanel(!showThreadPanel)}
-              title="Toggle investigative thread for focal account"
+              title="Toggle investigative thread"
               style={tbBtn(showThreadPanel, '#a5b4fc')}
             >
               <Layers size={11} />
@@ -1210,26 +1222,56 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         )}
       </div>
 
-      {/* ── Evidence focus banner ────────────────────────────────────────── */}
+      {/* ── Evidence focus banner — clearly distinguishes active lens, focal, and evidence ───────── */}
       {hasFocus && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '7px 16px', backgroundColor: `${focusColor}12`,
-          borderBottom: `1px solid ${focusColor}30`,
+          padding: '7px 16px', backgroundColor: `${focusColor}14`,
+          borderBottom: `1px solid ${focusColor}35`,
+          flexWrap: 'wrap', gap: '8px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ScanSearch size={13} style={{ color: focusColor, flexShrink: 0 }} />
-            <span style={{ fontSize: '11px', fontWeight: 700, color: focusColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Graph Focus:</span>
-            <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600 }}>{focusLabel}</span>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-              · {focusedCount > 0 ? `${focusedCount} highlighted account${focusedCount !== 1 ? 's' : ''}` : 'community-wide observable signal'}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Active Lens tag */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '3px' }}>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Lens:</span>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: '#93c5fd' }}>{activeLensConfig.label}</span>
+            </div>
+
+            {/* Investigation Focal tag */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '3px' }}>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Investigation Focal:</span>
+              <span className="font-mono" style={{ fontSize: '10px', fontWeight: 600, color: focalNodeId ? '#86efac' : 'var(--text-muted)' }}>
+                {focalNodeId || 'None (Signal Focus)'}
+              </span>
+            </div>
+
+            {/* Evidence Focus info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ScanSearch size={13} style={{ color: focusColor, flexShrink: 0 }} />
+              <span style={{ fontSize: '10px', fontWeight: 800, color: focusColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Evidence Focus:</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 700 }}>{focusLabel}</span>
+              {evidenceSubject.primary && (
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                  ({evidenceSubject.primary}{evidenceSubject.secondary ? ` · ${evidenceSubject.secondary}` : ''})
+                </span>
+              )}
+              {focusedCount > 0 && (
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                  · {focusedCount} highlighted
+                </span>
+              )}
+            </div>
           </div>
+
           <button
-            onClick={handleReset}
-            style={{ padding: '3px 9px', borderRadius: '4px', background: 'transparent', border: `1px solid ${focusColor}50`, color: focusColor, cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+            onClick={() => onClearFocus ? onClearFocus() : handleReset()}
+            style={{
+              padding: '3px 9px', borderRadius: '4px', background: 'transparent',
+              border: `1px solid ${focusColor}50`, color: focusColor, cursor: 'pointer',
+              fontSize: '11px', fontWeight: 600,
+            }}
           >
-            Clear Focus
+            Clear Evidence Focus
           </button>
         </div>
       )}
@@ -1323,9 +1365,9 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       }}>
 
         {/* ── Investigative Thread panel (left) ───────────────────────── */}
-        {showThreadPanel && focalNodeId && investigativeThread.length > 0 && (
+        {showThreadPanel && (focalNodeId || evidenceFocus) && (
           <div style={{
-            width: '264px', flexShrink: 0,
+            width: '280px', flexShrink: 0,
             backgroundColor: 'rgba(13,17,23,0.97)',
             backdropFilter: 'blur(12px)',
             borderRight: '1px solid var(--border)',
@@ -1333,33 +1375,72 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           }}>
             {/* Panel header */}
             <div style={{
-              padding: '10px 12px', borderBottom: '1px solid var(--border)',
+              padding: '12px 14px', borderBottom: '1px solid var(--border)',
               display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
             }}>
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0, flex: 1 }}>
                 <span style={{ fontSize: '9px', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}>
                   Investigative Thread
                 </span>
-                <span className="font-mono" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginTop: '2px' }}>
-                  {focalNodeId}
-                </span>
-                {focalNode?.customer_name && focalNode.customer_name !== focalNodeId && (
-                  <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block' }}>
-                    {focalNode.customer_name}
-                  </span>
+
+                {/* Account focal section: strictly account entities, never transactions */}
+                {focalNodeId ? (
+                  <div style={{ padding: '6px 8px', backgroundColor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                      INVESTIGATION FOCAL
+                    </span>
+                    <span className="font-mono" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginTop: '2px' }}>
+                      {focalNodeId}
+                    </span>
+                    {focalNode?.customer_name && focalNode.customer_name !== focalNodeId && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block' }}>
+                        {focalNode.customer_name}
+                      </span>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* Evidence Focus section */}
+                {evidenceFocus && (
+                  <div style={{
+                    padding: '6px 8px',
+                    backgroundColor: `${focusColor}14`,
+                    border: `1px solid ${focusColor}35`,
+                    borderRadius: '4px',
+                  }}>
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: focusColor, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                      {focalNodeId ? 'EVIDENCE FOCUS' : `SIGNAL FOCUS — ${focusLabel}`}
+                    </span>
+                    {focalNodeId && (
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginTop: '2px' }}>
+                        {focusLabel}
+                      </span>
+                    )}
+                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>
+                        Evidence subject:
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        {evidenceSubject.primary}
+                      </span>
+                      {evidenceSubject.secondary && (
+                        <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                          {evidenceSubject.secondary}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
-                <span style={{ fontSize: '10px', fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginTop: '4px' }}>
-                  FOCAL — UNDER INVESTIGATION
-                </span>
               </div>
               <button onClick={() => setShowThreadPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px', flexShrink: 0 }}>
                 <ChevronLeft size={14} />
               </button>
             </div>
+
             {/* Observations */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {investigativeThread.map((obs, i) => (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <div key={`thread-obs-${i}`} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   <span style={{ fontSize: '9px', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Deterministic Observation
                   </span>
@@ -1368,6 +1449,17 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
                   </p>
                 </div>
               ))}
+
+              {evidenceFocus && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: focusColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Observable Evidence Signal
+                  </span>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.55 }}>
+                    {evidenceFocus.description}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1375,6 +1467,92 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {/* ── Graph canvas ────────────────────────────────────────────────── */}
         <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
           <div ref={containerRef} style={{ width: '100%', height: '100%', backgroundColor: '#0d1117' }} />
+
+          {/* ── Empty state overlay for zero relationships ─────────────────── */}
+          {isZeroRelationships && (
+            <div
+              data-testid="graph-empty-state"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: 'rgba(13, 17, 23, 0.92)',
+                backdropFilter: 'blur(6px)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '24px',
+                textAlign: 'center',
+                zIndex: 25,
+                gap: '14px',
+              }}
+            >
+              <div style={{
+                width: '44px', height: '44px', borderRadius: '50%',
+                backgroundColor: 'rgba(234, 179, 8, 0.12)',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#facc15',
+              }}>
+                <Network size={22} />
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px 0', letterSpacing: '0.04em' }}>
+                  NO OBSERVED RELATIONSHIPS
+                </h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '420px', margin: 0, lineHeight: 1.5 }}>
+                  {lensStatusMessage || 'No observed relationships match the active investigation lens and evidence focus.'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={() => handleLensSelect('community')}
+                  style={{
+                    padding: '6px 12px', borderRadius: '5px',
+                    backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
+                    color: 'var(--text-primary)', fontSize: '11px', fontWeight: 600,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                  }}
+                >
+                  <Network size={12} />
+                  <span>View Community Structure</span>
+                </button>
+
+                {evidenceFocus && (
+                  <button
+                    onClick={() => {
+                      if (onClearFocus) onClearFocus();
+                      else handleReset();
+                    }}
+                    style={{
+                      padding: '6px 12px', borderRadius: '5px',
+                      backgroundColor: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.3)',
+                      color: '#60a5fa', fontSize: '11px', fontWeight: 600,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                    }}
+                  >
+                    <RotateCcw size={12} />
+                    <span>Clear Evidence Focus</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleReset}
+                  style={{
+                    padding: '6px 12px', borderRadius: '5px',
+                    backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border)',
+                    color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                  }}
+                >
+                  <RotateCcw size={12} />
+                  <span>Reset Lens</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ── Legend ────────────────────────────────────────────────────── */}
           <div style={{
@@ -1387,7 +1565,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           }}>
             <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Node Roles</span>
             {[
-              { bg: '#1e3a5f', border: '#3b82f6', label: 'Focal / Under Investigation' },
+              { bg: '#1e3a5f', border: '#3b82f6', label: 'Investigation Focal' },
               { bg: '#0f2942', border: '#38bdf8', label: 'Counterparty' },
               { bg: '#2d1a0f', border: '#fb923c', label: 'Shared Infrastructure' },
             ].map(({ bg, border, label }) => (
@@ -1415,10 +1593,10 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           </div>
 
           {/* ── Thread panel collapsed button ──────────────────────────────── */}
-          {focalNodeId && !showThreadPanel && (
+          {(focalNodeId || evidenceFocus) && !showThreadPanel && (
             <button
               onClick={() => setShowThreadPanel(true)}
-              title="Show investigative thread for focal account"
+              title="Show investigative thread"
               style={{
                 position: 'absolute', top: '14px', left: '14px',
                 display: 'flex', alignItems: 'center', gap: '5px',

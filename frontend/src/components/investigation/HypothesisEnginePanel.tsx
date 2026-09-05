@@ -30,7 +30,7 @@ export const HypothesisEnginePanel: React.FC<HypothesisEnginePanelProps> = ({
             <Badge variant="neutral">Anti-Confirmation Bias</Badge>
           </div>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-            Comparing competing explanations to avoid confirmation bias. High ML risk does not automatically prove fraudulent intent.
+            Comparing competing explanations to avoid confirmation bias. High ML risk does not establish wrongdoing.
           </p>
         </div>
       </div>

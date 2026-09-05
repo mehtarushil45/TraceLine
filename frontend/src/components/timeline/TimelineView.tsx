@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Clock, Search } from 'lucide-react';
 import type { TimelineEvent, EvidenceItem } from '../../types/api';
 
+import { isAccountId, getEvidenceSubject } from '../../utils/forensicUtils';
+
 interface TimelineViewProps {
   events: TimelineEvent[];
   evidenceFocus?: EvidenceItem | null;
@@ -13,6 +15,51 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ events, evidenceFocu
   const navigate = useNavigate();
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DECLINED' | 'SETTLED'>('ALL');
+  const [showOnlySupporting, setShowOnlySupporting] = useState(false);
+
+  const evidenceSubject = React.useMemo(() => {
+    if (!evidenceFocus) return null;
+    return getEvidenceSubject(evidenceFocus);
+  }, [evidenceFocus]);
+
+  // If an evidence focus is active, compute which events match supporting entities/window
+  const evidenceMatches = React.useMemo(() => {
+    if (!evidenceFocus) return new Set<string>();
+    const supports = new Set(evidenceFocus.supporting_entities || []);
+    const metrics = (evidenceFocus.metrics || {}) as Record<string, unknown>;
+    const startTs = typeof metrics.start_timestamp === 'string' ? new Date(metrics.start_timestamp).getTime() : null;
+    const endTs = typeof metrics.end_timestamp === 'string' ? new Date(metrics.end_timestamp).getTime() : null;
+
+    const matched = new Set<string>();
+    events.forEach((evt) => {
+      if (!evt) return;
+      if (supports.has(evt.transaction_id) || supports.has(evt.src_account_id) || supports.has(evt.dst_account_id)) {
+        matched.add(evt.transaction_id);
+        return;
+      }
+      if (startTs != null && endTs != null) {
+        const t = new Date(evt.timestamp).getTime();
+        if (t >= startTs && t <= endTs) {
+          matched.add(evt.transaction_id);
+        }
+      }
+    });
+    return matched;
+  }, [events, evidenceFocus]);
+
+  const totalSupportingCount = React.useMemo(() => {
+    if (!evidenceFocus) return 0;
+    if (evidenceSubject?.transactionCount != null && evidenceSubject.transactionCount > 0) {
+      return evidenceSubject.transactionCount;
+    }
+    const txEntities = (evidenceFocus.supporting_entities || []).filter((id) => !isAccountId(id));
+    if (txEntities.length > 0) return txEntities.length;
+    return evidenceMatches.size;
+  }, [evidenceFocus, evidenceSubject, evidenceMatches]);
+
+  const isCommunityLevelSignal = !evidenceFocus
+    ? false
+    : totalSupportingCount === 0 && evidenceMatches.size === 0;
 
   const filtered = events.filter((e) => {
     const matchesText =
@@ -26,22 +73,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ events, evidenceFocu
       (statusFilter === 'DECLINED' && e.transaction_status.toLowerCase() === 'declined') ||
       (statusFilter === 'SETTLED' && e.transaction_status.toLowerCase() === 'settled');
 
-    return matchesText && matchesStatus;
-  });
+    const matchesSupporting =
+      !showOnlySupporting || !evidenceFocus || evidenceMatches.size === 0 || evidenceMatches.has(e.transaction_id);
 
-  // If an evidence focus is active, compute which events match the supporting entities
-  const evidenceMatches = React.useMemo(() => {
-    if (!evidenceFocus) return new Set<string>();
-    const supports = new Set(evidenceFocus.supporting_entities || []);
-    const matched = new Set<string>();
-    filtered.forEach((evt) => {
-      if (!evt) return;
-      if (supports.has(evt.transaction_id) || supports.has(evt.src_account_id) || supports.has(evt.dst_account_id)) {
-        matched.add(evt.transaction_id);
-      }
-    });
-    return matched;
-  }, [filtered, evidenceFocus]);
+    return matchesText && matchesStatus && matchesSupporting;
+  });
 
 
   return (
@@ -123,14 +159,81 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ events, evidenceFocu
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {/* Evidence timeline banner when focus exists */}
         {evidenceFocus && (
-          <div style={{ marginBottom: 8, padding: '10px 12px', borderRadius: 6, background: 'rgba(5,10,24,0.6)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div
+            data-testid="timeline-evidence-banner"
+            style={{
+              marginBottom: 8,
+              padding: '12px 16px',
+              borderRadius: 6,
+              background: 'rgba(5,10,24,0.7)',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}
+          >
             <div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent-cyan)' }}>Evidence Focus: {evidenceFocus.type.replace(/_/g, ' ')}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{evidenceMatches.size} related transactions highlighted</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-cyan)' }}>
+                Evidence Focus: {evidenceFocus.title || evidenceFocus.type.replace(/_/g, ' ')}
+              </div>
+              {!isCommunityLevelSignal ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: '3px' }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {totalSupportingCount} supporting transaction{totalSupportingCount !== 1 ? 's' : ''}
+                  </strong>
+                  {evidenceSubject?.windowMinutes != null && (
+                    <span> · {evidenceSubject.windowMinutes}-minute observed window</span>
+                  )}
+                  {evidenceMatches.size > 0 && evidenceMatches.size !== totalSupportingCount && (
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                      {' '}({evidenceMatches.size} identified in timeline telemetry)
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: '3px' }}>
+                  Community-level signal — no individual transactions directly mapped to this evidence item.
+                </div>
+              )}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              {evidenceMatches.size === 0 ? 'No transaction-level evidence associated with this signal.' : ''}
-            </div>
+
+            {!isCommunityLevelSignal && (
+              <button
+                type="button"
+                onClick={() => setShowOnlySupporting(!showOnlySupporting)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '5px',
+                  backgroundColor: showOnlySupporting ? 'var(--accent-cyan)' : 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  color: showOnlySupporting ? '#000' : 'var(--accent-cyan)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span>{showOnlySupporting ? 'Show All Timeline Events' : 'View Supporting Transactions'}</span>
+                {evidenceMatches.size > 0 && (
+                  <span
+                    style={{
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      backgroundColor: showOnlySupporting ? 'rgba(0,0,0,0.25)' : 'rgba(56, 189, 248, 0.25)',
+                      fontSize: '10px',
+                      fontWeight: 800,
+                    }}
+                  >
+                    {evidenceMatches.size}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         )}
 

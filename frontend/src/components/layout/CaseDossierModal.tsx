@@ -59,7 +59,7 @@ export const CaseDossierModal: React.FC<CaseDossierModalProps> = ({
   const dossierDate = new Date().toLocaleString();
 
   // Generate plain-text/markdown report
-  const markdownReport = `# TRACELINE FORENSIC INTELLIGENCE | INVESTIGATION DOSSIER
+  const markdownReport = `# TraceLine Risk Intelligence | Investigation Dossier
 Generated: ${dossierDate}
 System: TraceLine Neural Graph Risk Platform v1.0
 Classification: RESTRICTED // FORENSIC INVESTIGATION DOSSIER

@@ -93,8 +93,8 @@ export const FraudStoryTimeline: React.FC<FraudStoryTimelineProps> = ({
     {
       id: 'velocity',
       stageNumber: '03',
-      title: 'Suspicious Velocity & Temporal Spikes',
-      subtitle: `Temporal compression score ${community.temporal_statistics.temporal_compression_score.toFixed(2)} with ${community.temporal_statistics.unique_active_hours} active transaction hours`,
+      title: 'Observed Velocity & Temporal Spikes',
+      subtitle: `Temporal concentration score ${community.temporal_statistics.temporal_compression_score.toFixed(2)} with ${community.temporal_statistics.unique_active_hours} active transaction hours`,
       icon: Zap,
       color: '#f87171',
       items: (evidence?.items || [])
@@ -113,7 +113,7 @@ export const FraudStoryTimeline: React.FC<FraudStoryTimelineProps> = ({
     {
       id: 'movement',
       stageNumber: '04',
-      title: 'Coordinated Fund Movement & Layering',
+      title: 'Observed Fund Movement Patterns',
       subtitle: `${community.transaction_statistics.tx_per_member.toFixed(1)} average transactions per member totaling $${community.transaction_statistics.total_transaction_amount.toLocaleString()}`,
       icon: Activity,
       color: '#34d399',
@@ -153,11 +153,11 @@ export const FraudStoryTimeline: React.FC<FraudStoryTimelineProps> = ({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Clock size={16} style={{ color: 'var(--accent)' }} />
-            <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>The Suspected Operation Storyline</strong>
+            <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>Observed Activity Storyline</strong>
             <Badge variant="accent">Chronological Reconstruction</Badge>
           </div>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-            Reconstructed stages of network activity from initial account observation to infrastructure reuse and fund movement.
+            Chronological reconstruction of observed network activity stages. This is an evidence-driven reconstruction, not a determination of wrongdoing.
           </p>
         </div>
       </div>
