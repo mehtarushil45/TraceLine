@@ -30,7 +30,6 @@ import { MoneyMovementFlow } from '../components/investigation/MoneyMovementFlow
 import { EntityRoleMatrix } from '../components/investigation/EntityRoleMatrix';
 import { CaseReadinessAudit } from '../components/investigation/CaseReadinessAudit';
 import { InvestigatorNarrativeBlock } from '../components/investigation/InvestigatorNarrativeBlock';
-import { RecommendedActionsPanel } from '../components/investigation/RecommendedActionsPanel';
 import {
   createFormalCase,
   findCaseForCommunity,
@@ -570,13 +569,6 @@ export const ForensicWorkspacePage: React.FC = () => {
       {activeView === 'evidence' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <EvidenceConvergencePanel evidence={evidence} onSelectEvidence={handleSelectEvidence} />
-          <RecommendedActionsPanel
-            community={community}
-            evidence={evidence}
-            graphData={graphData}
-            onFocusAccountInGraph={handleFocusInNetwork}
-            onScrollToFlow={() => setView('money-flow')}
-          />
         </div>
       )}
 
