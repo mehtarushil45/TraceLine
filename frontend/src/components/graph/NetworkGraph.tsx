@@ -640,6 +640,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       nodeRepulsion: () => 8000, idealEdgeLength: () => 65,
       edgeElasticity: () => 100, gravity: 0.3,
       numIter: 1000, initialTemp: 200, coolingFactor: 0.95, fit: false,
+      randomize: false,
     };
 
     const cy = cytoscape({

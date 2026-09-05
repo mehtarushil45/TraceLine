@@ -30,8 +30,9 @@ export const EntityRoleMatrix: React.FC<EntityRoleMatrixProps> = ({
 
   const nodes = graphData?.nodes || [];
 
-  // Classify entities based on degree, in-out transaction patterns, and merchant endpoints
-  const classifiedEntities: ClassifiedEntity[] = nodes.slice(0, 6).map((node) => {
+  // Sort entities deterministically by connectivity (degree), balance, and ID so the primary hubs remain consistent
+  const sortedNodes = [...nodes].sort((a, b) => (b.degree - a.degree) || ((b.balance ?? 0) - (a.balance ?? 0)) || a.id.localeCompare(b.id));
+  const classifiedEntities: ClassifiedEntity[] = sortedNodes.slice(0, 6).map((node) => {
     const isHub = node.degree >= 4;
     const isSource = timelineEvents.some((t) => t.src_account_id === node.id);
     const isRecipient = timelineEvents.some((t) => t.dst_account_id === node.id);

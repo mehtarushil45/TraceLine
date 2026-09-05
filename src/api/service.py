@@ -1305,8 +1305,19 @@ class TraceLineService:
                 if src in member_set:
                     selected_nodes_set.add(src)
 
+        # Deterministically sort selected nodes: focal first, then degree desc, balance desc, id asc
+        sorted_selected_accs = sorted(
+            selected_nodes_set,
+            key=lambda a: (
+                0 if a == focal_account_id else 1,
+                -degrees.get(a, 0),
+                -_sanitize_float(self.accounts_df.loc[a].get("balance")) if a in self.accounts_df.index else 0.0,
+                a,
+            ),
+        )
+
         nodes: list[GraphNode] = []
-        for acc in selected_nodes_set:
+        for acc in sorted_selected_accs:
             acc_row = self.accounts_df.loc[acc] if acc in self.accounts_df.index else None
             name = str(acc_row.get("customer_name", acc)) if acc_row is not None else acc
             balance = _sanitize_float(acc_row.get("balance")) if acc_row is not None else 0.0
@@ -1320,56 +1331,72 @@ class TraceLineService:
                 )
             )
 
-        # Select edges between selected nodes and compute observable fund flow
-        edges: list[GraphEdge] = []
-        existing_pairs: set[tuple[str, str]] = set()
+        # Partition valid edges between selected nodes into focal-touching and contextual background edges
+        focal_edges_list: list[dict] = []
+        other_edges_list: list[dict] = []
 
         for e in all_edges:
             src = e["source"]
             dst = e["target"]
             if src in selected_nodes_set and dst in selected_nodes_set:
-                src_sent = self.account_sent_tx_indices.get(src, [])
-                dst_recv = self.account_recv_tx_indices.get(dst, [])
-                fwd_indices = set(src_sent) & set(dst_recv)
-
-                dst_sent = self.account_sent_tx_indices.get(dst, [])
-                src_recv = self.account_recv_tx_indices.get(src, [])
-                rev_indices = set(dst_sent) & set(src_recv)
-
-                all_tx = fwd_indices | rev_indices
-                tx_count = len(all_tx)
-                if tx_count > 0:
-                    tx_amt = round(float(self.transactions_df.iloc[list(all_tx)]["amount"].sum()), 2)
-                    if fwd_indices and rev_indices:
-                        direction = "bidirectional"
-                    elif fwd_indices:
-                        direction = "source_to_target"
-                    else:
-                        direction = "target_to_source"
+                if focal_account_id and (src == focal_account_id or dst == focal_account_id):
+                    focal_edges_list.append(e)
                 else:
-                    tx_amt = 0.0
-                    direction = None
+                    other_edges_list.append(e)
 
-                edges.append(
-                    GraphEdge(
-                        source=src,
-                        target=dst,
-                        weight=round(float(e["weight"]), 4),
-                        shared_instruments=list(e.get("shared_instruments", [])),
-                        shared_devices=list(e.get("shared_devices", [])),
-                        shared_ips=list(e.get("shared_ips", [])),
-                        shared_merchants=list(e.get("shared_merchants", [])),
-                        temporal_overlap=int(e.get("temporal_overlap", 0)),
-                        has_transaction_flow=tx_count > 0,
-                        transaction_count=tx_count,
-                        total_amount=tx_amt,
-                        flow_direction=direction,
-                    )
+        # Deterministically sort edges by weight descending, then endpoints
+        focal_edges_list.sort(key=lambda e: (-float(e.get("weight", 0.0)), e["source"], e["target"]))
+        other_edges_list.sort(key=lambda e: (-float(e.get("weight", 0.0)), e["source"], e["target"]))
+
+        # Prioritize ALL focal edges so no observed relationships are truncated, then fill with top community edges
+        candidate_edges = focal_edges_list + other_edges_list[:max(0, max_edges - len(focal_edges_list))]
+
+        edges: list[GraphEdge] = []
+        existing_pairs: set[tuple[str, str]] = set()
+
+        for e in candidate_edges:
+            src = e["source"]
+            dst = e["target"]
+            src_sent = self.account_sent_tx_indices.get(src, [])
+            dst_recv = self.account_recv_tx_indices.get(dst, [])
+            fwd_indices = set(src_sent) & set(dst_recv)
+
+            dst_sent = self.account_sent_tx_indices.get(dst, [])
+            src_recv = self.account_recv_tx_indices.get(src, [])
+            rev_indices = set(dst_sent) & set(src_recv)
+
+            all_tx = fwd_indices | rev_indices
+            tx_count = len(all_tx)
+            if tx_count > 0:
+                tx_amt = round(float(self.transactions_df.iloc[list(all_tx)]["amount"].sum()), 2)
+                if fwd_indices and rev_indices:
+                    direction = "bidirectional"
+                elif fwd_indices:
+                    direction = "source_to_target"
+                else:
+                    direction = "target_to_source"
+            else:
+                tx_amt = 0.0
+                direction = None
+
+            edges.append(
+                GraphEdge(
+                    source=src,
+                    target=dst,
+                    weight=round(float(e["weight"]), 4),
+                    shared_instruments=list(e.get("shared_instruments", [])),
+                    shared_devices=list(e.get("shared_devices", [])),
+                    shared_ips=list(e.get("shared_ips", [])),
+                    shared_merchants=list(e.get("shared_merchants", [])),
+                    temporal_overlap=int(e.get("temporal_overlap", 0)),
+                    has_transaction_flow=tx_count > 0,
+                    transaction_count=tx_count,
+                    total_amount=tx_amt,
+                    flow_direction=direction,
                 )
-                existing_pairs.add((src, dst))
-                existing_pairs.add((dst, src))
-                if len(edges) >= max_edges:
-                    break
+            )
+            existing_pairs.add((src, dst))
+            existing_pairs.add((dst, src))
 
         # Ensure direct transaction edges for focal_account_id with selected nodes are included
         if focal_account_id and focal_account_id in selected_nodes_set:
@@ -1405,6 +1432,16 @@ class TraceLineService:
                     )
                     existing_pairs.add((src_node, dst_node))
                     existing_pairs.add((dst_node, src_node))
+
+        # Deterministically sort edges: focal-touching first, then weight descending, source, target
+        edges.sort(
+            key=lambda e: (
+                0 if focal_account_id and (e.source == focal_account_id or e.target == focal_account_id) else 1,
+                -e.weight,
+                e.source,
+                e.target,
+            )
+        )
 
         res = CommunityGraphResponse(
             community_id=community_id,

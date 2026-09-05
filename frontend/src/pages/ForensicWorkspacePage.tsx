@@ -95,7 +95,9 @@ export const ForensicWorkspacePage: React.FC = () => {
     'relationship', 'flow-of-funds', 'shared-infrastructure', 'temporal', 'community',
   ];
   const rawLens = searchParams.get('lens') as InvestigationLens | null;
-  const lensParam: InvestigationLens = VALID_LENSES.includes(rawLens!) ? rawLens! : 'community';
+  const lensParam: InvestigationLens = VALID_LENSES.includes(rawLens!)
+    ? rawLens!
+    : (focusParam ? 'relationship' : 'community');
 
   const setView = useCallback(
     (view: ForensicView, extra?: Record<string, string>) => {
@@ -121,6 +123,7 @@ export const ForensicWorkspacePage: React.FC = () => {
   const [community, setCommunity] = useState<CommunityDetailResponse | null>(cachedComm);
   const [evidence, setEvidence] = useState<CommunityEvidenceResponse | null>(cachedEv);
   const [graphData, setGraphData] = useState<CommunityGraphResponse | null>(null);
+  const [loadedGraphFocal, setLoadedGraphFocal] = useState<string | null | undefined>(undefined);
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [accountsTotal, setAccountsTotal] = useState(0);
   const [accountsPage, setAccountsPage] = useState(1);
@@ -201,22 +204,24 @@ export const ForensicWorkspacePage: React.FC = () => {
       .finally(() => setLoadingCore(false));
   }, [communityParam, activeView, navigate]);
 
-  // graph on demand (refetches if requested focal account is not in current graph slice)
+  // graph on demand (guarantees complete focal neighborhood when focal account is active)
   useEffect(() => {
     if (!communityParam || !['network', 'accounts'].includes(activeView) || loadingGraph) return;
 
-    if (graphData) {
-      if (!focusParam || graphData.nodes.some((n) => n.id === focusParam)) {
-        return;
-      }
+    const targetFocal = activeView === 'network' ? (focusParam || null) : null;
+    if (graphData && loadedGraphFocal === targetFocal) {
+      return;
     }
 
     setLoadingGraph(true);
-    getCommunityGraph(communityParam, 200, 500, focusParam)
-      .then(setGraphData)
+    getCommunityGraph(communityParam, 200, 500, targetFocal || undefined)
+      .then((data) => {
+        setGraphData(data);
+        setLoadedGraphFocal(targetFocal);
+      })
       .catch(console.error)
       .finally(() => setLoadingGraph(false));
-  }, [communityParam, activeView, graphData, loadingGraph, focusParam]);
+  }, [communityParam, activeView, graphData, loadingGraph, focusParam, loadedGraphFocal]);
 
   // accounts on demand with server-side filter, sort, and search
   useEffect(() => {
@@ -246,7 +251,7 @@ export const ForensicWorkspacePage: React.FC = () => {
   }, [communityParam, activeView, timelineEvents.length]);
 
   useEffect(() => {
-    if (focusParam) setFocusedNodeId(focusParam);
+    setFocusedNodeId(focusParam);
   }, [focusParam]);
 
   // cross-view helpers
