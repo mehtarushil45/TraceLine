@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Activity, ArrowLeft, BookOpen, Briefcase, CheckSquare,
+  Activity, ArrowDownUp, ArrowLeft, BookOpen, Briefcase, CheckSquare,
   CheckCircle2, Clock, FileText, FlaskConical, Layers, Network,
-  Scale, ScanSearch, Search, Users,
+  RotateCcw, Scale, ScanSearch, Search, Users,
 } from 'lucide-react';
 import {
   getCommunity, getCommunityAccounts, getCommunityEvidence,
@@ -16,7 +16,7 @@ import type {
 import type { FormalDecision } from '../types/cases';
 import {
   Badge, Button, DataTable, EmptyState,
-  EntityLink, LoadingState, Pagination, Panel, RiskBadge, RiskScore,
+  EntityLink, LoadingState, Pagination, Panel, RiskBadge, RiskScore, SearchInput,
 } from '../components/common';
 import type { Column } from '../components/common';
 import { NetworkGraph } from '../components/graph/NetworkGraph';
@@ -122,6 +122,10 @@ export const ForensicWorkspacePage: React.FC = () => {
   const [accountsTotal, setAccountsTotal] = useState(0);
   const [accountsPage, setAccountsPage] = useState(1);
   const [accountsTotalPages, setAccountsTotalPages] = useState(1);
+  const [accountRiskFilter, setAccountRiskFilter] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL');
+  const [accountSortBy, setAccountSortBy] = useState<string>('created_desc');
+  const [accountSearchQuery, setAccountSearchQuery] = useState('');
+  const [debouncedAccountSearch, setDebouncedAccountSearch] = useState('');
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [evidenceFocus, setEvidenceFocus] = useState<EvidenceItem | null>(null);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(focusParam);
@@ -155,6 +159,15 @@ export const ForensicWorkspacePage: React.FC = () => {
     return subscribeToCaseUpdates(update);
   }, [communityParam]);
 
+  // debounce account search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedAccountSearch(accountSearchQuery);
+      setAccountsPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [accountSearchQuery]);
+
   // core data on community change
   useEffect(() => {
     if (!communityParam) {
@@ -179,16 +192,23 @@ export const ForensicWorkspacePage: React.FC = () => {
       .then(setGraphData).catch(console.error).finally(() => setLoadingGraph(false));
   }, [communityParam, activeView, graphData, loadingGraph, focusParam]);
 
-  // accounts on demand
+  // accounts on demand with server-side filter, sort, and search
   useEffect(() => {
     if (!communityParam || activeView !== 'accounts') return;
     setLoadingAccounts(true);
-    getCommunityAccounts(communityParam, accountsPage, 50)
+    getCommunityAccounts(
+      communityParam,
+      accountsPage,
+      50,
+      accountRiskFilter === 'ALL' ? undefined : accountRiskFilter,
+      accountSortBy,
+      debouncedAccountSearch,
+    )
       .then((res) => {
         setAccounts(res.items); setAccountsTotal(res.total); setAccountsTotalPages(res.total_pages);
       })
       .catch(console.error).finally(() => setLoadingAccounts(false));
-  }, [communityParam, activeView, accountsPage]);
+  }, [communityParam, activeView, accountsPage, accountRiskFilter, accountSortBy, debouncedAccountSearch]);
 
   // timeline on demand (shared for timeline/money-flow/story)
   useEffect(() => {
@@ -568,10 +588,182 @@ export const ForensicWorkspacePage: React.FC = () => {
             />
           )}
           <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
-              <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
-                Member Accounts — {accountsTotal.toLocaleString()} total
-              </strong>
+            <div
+              style={{
+                padding: '12px 18px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                  Member Accounts
+                </strong>
+                <Badge variant="neutral" size="sm">
+                  {accountsTotal.toLocaleString()} {accountRiskFilter !== 'ALL' || debouncedAccountSearch ? 'filtered' : 'total'}
+                </Badge>
+              </div>
+
+              {/* Filter & Sort Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {/* Risk Filter Pills */}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    backgroundColor: 'var(--bg-input)',
+                    padding: '2px',
+                    borderRadius: '5px',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { setAccountRiskFilter('ALL'); setAccountsPage(1); }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: accountRiskFilter === 'ALL' ? 700 : 500,
+                      fontFamily: 'var(--font-sans)',
+                      cursor: 'pointer',
+                      backgroundColor: accountRiskFilter === 'ALL' ? 'var(--bg-subtle)' : 'transparent',
+                      color: accountRiskFilter === 'ALL' ? 'var(--text-primary)' : 'var(--text-muted)',
+                      transition: 'all 0.12s ease',
+                    }}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAccountRiskFilter('HIGH'); setAccountsPage(1); }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: accountRiskFilter === 'HIGH' ? 700 : 500,
+                      fontFamily: 'var(--font-sans)',
+                      cursor: 'pointer',
+                      backgroundColor: accountRiskFilter === 'HIGH' ? 'var(--risk-high-bg)' : 'transparent',
+                      color: accountRiskFilter === 'HIGH' ? '#fca5a5' : 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.12s ease',
+                    }}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                    High Risk
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAccountRiskFilter('MEDIUM'); setAccountsPage(1); }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: accountRiskFilter === 'MEDIUM' ? 700 : 500,
+                      fontFamily: 'var(--font-sans)',
+                      cursor: 'pointer',
+                      backgroundColor: accountRiskFilter === 'MEDIUM' ? 'var(--risk-med-bg)' : 'transparent',
+                      color: accountRiskFilter === 'MEDIUM' ? '#fde68a' : 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.12s ease',
+                    }}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                    Medium Risk
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAccountRiskFilter('LOW'); setAccountsPage(1); }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: accountRiskFilter === 'LOW' ? 700 : 500,
+                      fontFamily: 'var(--font-sans)',
+                      cursor: 'pointer',
+                      backgroundColor: accountRiskFilter === 'LOW' ? 'var(--risk-low-bg)' : 'transparent',
+                      color: accountRiskFilter === 'LOW' ? '#86efac' : 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.12s ease',
+                    }}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                    Low Risk
+                  </button>
+                </div>
+
+                {/* Quick Search */}
+                <SearchInput
+                  value={accountSearchQuery}
+                  onChange={setAccountSearchQuery}
+                  placeholder="Search account or customer..."
+                  width="210px"
+                />
+
+                {/* Sort Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ArrowDownUp size={13} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+                  <select
+                    value={accountSortBy}
+                    onChange={(e) => {
+                      setAccountSortBy(e.target.value);
+                      setAccountsPage(1);
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      backgroundColor: 'var(--bg-input)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '5px',
+                      color: 'var(--text-primary)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-sans)',
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="created_desc">Date: Newest to Oldest</option>
+                    <option value="created_asc">Date: Oldest to Newest</option>
+                    <option value="risk_desc">Risk: Highest First (Triage)</option>
+                    <option value="risk_asc">Risk: Lowest First</option>
+                    <option value="balance_desc">Balance: Highest First</option>
+                    <option value="balance_asc">Balance: Lowest First</option>
+                  </select>
+                </div>
+
+                {/* Reset Filters button if modified */}
+                {(accountRiskFilter !== 'ALL' || debouncedAccountSearch !== '' || accountSortBy !== 'created_desc') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={RotateCcw}
+                    onClick={() => {
+                      setAccountRiskFilter('ALL');
+                      setAccountSortBy('created_desc');
+                      setAccountSearchQuery('');
+                      setAccountsPage(1);
+                    }}
+                    title="Reset all filters and sort"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
             </div>
             {loadingAccounts
               ? <div style={{ padding: '24px' }}><LoadingState type="table" count={8} /></div>
@@ -581,7 +773,7 @@ export const ForensicWorkspacePage: React.FC = () => {
                     columns={accountColumns}
                     data={accounts}
                     keyExtractor={(acc) => acc.account_id}
-                    emptyMessage="No member accounts found."
+                    emptyMessage={debouncedAccountSearch || accountRiskFilter !== 'ALL' ? 'No member accounts match the active filter criteria.' : 'No member accounts found.'}
                   />
                   <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
                     <Pagination

@@ -19,10 +19,26 @@ export async function getCommunity(communityId: number | string): Promise<Commun
 export async function getCommunityAccounts(
   communityId: number | string,
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 50,
+  riskLevel?: string,
+  sortBy?: string,
+  search?: string
 ): Promise<PaginatedAccountsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  if (riskLevel && riskLevel !== 'ALL') {
+    params.set('risk_level', riskLevel);
+  }
+  if (sortBy) {
+    params.set('sort_by', sortBy);
+  }
+  if (search && search.trim()) {
+    params.set('search', search.trim());
+  }
   return fetchApi<PaginatedAccountsResponse>(
-    `/communities/${communityId}/accounts?page=${page}&page_size=${pageSize}`
+    `/communities/${communityId}/accounts?${params.toString()}`
   );
 }
 

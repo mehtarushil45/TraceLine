@@ -93,11 +93,21 @@ export const EntityRoleMatrix: React.FC<EntityRoleMatrixProps> = ({
               gap: '8px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Badge variant={ent.roleVariant} size="sm">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+              <Badge variant={ent.roleVariant} size="sm" style={{ flexShrink: 0 }}>
                 {ent.role}
               </Badge>
-              <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+              <span
+                className="font-mono"
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--text-dim)',
+                  textAlign: 'right',
+                  lineHeight: 1.3,
+                  flexShrink: 1,
+                  whiteSpace: 'normal',
+                }}
+              >
                 {ent.metric}
               </span>
             </div>

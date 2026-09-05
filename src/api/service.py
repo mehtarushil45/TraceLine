@@ -418,9 +418,15 @@ class TraceLineService:
         )
 
     def get_community_accounts(
-        self, community_id: int, page: int = 1, page_size: int = 50
+        self,
+        community_id: int,
+        page: int = 1,
+        page_size: int = 50,
+        risk_level: str | None = None,
+        sort_by: str = "created_desc",
+        search: str | None = None,
     ) -> PaginatedAccountsResponse | None:
-        """Return paginated list of accounts in a community."""
+        """Return paginated list of accounts in a community with filtering and sorting."""
         self.load_data()
 
         if (
@@ -429,11 +435,92 @@ class TraceLineService:
         ):
             return None
 
-        account_ids = self.community_to_accounts.get(community_id, [])
+        account_ids = list(self.community_to_accounts.get(community_id, []))
+
+        # Filter by search (case-insensitive substring of account_id or customer_name)
+        if search:
+            s_clean = search.strip().lower()
+            filtered_ids = []
+            for aid in account_ids:
+                if s_clean in aid.lower():
+                    filtered_ids.append(aid)
+                else:
+                    cname = str(self.accounts_df.loc[aid, "customer_name"] if aid in self.accounts_df.index else "").lower()
+                    if s_clean in cname:
+                        filtered_ids.append(aid)
+            account_ids = filtered_ids
+
+        # Filter by risk_level (HIGH, MEDIUM, LOW)
+        if risk_level and risk_level.strip().upper() not in ("ALL", ""):
+            lvl_upper = risk_level.strip().upper()
+            filtered_ids = []
+            for aid in account_ids:
+                acc_row = self.accounts_df.loc[aid] if aid in self.accounts_df.index else None
+                rscore = float(acc_row.get("risk_score", 0.0)) if acc_row is not None and pd.notna(acc_row.get("risk_score")) else 0.0
+                if rscore >= 0.60:
+                    tier = "HIGH"
+                elif rscore >= 0.35:
+                    tier = "MEDIUM"
+                else:
+                    tier = "LOW"
+                if tier == lvl_upper:
+                    filtered_ids.append(aid)
+            account_ids = filtered_ids
+
+        # Deterministic sorting
+        if sort_by in ("risk_asc", "risk_low"):
+            account_ids.sort(
+                key=lambda aid: (
+                    float(self.accounts_df.loc[aid, "risk_score"]) if aid in self.accounts_df.index and pd.notna(self.accounts_df.loc[aid, "risk_score"]) else 0.0,
+                    aid
+                ),
+                reverse=False,
+            )
+        elif sort_by in ("risk_desc", "risk_high"):
+            account_ids.sort(
+                key=lambda aid: (
+                    float(self.accounts_df.loc[aid, "risk_score"]) if aid in self.accounts_df.index and pd.notna(self.accounts_df.loc[aid, "risk_score"]) else 0.0,
+                    aid
+                ),
+                reverse=True,
+            )
+        elif sort_by in ("balance_asc", "bal_low"):
+            account_ids.sort(
+                key=lambda aid: (
+                    float(self.accounts_df.loc[aid, "balance"]) if aid in self.accounts_df.index and pd.notna(self.accounts_df.loc[aid, "balance"]) else 0.0,
+                    aid
+                ),
+                reverse=False,
+            )
+        elif sort_by in ("balance_desc", "bal_high"):
+            account_ids.sort(
+                key=lambda aid: (
+                    float(self.accounts_df.loc[aid, "balance"]) if aid in self.accounts_df.index and pd.notna(self.accounts_df.loc[aid, "balance"]) else 0.0,
+                    aid
+                ),
+                reverse=True,
+            )
+        elif sort_by in ("created_asc", "date_asc", "oldest"):
+            account_ids.sort(
+                key=lambda aid: (
+                    str(self.accounts_df.loc[aid, "creation_date"]) if aid in self.accounts_df.index and pd.notna(self.accounts_df.loc[aid, "creation_date"]) else "",
+                    aid
+                ),
+                reverse=False,
+            )
+        else:  # "created_desc", "date_desc", "newest"
+            account_ids.sort(
+                key=lambda aid: (
+                    str(self.accounts_df.loc[aid, "creation_date"]) if aid in self.accounts_df.index and pd.notna(self.accounts_df.loc[aid, "creation_date"]) else "",
+                    aid
+                ),
+                reverse=True,
+            )
+
         total = len(account_ids)
         page = max(1, page)
         page_size = max(1, min(100, page_size))
-        total_pages = max(1, math.ceil(total / page_size))
+        total_pages = max(1, math.ceil(total / page_size)) if total > 0 else 1
 
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size

@@ -194,6 +194,50 @@ def test_api_community_accounts_not_found() -> None:
     assert response.status_code == 404
 
 
+def test_api_community_accounts_filter_and_sort() -> None:
+    """GET /api/communities/{id}/accounts supports risk_level filter and sorting."""
+    # Test HIGH risk filter
+    resp_high = client.get("/api/communities/3/accounts?risk_level=HIGH&page=1&page_size=20")
+    assert resp_high.status_code == 200
+    data_high = resp_high.json()
+    for item in data_high["items"]:
+        if item["account_risk_score"] is not None:
+            assert item["account_risk_score"] >= 0.60
+
+    # Test LOW risk filter
+    resp_low = client.get("/api/communities/3/accounts?risk_level=LOW&page=1&page_size=20")
+    assert resp_low.status_code == 200
+    data_low = resp_low.json()
+    for item in data_low["items"]:
+        if item["account_risk_score"] is not None:
+            assert item["account_risk_score"] < 0.35
+
+    # Test sort by risk_desc
+    resp_sort_risk = client.get("/api/communities/3/accounts?sort_by=risk_desc&page=1&page_size=10")
+    assert resp_sort_risk.status_code == 200
+    scores = [
+        item["account_risk_score"]
+        for item in resp_sort_risk.json()["items"]
+        if item["account_risk_score"] is not None
+    ]
+    assert scores == sorted(scores, reverse=True)
+
+    # Test sort by balance_desc
+    resp_sort_bal = client.get("/api/communities/3/accounts?sort_by=balance_desc&page=1&page_size=10")
+    assert resp_sort_bal.status_code == 200
+    balances = [item["balance"] for item in resp_sort_bal.json()["items"]]
+    assert balances == sorted(balances, reverse=True)
+
+    # Test search
+    first_acc_id = data_high["items"][0]["account_id"]
+    resp_search = client.get(f"/api/communities/3/accounts?search={first_acc_id}")
+    assert resp_search.status_code == 200
+    search_data = resp_search.json()
+    assert search_data["total"] >= 1
+    assert any(acc["account_id"] == first_acc_id for acc in search_data["items"])
+
+
+
 # ---------------------------------------------------------------------------
 # 6. Account Lookup Endpoint
 # ---------------------------------------------------------------------------
