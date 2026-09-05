@@ -20,3 +20,4 @@ export * from './SectionHeader';
 export * from './SignalBadge';
 export * from './StatusBadge';
 export * from './AddToInvestigationButton';
+export * from './TopProgressBar';

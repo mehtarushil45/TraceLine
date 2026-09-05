@@ -30,9 +30,10 @@ logger = logging.getLogger("traceline.api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Lifespan event handler to preload and index data on startup."""
+    """Lifespan event handler to preload, index, and prewarm data on startup."""
     try:
         service.load_data()
+        service.prewarm_cache()
     except (FileNotFoundError, ValueError, KeyError, OSError, RuntimeError) as e:
         logger.error("Failed to preload datasets during startup: %s", e)
     yield

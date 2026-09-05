@@ -9,7 +9,14 @@ import {
   ShieldAlert,
   Users,
 } from 'lucide-react';
-import { getHealth } from '../../api';
+import {
+  getAccounts,
+  getCommunities,
+  getCommunity,
+  getHealth,
+  getSummary,
+  getTransactionsList,
+} from '../../api';
 import { getCases, subscribeToCaseUpdates } from '../../utils/caseManager';
 
 interface NavItem {
@@ -59,6 +66,8 @@ export const Sidebar: React.FC = () => {
     };
   }, []);
 
+  const lastCommunity = sessionStorage.getItem('traceline_last_community') || '3';
+
   const navItems: NavItem[] = [
     {
       label: 'Risk Queue',
@@ -74,7 +83,7 @@ export const Sidebar: React.FC = () => {
     },
     {
       label: 'Forensic Workspace',
-      path: '/forensics',
+      path: `/forensics?community=${lastCommunity}`,
       icon: FlaskConical,
       match: ['/forensics'],
     },
@@ -99,11 +108,40 @@ export const Sidebar: React.FC = () => {
     },
   ];
 
+  const handlePrefetch = (path: string) => {
+    try {
+      if (path === '/') {
+        import('../../pages/DashboardPage');
+        getSummary().catch(() => {});
+        getCommunities().catch(() => {});
+      } else if (path.startsWith('/communities')) {
+        import('../../pages/CommunitiesPage');
+        getCommunities().catch(() => {});
+      } else if (path.startsWith('/forensics')) {
+        import('../../pages/ForensicWorkspacePage');
+        getCommunity(lastCommunity).catch(() => {});
+      } else if (path.startsWith('/accounts')) {
+        import('../../pages/AccountsListPage');
+        getAccounts({ page: 1, pageSize: 50 }).catch(() => {});
+      } else if (path.startsWith('/transactions')) {
+        import('../../pages/TransactionsListPage');
+        getTransactionsList({ page: 1, page_size: 50 }).catch(() => {});
+      } else if (path.startsWith('/investigations')) {
+        import('../../pages/InvestigationsPage');
+      }
+    } catch {
+      // Prefetching is non-blocking
+    }
+  };
+
   const isItemActive = (item: NavItem) => {
     if (item.path === '/') {
       return location.pathname === '/' || location.pathname === '/dashboard';
     }
-    return location.pathname.startsWith(item.path);
+    if (item.label === 'Forensic Workspace') {
+      return location.pathname.startsWith('/forensics');
+    }
+    return location.pathname.startsWith(item.path.split('?')[0]);
   };
 
   return (
@@ -170,6 +208,8 @@ export const Sidebar: React.FC = () => {
             <Link
               key={item.path}
               to={item.path}
+              onMouseEnter={() => handlePrefetch(item.path)}
+              onFocus={() => handlePrefetch(item.path)}
               style={{
                 display: 'flex',
                 alignItems: 'center',

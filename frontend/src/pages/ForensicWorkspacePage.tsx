@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   getCommunity, getCommunityAccounts, getCommunityEvidence,
-  getCommunityGraph, getCommunityTimeline,
+  getCommunityGraph, getCommunityTimeline, getCachedApiData,
 } from '../api';
 import type {
   AccountSummary, CommunityDetailResponse, CommunityEvidenceResponse,
@@ -114,9 +114,13 @@ export const ForensicWorkspacePage: React.FC = () => {
     [setSearchParams, communityParam],
   );
 
+  // Cache-first initial state for instant 0ms render
+  const cachedComm = communityParam ? getCachedApiData<CommunityDetailResponse>(`/communities/${communityParam}`) : null;
+  const cachedEv = communityParam ? getCachedApiData<CommunityEvidenceResponse>(`/communities/${communityParam}/evidence`) : null;
+
   // data state
-  const [community, setCommunity] = useState<CommunityDetailResponse | null>(null);
-  const [evidence, setEvidence] = useState<CommunityEvidenceResponse | null>(null);
+  const [community, setCommunity] = useState<CommunityDetailResponse | null>(cachedComm);
+  const [evidence, setEvidence] = useState<CommunityEvidenceResponse | null>(cachedEv);
   const [graphData, setGraphData] = useState<CommunityGraphResponse | null>(null);
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [accountsTotal, setAccountsTotal] = useState(0);
@@ -140,7 +144,7 @@ export const ForensicWorkspacePage: React.FC = () => {
   const [decisionSuccess, setDecisionSuccess] = useState<string | null>(null);
 
   // loading flags
-  const [loadingCore, setLoadingCore] = useState(false);
+  const [loadingCore, setLoadingCore] = useState(!cachedComm || !cachedEv);
   const [loadingGraph, setLoadingGraph] = useState(false);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
@@ -168,13 +172,27 @@ export const ForensicWorkspacePage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [accountSearchQuery]);
 
-  // core data on community change
+  // core data on community change with state preservation
   useEffect(() => {
     if (!communityParam) {
-      setCommunity(null); setEvidence(null); setGraphData(null);
-      setAccounts([]); setTimelineEvents([]); setCoreError(null); return;
+      const lastComm = sessionStorage.getItem('traceline_last_community') || '3';
+      const lastView = sessionStorage.getItem('traceline_last_view') || 'evidence';
+      navigate(`/forensics?community=${lastComm}&view=${lastView}`, { replace: true });
+      return;
     }
-    setLoadingCore(true); setCoreError(null);
+
+    sessionStorage.setItem('traceline_last_community', communityParam);
+    sessionStorage.setItem('traceline_last_view', activeView);
+
+    const cComm = getCachedApiData<CommunityDetailResponse>(`/communities/${communityParam}`);
+    const cEv = getCachedApiData<CommunityEvidenceResponse>(`/communities/${communityParam}/evidence`);
+    if (cComm) setCommunity(cComm);
+    if (cEv) setEvidence(cEv);
+    if (!cComm || !cEv) {
+      setLoadingCore(true);
+    }
+    setCoreError(null);
+
     Promise.all([
       getCommunity(communityParam),
       getCommunityEvidence(communityParam).catch(() => null),
@@ -182,7 +200,7 @@ export const ForensicWorkspacePage: React.FC = () => {
       .then(([comm, ev]) => { setCommunity(comm); setEvidence(ev); })
       .catch((err) => setCoreError(err instanceof Error ? err.message : 'Community not found'))
       .finally(() => setLoadingCore(false));
-  }, [communityParam]);
+  }, [communityParam, activeView, navigate]);
 
   // graph on demand (refetches if requested focal account is not in current graph slice)
   useEffect(() => {

@@ -48,6 +48,42 @@ interface CacheEntry<T> {
 const apiCache = new Map<string, CacheEntry<any>>();
 const inFlightRequests = new Map<string, Promise<any>>();
 
+const cacheListeners = new Map<string, Set<() => void>>();
+
+export function getCachedApiData<T>(endpoint: string): T | null {
+  const cacheKey = `GET:${endpoint}`;
+  const entry = apiCache.get(cacheKey);
+  return entry ? (entry.data as T) : null;
+}
+
+export function setCachedApiData<T>(endpoint: string, data: T, ttlMs = 120_000): void {
+  const cacheKey = `GET:${endpoint}`;
+  apiCache.set(cacheKey, { data, timestamp: Date.now(), ttlMs });
+  notifyListeners(cacheKey);
+}
+
+export function subscribeToApiCache(endpoint: string, listener: () => void): () => void {
+  const cacheKey = `GET:${endpoint}`;
+  if (!cacheListeners.has(cacheKey)) {
+    cacheListeners.set(cacheKey, new Set());
+  }
+  cacheListeners.get(cacheKey)!.add(listener);
+  return () => {
+    cacheListeners.get(cacheKey)?.delete(listener);
+  };
+}
+
+function notifyListeners(cacheKey: string) {
+  const listeners = cacheListeners.get(cacheKey);
+  if (listeners) {
+    listeners.forEach((fn) => {
+      try {
+        fn();
+      } catch { /* ignore */ }
+    });
+  }
+}
+
 export interface CacheOptions {
   /** Time to live in milliseconds (default: 60,000ms = 1 min). */
   ttlMs?: number;
@@ -64,11 +100,13 @@ export interface CacheOptions {
 export function invalidateApiCache(pattern?: string | RegExp): void {
   if (!pattern) {
     apiCache.clear();
+    cacheListeners.forEach((set) => set.forEach((fn) => fn()));
     return;
   }
   for (const key of apiCache.keys()) {
     if (typeof pattern === 'string' ? key.includes(pattern) : pattern.test(key)) {
       apiCache.delete(key);
+      notifyListeners(key);
     }
   }
 }
@@ -110,6 +148,7 @@ export async function fetchApi<T>(
     .then((data) => {
       if (shouldCache) {
         apiCache.set(cacheKey, { data, timestamp: Date.now(), ttlMs });
+        notifyListeners(cacheKey);
       }
       return data;
     })
@@ -136,6 +175,7 @@ async function revalidateInBackground<T>(
   try {
     const p = executeRequest<T>(endpoint, options).then((data) => {
       apiCache.set(cacheKey, { data, timestamp: Date.now(), ttlMs });
+      notifyListeners(cacheKey);
       return data;
     }).finally(() => {
       inFlightRequests.delete(cacheKey);

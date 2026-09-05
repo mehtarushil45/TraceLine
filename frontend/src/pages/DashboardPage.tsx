@@ -8,7 +8,7 @@ import {
   ListFilter,
   Zap,
 } from 'lucide-react';
-import { getCommunities, getCommunityEvidence, getSummary } from '../api';
+import { getCommunities, getCommunityEvidence, getSummary, getCachedApiData } from '../api';
 import type {
   CommunityEvidenceResponse,
   CommunitySummary,
@@ -37,12 +37,20 @@ import './risk-queue.css';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<SummaryResponse | null>(null);
-  const [communities, setCommunities] = useState<CommunitySummary[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  // Instant 0ms rehydration from client query cache
+  const cachedSummary = getCachedApiData<SummaryResponse>('/summary');
+  const cachedCommunities = getCachedApiData<{ items: CommunitySummary[] }>('/communities');
+  const initialSorted = cachedCommunities ? [...cachedCommunities.items].sort((a, b) => b.risk_score - a.risk_score) : [];
+
+  const [summary, setSummary] = useState<SummaryResponse | null>(cachedSummary);
+  const [communities, setCommunities] = useState<CommunitySummary[]>(initialSorted);
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    return initialSorted.length > 0 ? initialSorted[0].community_id : null;
+  });
   const [evidenceMap, setEvidenceMap] = useState<Record<number, CommunityEvidenceResponse>>({});
-  const [loading, setLoading] = useState(true);
-  const [evidenceLoading, setEvidenceLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedSummary || !cachedCommunities);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [triageSearchQuery, setTriageSearchQuery] = useState('');
   const [tableFilterRisk, setTableFilterRisk] = useState('ALL');
@@ -65,12 +73,7 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   const loadData = useCallback(async () => {
-    // Only trigger full page loading indicator if we don't have initial summary yet
-    if (!summary) {
-      setLoading(true);
-    }
     setError(null);
-
     try {
       const [summaryResponse, communitiesResponse] = await Promise.all([
         getSummary(),
@@ -91,36 +94,27 @@ export const DashboardPage: React.FC = () => {
       setLoading(false);
       setEvidenceLoading(true);
 
-      // Progressive hydration: update evidenceMap per-community as each request resolves.
-      // Do NOT wait for all 59 — each community row updates the moment its own data arrives.
-      let remaining = sorted.length;
-      sorted.forEach(async (comm) => {
-        try {
-          const ev = await getCommunityEvidence(comm.community_id);
-          if (ev) {
-            setEvidenceMap((prev) => ({ ...prev, [comm.community_id]: ev }));
-          }
-        } catch {
-          // Non-blocking: this community stays in "unavailable" state
-        } finally {
-          remaining -= 1;
-          if (remaining === 0) {
-            setEvidenceLoading(false);
-          }
-        }
-      });
-
-      // Safety: if sorted is empty, clear the loading state immediately
-      if (sorted.length === 0) {
+      // Targeted hydration: Hydrate top priority queue items (top 5) rather than choking the server with 59 parallel requests
+      const priorityItems = sorted.slice(0, 5);
+      Promise.allSettled(
+        priorityItems.map((comm) =>
+          getCommunityEvidence(comm.community_id)
+            .then((ev) => {
+              if (ev) {
+                setEvidenceMap((prev) => ({ ...prev, [comm.community_id]: ev }));
+              }
+            })
+            .catch(() => {})
+        )
+      ).finally(() => {
         setEvidenceLoading(false);
-      }
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to TraceLine API');
     } finally {
       setLoading(false);
     }
-
-  }, [loadCases, summary]);
+  }, [loadCases]);
 
   useEffect(() => {
     loadData();

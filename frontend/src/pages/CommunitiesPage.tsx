@@ -5,7 +5,7 @@ import {
   Search,
   ScanSearch,
 } from 'lucide-react';
-import { getCommunities, getCommunityEvidence } from '../api';
+import { getCommunities, getCommunityEvidence, getCachedApiData } from '../api';
 import type { CommunityEvidenceResponse, CommunitySummary } from '../types/api';
 import {
   AddToInvestigationButton,
@@ -35,17 +35,20 @@ import type { FilterOption } from '../components/common';
 export const CommunitiesPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const [communities, setCommunities] = useState<CommunitySummary[]>([]);
+  // Instant 0ms cache re-hydration
+  const cachedCommunities = getCachedApiData<{ items: CommunitySummary[] }>('/communities');
+  const initialSorted = cachedCommunities ? [...cachedCommunities.items].sort((a, b) => b.risk_score - a.risk_score) : [];
+
+  const [communities, setCommunities] = useState<CommunitySummary[]>(initialSorted);
   const [evidenceMap, setEvidenceMap] = useState<Record<number, CommunityEvidenceResponse>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedCommunities);
   const [error, setError] = useState<string | null>(null);
 
   const [riskFilter, setRiskFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Load communities then progressively hydrate evidence scores
+  // Load communities then hydrate evidence for initial visible items
   const loadData = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const res = await getCommunities();
@@ -53,8 +56,8 @@ export const CommunitiesPage: React.FC = () => {
       setCommunities(sorted);
       setLoading(false);
 
-      // Progressive evidence hydration — each resolves independently
-      sorted.forEach(async (comm) => {
+      // Hydrate evidence for visible cards (top 10) instead of firing 59 parallel calls
+      sorted.slice(0, 10).forEach(async (comm) => {
         try {
           const ev = await getCommunityEvidence(comm.community_id);
           if (ev) {

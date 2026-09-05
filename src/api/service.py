@@ -125,6 +125,13 @@ class TraceLineService:
         self.total_communities: int = 0
         self.total_graph_edges: int = 2617094  # Total AccountGraph projected edges
 
+        # In-memory response caches (microsecond retrieval)
+        self._summary_cache: SummaryResponse | None = None
+        self._communities_cache: CommunityListResponse | None = None
+        self._community_detail_cache: dict[int, CommunityDetailResponse] = {}
+        self._evidence_cache: dict[int, CommunityEvidenceResponse] = {}
+        self._graph_cache: dict[str, CommunityGraphResponse] = {}
+
     def load_data(self) -> None:
         """Load and index all observable datasets into memory."""
         if self._is_loaded:
@@ -287,6 +294,8 @@ class TraceLineService:
     def get_summary(self) -> SummaryResponse:
         """Return system-wide summary metrics."""
         self.load_data()
+        if self._summary_cache is not None:
+            return self._summary_cache
         
         tier_counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
         if not self.community_risk_scores_df.empty and "risk_level" in self.community_risk_scores_df.columns:
@@ -295,7 +304,7 @@ class TraceLineService:
             tier_counts["MEDIUM"] = counts.get("MEDIUM", 0)
             tier_counts["LOW"] = counts.get("LOW", 0)
 
-        return SummaryResponse(
+        res = SummaryResponse(
             account_count=self.total_accounts,
             transaction_count=self.total_transactions,
             community_count=self.total_communities,
@@ -304,10 +313,14 @@ class TraceLineService:
             low_risk_count=tier_counts["LOW"],
             graph_edge_count=self.total_graph_edges,
         )
+        self._summary_cache = res
+        return res
 
     def get_communities(self) -> CommunityListResponse:
         """Return all communities sorted by risk_score descending."""
         self.load_data()
+        if self._communities_cache is not None:
+            return self._communities_cache
 
         if self.community_risk_scores_df.empty:
             return CommunityListResponse(total=0, items=[])
@@ -336,11 +349,15 @@ class TraceLineService:
                 )
             )
 
-        return CommunityListResponse(total=len(items), items=items)
+        res = CommunityListResponse(total=len(items), items=items)
+        self._communities_cache = res
+        return res
 
     def get_community_detail(self, community_id: int) -> CommunityDetailResponse | None:
         """Return detailed metrics and features for a single community."""
         self.load_data()
+        if community_id in self._community_detail_cache:
+            return self._community_detail_cache[community_id]
 
         if (
             self.community_risk_scores_df.empty
@@ -398,7 +415,7 @@ class TraceLineService:
             device_sharing_ratio=_to_float(feat_row.get("device_sharing_ratio"), 0.0),
         )
 
-        return CommunityDetailResponse(
+        res = CommunityDetailResponse(
             community_id=community_id,
             member_count=member_count,
             risk_score=int(risk_row["risk_score"]),
@@ -416,6 +433,8 @@ class TraceLineService:
             temporal_statistics=temp_stats,
             entity_sharing=entity_sharing,
         )
+        self._community_detail_cache[community_id] = res
+        return res
 
     def get_community_accounts(
         self,
@@ -1234,6 +1253,10 @@ class TraceLineService:
         """Return graph nodes and edges for community visualization."""
         self.load_data()
 
+        cache_key = f"{community_id}:{max_nodes}:{max_edges}:{focal_account_id}"
+        if cache_key in self._graph_cache:
+            return self._graph_cache[cache_key]
+
         if (
             self.community_risk_scores_df.empty
             or community_id not in self.community_risk_scores_df.index
@@ -1383,13 +1406,15 @@ class TraceLineService:
                     existing_pairs.add((src_node, dst_node))
                     existing_pairs.add((dst_node, src_node))
 
-        return CommunityGraphResponse(
+        res = CommunityGraphResponse(
             community_id=community_id,
             total_nodes=len(member_accounts),
             total_edges=len(all_edges),
             nodes=nodes,
             edges=edges,
         )
+        self._graph_cache[cache_key] = res
+        return res
 
     def get_community_timeline(
         self, community_id: int, limit: int = 100, offset: int = 0
@@ -1460,6 +1485,8 @@ class TraceLineService:
           evidence_score = deterministic observable rule strength
         """
         self.load_data()
+        if community_id in self._evidence_cache:
+            return self._evidence_cache[community_id]
 
         if (
             self.community_risk_scores_df.empty
@@ -1492,7 +1519,7 @@ class TraceLineService:
             + result.low_count * SCORE_CONTRIBUTION.get("LOW", 5)
         )
 
-        return CommunityEvidenceResponse(
+        res = CommunityEvidenceResponse(
             community_id=result.community_id,
             evidence_score=result.evidence_score,
             raw_evidence_score=raw_score,
@@ -1518,6 +1545,22 @@ class TraceLineService:
                 for item in result.items
             ],
         )
+        self._evidence_cache[community_id] = res
+        return res
+
+    def prewarm_cache(self) -> None:
+        """Precompute critical datasets and high-priority intelligence on server startup."""
+        logger.info("Pre-warming TraceLine in-memory intelligence caches...")
+        try:
+            self.get_summary()
+            comms = self.get_communities()
+            top_cid = comms.items[0].community_id if comms.items else 3
+            self.get_community_detail(top_cid)
+            self.get_community_evidence(top_cid)
+            self.get_community_graph(top_cid, 200, 500)
+            logger.info("Pre-warming completed. Community #%s intelligence is hot in cache.", top_cid)
+        except Exception as e:
+            logger.warning("Cache pre-warming encountered non-critical exception: %s", e)
 
 
     def get_account_evidence(self, account_id: str) -> AccountEvidenceResponse | None:
