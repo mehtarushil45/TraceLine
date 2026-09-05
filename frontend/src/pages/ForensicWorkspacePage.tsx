@@ -184,12 +184,21 @@ export const ForensicWorkspacePage: React.FC = () => {
       .finally(() => setLoadingCore(false));
   }, [communityParam]);
 
-  // graph on demand
+  // graph on demand (refetches if requested focal account is not in current graph slice)
   useEffect(() => {
-    if (!communityParam || !['network', 'accounts'].includes(activeView) || graphData || loadingGraph) return;
+    if (!communityParam || !['network', 'accounts'].includes(activeView) || loadingGraph) return;
+
+    if (graphData) {
+      if (!focusParam || graphData.nodes.some((n) => n.id === focusParam)) {
+        return;
+      }
+    }
+
     setLoadingGraph(true);
     getCommunityGraph(communityParam, 200, 500, focusParam)
-      .then(setGraphData).catch(console.error).finally(() => setLoadingGraph(false));
+      .then(setGraphData)
+      .catch(console.error)
+      .finally(() => setLoadingGraph(false));
   }, [communityParam, activeView, graphData, loadingGraph, focusParam]);
 
   // accounts on demand with server-side filter, sort, and search
@@ -555,13 +564,17 @@ export const ForensicWorkspacePage: React.FC = () => {
 
       {/* VIEW: NETWORK */}
       {activeView === 'network' && (
-        <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: 'calc(100vh - 215px)', minHeight: '640px', display: 'flex', flexDirection: 'column' }}>
           {loadingGraph || !graphData
-            ? <div style={{ padding: '24px' }}><LoadingState type="graph" /></div>
+            ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
+                <LoadingState type="graph" />
+              </div>
+            )
             : (
               <NetworkGraph
                 graphData={graphData}
-                height="680px"
+                height="100%"
                 evidenceFocus={evidenceFocus}
                 allEvidenceItems={evidence?.items ?? []}
                 communityId={community.community_id}

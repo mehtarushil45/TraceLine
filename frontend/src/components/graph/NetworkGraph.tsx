@@ -394,17 +394,43 @@ function applyLens(
   }
 
   if (lens === 'flow-of-funds') {
-    const flowEdges = cy.edges().filter((e: any) => {
+    let flowEdges = cy.edges().filter((e: any) => {
       const hasTx = Boolean(e.data('has_transaction_flow'));
       const count = (e.data('transaction_count') as number) || 0;
       return hasTx || count > 0;
     });
+
+    // If focal account is specified, isolate direct fund movement involving this account
+    if (focalId) {
+      const focalFlowEdges = flowEdges.filter(
+        (e: any) => e.data('source') === focalId || e.data('target') === focalId
+      );
+      if (focalFlowEdges.length > 0) {
+        flowEdges = focalFlowEdges;
+      }
+    }
+
     if (flowEdges.length === 0) {
+      if (focalId) {
+        const focalNode = cy.nodes().filter((n: any) => n.id() === focalId);
+        if (focalNode.length > 0) {
+          cy.elements().difference(focalNode).addClass('lens-dim');
+          focalNode.addClass('lens-focus');
+          return { statusMessage: `Account ${focalId} has no direct fund transfers recorded in current telemetry window.` };
+        }
+      }
       cy.elements().addClass('lens-dim');
       return { statusMessage: 'No direct inter-account fund transfers recorded between these nodes in available telemetry.' };
     }
+
     const flowNodes = flowEdges.connectedNodes();
-    const flowSet   = flowNodes.add(flowEdges);
+    let flowSet = flowNodes.add(flowEdges);
+    if (focalId) {
+      const focalNode = cy.nodes().filter((n: any) => n.id() === focalId);
+      if (focalNode.length > 0) {
+        flowSet = flowSet.add(focalNode);
+      }
+    }
     cy.elements().difference(flowSet).addClass('lens-dim');
     flowSet.addClass('lens-focus');
     return {};
@@ -470,7 +496,7 @@ interface NetworkGraphProps {
 // ---------------------------------------------------------------------------
 export const NetworkGraph: React.FC<NetworkGraphProps> = ({
   graphData,
-  height = '640px',
+  height = 'calc(100vh - 215px)',
   evidenceFocus = null,
   allEvidenceItems = [],
   communityId,
@@ -613,7 +639,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       name: 'cose', animate: false, padding: 60,
       nodeRepulsion: () => 8000, idealEdgeLength: () => 65,
       edgeElasticity: () => 100, gravity: 0.3,
-      numIter: 1000, initialTemp: 200, coolingFactor: 0.95, fit: true,
+      numIter: 1000, initialTemp: 200, coolingFactor: 0.95, fit: false,
     };
 
     const cy = cytoscape({
@@ -647,22 +673,34 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         {
           selector: 'node.role-focal',
           style: {
-            'background-color': '#1e3a5f',
-            'border-color': '#3b82f6',
+            'background-color': '#1d4ed8',
+            'border-color': '#60a5fa',
             'border-width': 4,
-            color: '#93c5fd',
-            'font-size': '11px',
+            color: '#ffffff',
+            'font-size': '12px',
             'font-weight': 'bold',
+            'text-background-color': '#0f172a',
+            'text-background-opacity': 0.9,
+            'text-background-padding': '3px',
+            'text-background-shape': 'roundrectangle',
+            'z-index': 150,
           },
         },
         // ── Counterparty ──
         {
           selector: 'node.role-counterparty',
           style: {
-            'background-color': '#0f2942',
-            'border-color': '#38bdf8',
-            'border-width': 2.5,
-            color: '#7dd3fc',
+            'background-color': '#065f46',
+            'border-color': '#34d399',
+            'border-width': 3,
+            color: '#a7f3d0',
+            'font-size': '11px',
+            'font-weight': 'bold',
+            'text-background-color': '#0f172a',
+            'text-background-opacity': 0.85,
+            'text-background-padding': '2px',
+            'text-background-shape': 'roundrectangle',
+            'z-index': 120,
           },
         },
         // ── Shared Infrastructure ──
@@ -729,7 +767,19 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           },
         },
         // ── Edge relationship type colors ──
-        { selector: 'edge.rel-transaction-flow',      style: { 'line-color': '#10b981', opacity: 0.85, width: 2.8 } },
+        {
+          selector: 'edge.rel-transaction-flow',
+          style: {
+            'line-color': '#10b981',
+            opacity: 0.95,
+            width: 3.2,
+            'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#10b981',
+            'arrow-scale': 1.25,
+            'curve-style': 'bezier',
+            'z-index': 100,
+          },
+        },
         { selector: 'edge.rel-shared-device',         style: { 'line-color': '#fb923c', opacity: 0.8 } },
         { selector: 'edge.rel-shared-instrument',     style: { 'line-color': '#fbbf24', opacity: 0.8 } },
         { selector: 'edge.rel-shared-ip',             style: { 'line-color': '#60a5fa', opacity: 0.8 } },
@@ -740,7 +790,19 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         // ── Lens dim edge ──
         { selector: 'edge.lens-dim',  style: { opacity: 0.04 } },
         // ── Lens focus edge ──
-        { selector: 'edge.lens-focus', style: { opacity: 1 } },
+        {
+          selector: 'edge.lens-focus',
+          style: {
+            opacity: 1,
+            width: 3.2,
+            'line-color': '#10b981',
+            'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#10b981',
+            'arrow-scale': 1.25,
+            'curve-style': 'bezier',
+            'z-index': 100,
+          },
+        },
         // ── Evidence ──
         { selector: 'edge.ev-dim',   style: { opacity: 0.03 } },
         { selector: 'edge.ev-focus', style: { opacity: 1, width: 3.5, 'z-index': 90 } },
@@ -800,36 +862,103 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
     cyRef.current = cy;
 
-    // Mount: fit, apply initial lens, center on focal
-    setTimeout(() => {
+    // Resize observer to keep Cytoscape canvas dimensions in sync with container bounds
+    let resizeObserver: ResizeObserver | null = null;
+    if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        try {
+          if (cyRef.current) {
+            cyRef.current.resize();
+          }
+        } catch { /* ignore */ }
+      });
+      resizeObserver.observe(containerRef.current);
+    }
+
+    // Mount & Layout completion handler: focus lens and center camera
+    let hasAppliedInitial = false;
+    const applyInitialFocus = () => {
+      if (hasAppliedInitial) return;
+      hasAppliedInitial = true;
       try {
         cy.resize();
-        cy.fit(undefined, 50);
         const res = applyLens(cy, initialLens, initialSelectedNodeId);
         setLensStatusMessage(res.statusMessage || null);
         if (initialSelectedNodeId) {
           const focal = cy.nodes().filter((n: any) => n.id() === initialSelectedNodeId);
           if (focal.length > 0) {
             focal.select();
-            const neighborhood = focal.neighborhood().add(focal);
-            cy.fit(neighborhood, 80);
-            cy.zoom(Math.min(cy.zoom(), 1.8));
+            let targetSet = focal.neighborhood().add(focal);
+            if (initialLens === 'flow-of-funds') {
+              const flowEdges = cy.edges('.lens-focus');
+              if (flowEdges.length > 0) {
+                targetSet = flowEdges.connectedNodes().add(flowEdges).add(focal);
+              }
+            }
+            cy.fit(targetSet, 80);
+            const z = cy.zoom();
+            if (z < 0.95) {
+              cy.zoom(1.15);
+              cy.center(focal);
+            } else if (z > 1.6) {
+              cy.zoom(1.4);
+              cy.center(focal);
+            }
+            setZoomLevel(Math.round(cy.zoom() * 100));
+          } else {
+            cy.fit(undefined, 50);
+            setZoomLevel(Math.round(cy.zoom() * 100));
           }
+        } else {
+          cy.fit(undefined, 50);
+          setZoomLevel(Math.round(cy.zoom() * 100));
         }
       } catch { /* ignore */ }
-    }, 120);
+    };
 
-    return () => { cy.destroy(); };
+    cy.one('layoutstop', applyInitialFocus);
+    const initTimer = setTimeout(applyInitialFocus, 100);
+
+    return () => {
+      clearTimeout(initTimer);
+      resizeObserver?.disconnect();
+      cy.destroy();
+    };
   // Re-init only when graphData or layout actually change — lens is applied separately
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphData, layoutName]);
 
-  // ── Lens effect ───────────────────────────────────────────────────────────
+  // ── Lens & Focal Camera effect ───────────────────────────────────────────
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
     const res = applyLens(cy, activeLens, focalNodeId);
     setLensStatusMessage(res.statusMessage || null);
+
+    // When focalNodeId is present, ensure camera centers and zooms into the focused structure
+    if (focalNodeId) {
+      const focal = cy.nodes().filter((n: any) => n.id() === focalNodeId);
+      if (focal.length > 0) {
+        focal.select();
+        let targetSet = focal.neighborhood().add(focal);
+        if (activeLens === 'flow-of-funds') {
+          const flowEdges = cy.edges('.lens-focus');
+          if (flowEdges.length > 0) {
+            targetSet = flowEdges.connectedNodes().add(flowEdges).add(focal);
+          }
+        }
+        cy.fit(targetSet, 80);
+        const z = cy.zoom();
+        if (z < 0.95) {
+          cy.zoom(1.15);
+          cy.center(focal);
+        } else if (z > 1.6) {
+          cy.zoom(1.4);
+          cy.center(focal);
+        }
+        setZoomLevel(Math.round(cy.zoom() * 100));
+      }
+    }
   }, [activeLens, focalNodeId, graphData]);
 
   // ── Node role update when focalNodeId changes ─────────────────────────────
@@ -954,8 +1083,27 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
     const cy = cyRef.current;
     if (!cy) return;
     const focal = cy.nodes().filter((n: any) => n.id() === nodeId);
-    if (focal.length > 0) { cy.center(focal); }
-  }, [onFocalChange]);
+    if (focal.length > 0) {
+      focal.select();
+      let targetSet = focal.neighborhood().add(focal);
+      if (activeLens === 'flow-of-funds') {
+        const flowEdges = cy.edges('.lens-focus');
+        if (flowEdges.length > 0) {
+          targetSet = flowEdges.connectedNodes().add(flowEdges).add(focal);
+        }
+      }
+      cy.fit(targetSet, 80);
+      const z = cy.zoom();
+      if (z < 0.95) {
+        cy.zoom(1.15);
+        cy.center(focal);
+      } else if (z > 1.6) {
+        cy.zoom(1.4);
+        cy.center(focal);
+      }
+      setZoomLevel(Math.round(cy.zoom() * 100));
+    }
+  }, [onFocalChange, activeLens]);
 
   const handleTracePath = () => {
     if (!pathFrom.trim() || !pathTo.trim()) return;
@@ -1277,7 +1425,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         position: isFullscreen ? 'fixed' : 'relative',
         inset: isFullscreen ? 0 : 'auto',
         zIndex: isFullscreen ? 9999 : 1,
-        height: isFullscreen ? '100vh' : 'auto',
+        height: isFullscreen ? '100vh' : (typeof height === 'number' ? `${height}px` : height),
+        minHeight: isFullscreen ? '100vh' : '640px',
         overflow: 'hidden',
         border: hasFocus ? `1px solid ${focusColor}50` : '1px solid var(--border)',
         transition: 'border-color 0.25s ease',
@@ -1288,6 +1437,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         display: 'flex', flexDirection: 'column',
         borderBottom: `1px solid ${hasFocus ? `${focusColor}30` : 'var(--border)'}`,
         backgroundColor: 'var(--bg-sidebar)',
+        flexShrink: 0,
       }}>
         {/* Row 1: Lens tabs */}
         <div style={{
@@ -1522,6 +1672,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           padding: '7px 16px', backgroundColor: `${focusColor}14`,
           borderBottom: `1px solid ${focusColor}35`,
           flexWrap: 'wrap', gap: '8px',
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {/* Active Lens tag */}
@@ -1575,6 +1726,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
           padding: '12px 16px', borderBottom: '1px solid var(--border)',
           backgroundColor: 'rgba(17,24,39,0.97)',
           display: 'flex', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap',
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#86efac', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -1652,8 +1804,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
       {/* ── Main canvas area ─────────────────────────────────────────────── */}
       <div style={{
-        position: 'relative', flex: 1,
-        width: '100%', height: isFullscreen ? 'calc(100vh - 130px)' : height,
+        position: 'relative', flex: 1, minHeight: 0,
+        width: '100%',
         display: 'flex', overflow: 'hidden',
       }}>
 
@@ -1665,6 +1817,8 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
             backdropFilter: 'blur(12px)',
             borderRight: '1px solid var(--border)',
             display: 'flex', flexDirection: 'column', zIndex: 10,
+            height: '100%',
+            overflow: 'hidden',
           }}>
             {/* Panel header */}
             <div style={{
@@ -1758,7 +1912,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         )}
 
         {/* ── Graph canvas ────────────────────────────────────────────────── */}
-        <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+        <div style={{ flex: 1, position: 'relative', minWidth: 0, height: '100%' }}>
           <div ref={containerRef} style={{ width: '100%', height: '100%', backgroundColor: '#0d1117' }} />
 
           {/* ── Empty state overlay for zero relationships ─────────────────── */}

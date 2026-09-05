@@ -1257,17 +1257,30 @@ class TraceLineService:
         sorted_members = sorted(member_accounts, key=lambda a: degrees.get(a, 0), reverse=True)
         selected_nodes_set = set(sorted_members[:max_nodes])
 
-        # If a focal account is requested and in this community, guarantee inclusion of focal and its direct neighbors
-        if focal_account_id and focal_account_id in degrees:
+        # If a focal account is requested, guarantee inclusion of focal and its direct neighbors / counterparties
+        if focal_account_id and focal_account_id in self.accounts_df.index:
             selected_nodes_set.add(focal_account_id)
-            focal_neighbors = [
+            # 1. Direct neighbors from internal community edges
+            focal_internal_neighbors = [
                 e["target"] if e["source"] == focal_account_id else e["source"]
                 for e in all_edges
                 if e["source"] == focal_account_id or e["target"] == focal_account_id
             ]
-            for nbr in focal_neighbors:
-                if len(selected_nodes_set) < max_nodes + len(focal_neighbors):
-                    selected_nodes_set.add(nbr)
+            for nbr in focal_internal_neighbors:
+                selected_nodes_set.add(nbr)
+
+            # 2. Direct counterparties from transaction flow involving members of this community
+            member_set = set(member_accounts)
+            sent_txs = self.account_sent_tx_indices.get(focal_account_id, [])
+            recv_txs = self.account_recv_tx_indices.get(focal_account_id, [])
+            for idx in sent_txs:
+                dst = str(self.transactions_df.iloc[idx]["dst_account_id"])
+                if dst in member_set:
+                    selected_nodes_set.add(dst)
+            for idx in recv_txs:
+                src = str(self.transactions_df.iloc[idx]["src_account_id"])
+                if src in member_set:
+                    selected_nodes_set.add(src)
 
         nodes: list[GraphNode] = []
         for acc in selected_nodes_set:
@@ -1286,6 +1299,8 @@ class TraceLineService:
 
         # Select edges between selected nodes and compute observable fund flow
         edges: list[GraphEdge] = []
+        existing_pairs: set[tuple[str, str]] = set()
+
         for e in all_edges:
             src = e["source"]
             dst = e["target"]
@@ -1328,8 +1343,45 @@ class TraceLineService:
                         flow_direction=direction,
                     )
                 )
+                existing_pairs.add((src, dst))
+                existing_pairs.add((dst, src))
                 if len(edges) >= max_edges:
                     break
+
+        # Ensure direct transaction edges for focal_account_id with selected nodes are included
+        if focal_account_id and focal_account_id in selected_nodes_set:
+            for other_id in selected_nodes_set:
+                if other_id == focal_account_id:
+                    continue
+                if (focal_account_id, other_id) in existing_pairs:
+                    continue
+
+                fwd_indices = set(self.account_sent_tx_indices.get(focal_account_id, [])) & set(self.account_recv_tx_indices.get(other_id, []))
+                rev_indices = set(self.account_sent_tx_indices.get(other_id, [])) & set(self.account_recv_tx_indices.get(focal_account_id, []))
+                all_tx = fwd_indices | rev_indices
+                if all_tx:
+                    tx_amt = round(float(self.transactions_df.iloc[list(all_tx)]["amount"].sum()), 2)
+                    direction = "bidirectional" if (fwd_indices and rev_indices) else ("source_to_target" if fwd_indices else "target_to_source")
+                    src_node = focal_account_id if fwd_indices else other_id
+                    dst_node = other_id if fwd_indices else focal_account_id
+                    edges.append(
+                        GraphEdge(
+                            source=src_node,
+                            target=dst_node,
+                            weight=1.0,
+                            shared_instruments=[],
+                            shared_devices=[],
+                            shared_ips=[],
+                            shared_merchants=[],
+                            temporal_overlap=0,
+                            has_transaction_flow=True,
+                            transaction_count=len(all_tx),
+                            total_amount=tx_amt,
+                            flow_direction=direction,
+                        )
+                    )
+                    existing_pairs.add((src_node, dst_node))
+                    existing_pairs.add((dst_node, src_node))
 
         return CommunityGraphResponse(
             community_id=community_id,

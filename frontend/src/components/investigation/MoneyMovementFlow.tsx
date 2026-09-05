@@ -97,7 +97,12 @@ export const MoneyMovementFlow: React.FC<MoneyMovementFlowProps> = ({
                 </div>
 
                 {/* Transfer Arrow & Amount */}
-                <div className="inv-flow-arrow">
+                <div
+                  className="inv-flow-arrow"
+                  onClick={() => onFocusAccountInGraph(hop.source)}
+                  title={`Click to inspect transfer ${hop.source} → ${hop.target} in Network Graph`}
+                  style={{ cursor: 'pointer' }}
+                >
                   <span style={{ color: '#34d399', fontSize: '11px', fontWeight: 700 }}>
                     ${hop.amount.toLocaleString()}
                   </span>
